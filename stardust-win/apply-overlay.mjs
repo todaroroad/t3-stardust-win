@@ -56,21 +56,13 @@ if (!fs.existsSync(path.join(repoRoot, ".stardust-base-version"))) {
 // ---------------------------------------------------------------------------
 // 2. Privacy & Telemetry Purge (StardustStats + CommunityUpdates)
 // ---------------------------------------------------------------------------
-const telemetryFilesToRemove = [
-  "apps/web/src/state/stardustStats.ts",
-  "apps/web/src/state/stardustStats.logic.ts",
-  "apps/web/src/state/stardustStats.logic.test.ts",
-  "apps/web/src/components/settings/StardustStats.tsx",
-  "apps/web/src/state/communityUpdates.ts",
-  "apps/web/src/state/communityUpdates.logic.ts",
-  "apps/web/src/state/communityUpdates.test.ts",
-  "apps/web/src/components/settings/CommunityUpdates.tsx",
-  "apps/web/src/components/settings/CommunityUpdates.browser.test.tsx",
-];
-for (const rel of telemetryFilesToRemove) {
-  const full = path.join(repoRoot, rel);
-  if (fs.existsSync(full)) {
-    fs.unlinkSync(full);
+for (const dirRel of ["apps/web/src/state", "apps/web/src/components/settings"]) {
+  const dirFull = path.join(repoRoot, dirRel);
+  if (!fs.existsSync(dirFull)) continue;
+  for (const name of fs.readdirSync(dirFull)) {
+    if (/^(stardustStats|StardustStats|communityUpdates|CommunityUpdates)\b/.test(name)) {
+      fs.unlinkSync(path.join(dirFull, name));
+    }
   }
 }
 
@@ -336,6 +328,13 @@ for (const rel of [
     }
   }
   assertIncludes(src, `repo: "${TARGET_REPO_NAME}"`, rel);
+
+  // Separate staged package name so NSIS installs into %LOCALAPPDATA%\Programs\t3-stardust and uses t3-stardust-updater cache
+  src = src.replace(
+    /const stagePackageJson: StagePackageJson = \{\r?\n    name: "[^"]+",/,
+    'const stagePackageJson: StagePackageJson = {\n    name: "t3-stardust",',
+  );
+  assertIncludes(src, 'name: "t3-stardust",', rel);
 
   // Disable Authenticode Publisher check on unsigned GitHub Actions NSIS updates (SHA-512 from latest.yml still enforced)
   if (!src.includes("verifyUpdateCodeSignature: false")) {
