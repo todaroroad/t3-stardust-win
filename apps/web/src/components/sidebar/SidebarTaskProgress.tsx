@@ -1,0 +1,75 @@
+import { useUiText } from "~/i18n/useUiText";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
+import type { ScopedThreadRef } from "@t3tools/contracts";
+import { useQuietThreadProjection, useThreadShell } from "../../state/entities";
+import { useEnvironment } from "../../state/environments";
+import { taskProgressSnapshot } from "../../taskProgress";
+import { useNavigate } from "@tanstack/react-router";
+import { buildThreadRouteParams } from "../../threadRoutes";
+
+import { cn } from "~/lib/utils";
+import { progressTone, taskProgressStateLabels } from "../chat/TaskProgressSteps";
+
+/** One-line summary; the full step list lives in the conversation so the sidebar never reflows. */
+export function SidebarTaskProgress({ threadRef }: { threadRef: ScopedThreadRef }) {
+  const uiText = useUiText();
+  const projection = useQuietThreadProjection(threadRef)?.projection ?? null;
+  const shell = useThreadShell(threadRef);
+  const environment = useEnvironment(threadRef.environmentId);
+  const navigate = useNavigate();
+  const progress = taskProgressSnapshot(
+    projection,
+    shell,
+    environment?.connection.phase === "connected",
+  );
+  if (progress.total === 0) return null;
+  const stateLabel = uiText(
+    progress.stale ? "Status may be out of date" : taskProgressStateLabels[progress.state],
+  );
+  const current = progress.steps.find((step) => step.status === "running")?.text;
+  const percent = Math.round((progress.completed / progress.total) * 100);
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <button
+            type="button"
+            aria-label={`${uiText("{completed}/{total} completed", {
+              completed: progress.completed,
+              total: progress.total,
+            })} · ${stateLabel} · ${uiText("View full progress")}`}
+            className="mx-2 mb-1.5 block w-[calc(100%-1rem)] min-w-0 rounded px-1.5 py-1 text-left text-3xs outline-none hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+            onPointerDown={(event) => event.stopPropagation()}
+            onKeyDown={(event) => event.stopPropagation()}
+            onClick={(event) => {
+              event.stopPropagation();
+              void navigate({
+                to: "/$environmentId/$threadId",
+                params: buildThreadRouteParams(threadRef),
+              });
+            }}
+          >
+            <span className="flex min-w-0 items-center gap-1.5">
+              <span className="shrink-0 tabular-nums text-sidebar-muted-foreground">
+                {progress.completed}/{progress.total}
+              </span>
+              <span className={cn("min-w-0 truncate", progressTone(progress))}>{stateLabel}</span>
+            </span>
+            <span
+              aria-hidden
+              className="mt-1 block h-0.5 overflow-hidden rounded-full bg-sidebar-border"
+            >
+              <span
+                className={cn("block h-full rounded-full bg-current", progressTone(progress))}
+                style={{ width: `${percent}%` }}
+              />
+            </span>
+          </button>
+        }
+      />
+      <TooltipPopup>
+        {current ? uiText("{label}: {value}", { label: stateLabel, value: current }) : stateLabel}
+      </TooltipPopup>
+    </Tooltip>
+  );
+}

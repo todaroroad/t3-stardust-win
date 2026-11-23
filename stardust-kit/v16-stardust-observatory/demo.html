@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>V16 推理强度 · 星尘观测站</title>
+<style>
+  :root { --ink:#1d1d1f; --sub:#6e6e73; --line:rgba(0,0,0,.08); }
+  * { box-sizing: border-box; }
+  body { margin:0; padding:28px 32px 40px; font:14px/1.45 -apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue",sans-serif; color:var(--ink); background:#f2f2f4; }
+  h1 { font-size:20px; margin:0 0 4px; }
+  .lead { color:var(--sub); margin:0 0 22px; max-width:980px; }
+  .row { display:flex; gap:28px; flex-wrap:wrap; align-items:flex-start; }
+  .card { width:380px; border-radius:18px; padding:14px 16px 10px; background:#f7f7f8; border:1px solid var(--line); box-shadow:0 10px 30px rgba(0,0,0,.07); }
+  .card.dark { background:#1f1f22; color:#f2f2f4; border-color:rgba(255,255,255,.08); }
+  .card.dark .muted { color:#9a9aa1; }
+  .card.dark .ticks button { color:#8d8d94; }
+  .card.dark .ticks button.on { background:rgba(255,255,255,.1); color:#fff; }
+  .head { display:flex; align-items:center; gap:8px; font-weight:600; font-size:15px; }
+  .dot { width:9px; height:9px; border-radius:50%; background:#6fd18b; box-shadow:0 0 0 3px rgba(111,209,139,.18); }
+  .meta { display:flex; justify-content:space-between; margin:6px 0 10px; font-size:13px; }
+  .muted { color:var(--sub); }
+  .story { transition: opacity .25s; }
+  .track { position:relative; height:56px; border-radius:28px; padding:3px; background:linear-gradient(#d9d9de,#c9c9cf); box-shadow: inset 0 1px 2px rgba(0,0,0,.18); cursor:grab; touch-action:none; }
+  .card.dark .track { background:linear-gradient(#3a3a40,#2b2b30); }
+  .track canvas { display:block; width:100%; height:50px; border-radius:25px; }
+  .ticks { display:flex; justify-content:space-between; margin:8px 6px 0; }
+  .ticks button { border:0; background:none; font:inherit; font-size:13px; color:#8e8e93; padding:3px 8px; border-radius:8px; cursor:pointer; }
+  .ticks button.on { background:rgba(0,0,0,.06); color:var(--ink); font-weight:600; }
+  .board { margin-top:30px; }
+  .board h2 { font-size:15px; margin:0 0 10px; }
+  .frames { display:grid; grid-template-columns:repeat(5, 1fr); gap:12px; max-width:1180px; }
+  .frame { background:#fff; border:1px solid var(--line); border-radius:12px; padding:8px; }
+  .frame canvas { width:100%; height:auto; display:block; border-radius:14px; }
+  .frame b { display:block; margin-top:6px; font-size:13px; }
+  .frame span { color:var(--sub); font-size:12px; }
+  .notes { margin-top:26px; max-width:1180px; background:#fff; border:1px solid var(--line); border-radius:12px; padding:14px 18px; }
+  .notes li { margin:3px 0; }
+  .tag { display:inline-block; font-size:11px; padding:1px 6px; border-radius:6px; background:#eef; color:#446; margin-left:6px; }
+</style>
+</head>
+<body>
+<h1>推理强度 V16 · 「星尘观测站」<span class="tag">只保留这一个动画，去掉 C1–C4</span></h1>
+<p class="lead">一个小机器人守着一间夜里的观测站。强度越高，它想得越用力：玻璃滑块往右走，经过的东西一件件「醒过来」——台灯亮、机器人醒、黑板写满推演、齿轮转动、星尘瓶发光、望远镜抬头，到 Max 时屋顶外划过一颗流星。滑块右边的部分还在沉睡。下面两张卡可以直接拖动或点档位。</p>
+
+<div class="row">
+  <div class="card" data-card>
+    <div class="head"><span class="dot"></span><span data-title>推理强度 · 中</span></div>
+    <div class="meta"><span class="muted story" data-story>醒了，台灯亮起</span><span class="muted" data-count>5 档</span></div>
+    <div class="track" data-track><canvas></canvas></div>
+    <div class="ticks" data-ticks></div>
+  </div>
+  <div class="card dark" data-card>
+    <div class="head"><span class="dot"></span><span data-title>推理强度 · 中</span></div>
+    <div class="meta"><span class="muted story" data-story>醒了，台灯亮起</span><span class="muted" data-count>6 档</span></div>
+    <div class="track" data-track><canvas></canvas></div>
+    <div class="ticks" data-ticks></div>
+  </div>
+</div>
+
+<div class="board">
+  <h2>故事分镜（Claude 的 5 档，静止帧）</h2>
+  <div class="frames" data-frames></div>
+</div>
+
+<div class="notes">
+  <b>改动说明</b>
+  <ul>
+    <li>只留这一个场景，删掉 C1 / C2 / C3 / C4 切换和对应的四套名字。</li>
+    <li>轨道从 48px 加高到 56px，像素画才放得下人物和物件；滑块是 48×44 的玻璃胶囊，里面放大显示，边缘带一点彩色折射。</li>
+    <li>左上的小字随档位讲故事：打盹 → 台灯亮起 → 黑板推演 → 齿轮运转 → 星尘瓶发光 → 望远镜对准星空 → 流星划过。</li>
+    <li>每件东西醒来时有一下小动作（机器人伸懒腰、台灯闪一下、望远镜抬头），不是瞬间切换。</li>
+    <li>动画按 12 帧/秒的像素画节奏播放，弹窗关闭后停止；系统开了「减少动态效果」时只画静止帧。</li>
+    <li>全部是原创像素画，程序绘制，没有用参考视频里的任何素材。</li>
+  </ul>
+</div>
+
+<script>
+// ---------- pixel scene (art pixels; 1 art px = 2 CSS px) ----------
+const AH = 25; // art height (50 CSS px canvas)
+const OBJ = [ // wake order left→right; c = centre x in art px (on a 168-wide scene)
+  { id:'lamp', c:18 }, { id:'robot', c:33 }, { id:'board', c:56 }, { id:'gears', c:80 },
+  { id:'jars', c:101 }, { id:'scope', c:119 }, { id:'window', c:146 },
+];
+const STORY = {
+  none:'小机器人在打盹', lamp:'台灯亮了', robot:'醒了，开始想', board:'黑板上写满推演',
+  gears:'齿轮全速运转', jars:'星尘瓶一个个亮起', scope:'望远镜对准星空', window:'流星划过 · 全力以赴',
+};
+function rnd(seed){ let s=seed; return ()=> (s = (s*16807)%2147483647, (s-1)/2147483646); }
+const R = rnd(7);
+const STARS = Array.from({length:14},()=>({x:Math.floor(R()*20), y:Math.floor(R()*12), p:R()*6.28}));
+const DUST = Array.from({length:26},()=>({x:R()*168, y:R()*22, v:0.4+R()*0.8, p:R()*6.28}));
+
+function P(g,x,y,w,h,c){ g.fillStyle=c; g.fillRect(Math.round(x),Math.round(y),w,h); }
+function mix(a,b,t){ const pa=hex(a), pb=hex(b); return `rgb(${pa.map((v,i)=>Math.round(v+(pb[i]-v)*t)).join(',')})`; }
+function hex(h){ h=h.replace('#',''); return [0,2,4].map(i=>parseInt(h.slice(i,i+2),16)); }
+
+// a: per-object wake 0..1, t: seconds, W: scene width, max: 0..1 finale strength, lensX: art x
+function drawScene(g, W, a, t, max, lensX){
+  const sx = W/168; // horizontal stretch for wider tracks
+  const X = x => x*sx;
+  // wall: lit left of the lens, asleep to the right (soft 6px edge)
+  for (let x=0; x<W; x++){
+    const lit = Math.max(0, Math.min(1, (lensX - x)/6 + 0.5));
+    P(g,x,0,1,20, mix('#191b33','#3b3062',lit));
+    P(g,x,20,1,AH-20, mix('#1e1a18','#6b4630',lit));
+    if (x%7===0) P(g,x,20,1,AH-20, mix('#15110f','#4a2f1f',lit));
+  }
+  P(g,0,20,W,1, mix('#25202a','#7a5236',Math.min(1,lensX/W*1.2)));
+  // finale stardust everywhere
+  if (max>0) for (const d of DUST){ const yy=(d.y - t*d.v*3 + 40)%22; const tw=(Math.sin(t*4+d.p)+1)/2; g.globalAlpha=max*(.35+.65*tw); P(g,(d.x*sx)%W,yy,1,1,tw>.7?'#fff6c8':'#b9a7ff'); }
+  g.globalAlpha=1;
+
+  // 1 lamp + desk
+  { const x=X(8), w=a.lamp; const desk=mix('#2c2a38','#8a5a3a',Math.max(w,a.robot*.6));
+    P(g,x,15,22,2,desk); P(g,x+1,17,1,4,desk); P(g,x+20,17,1,4,desk);
+    P(g,x+3,14,4,1,'#3a3a48'); P(g,x+4,9,1,5,'#3a3a48'); P(g,x+2,7,5,2,mix('#3b3b4c','#e0a446',w));
+    if (w>0){ const flick = w<1 && Math.sin(t*60)>0 ? .4:1; g.globalAlpha=.28*w*flick; g.fillStyle='#ffd27a';
+      g.beginPath(); g.moveTo(x+2,9); g.lineTo(x+7,9); g.lineTo(x+12,15); g.lineTo(x-2,15); g.fill(); g.globalAlpha=1; P(g,x+3,9,3,1,'#fff1b8'); }
+    // mug + steam
+    P(g,x+15,12,3,3,mix('#3b3b4c','#e7e1d6',w)); P(g,x+18,13,1,1,mix('#3b3b4c','#e7e1d6',w));
+    if (w>.5) for(let i=0;i<3;i++){ const yy=11-((t*6+i*3)%6); g.globalAlpha=(yy-5)/6*w; P(g,x+16+Math.round(Math.sin(t*3+i)),yy,1,1,'#ffffff'); } g.globalAlpha=1;
+  }
+  // 2 robot (sleeps with z's; wakes, stretches, writes)
+  { const x=X(27), w=a.robot; const body=mix('#4a4d63','#9fd6ff',w), dark=mix('#2c2e3c','#3c6e93',w);
+    P(g,x,17,10,1,'#3a2a22'); P(g,x+1,18,1,3,'#3a2a22'); P(g,x+8,18,1,3,'#3a2a22'); // chair
+    const slump = Math.round((1-w)*2), cheer = max>0.5;
+    P(g,x+2,12+slump,6,5,body); P(g,x+3,13+slump,4,1,dark);
+    const hx=x+1+(1-w)*1, hy=6+slump*1.5; P(g,hx,hy,8,6,body); P(g,hx+1,hy+1,6,4,'#1b2233');
+    // eyes
+    if (w<.5){ P(g,hx+2,hy+3,2,1,'#7f8aa8'); P(g,hx+5,hy+3,2,1,'#7f8aa8'); }
+    else { const blink = (t%3.2)<.12; const ec = cheer?'#fff3a6':'#7ff3ff'; P(g,hx+2,hy+(blink?3:2),1,blink?1:2,ec); P(g,hx+5,hy+(blink?3:2),1,blink?1:2,ec); }
+    // antenna
+    P(g,hx+4,hy-2,1,2,dark); P(g,hx+4,hy-3,1,1, w>.5 ? ((t*2|0)%2?'#ff7aa8':'#ffe27a') : '#545870');
+    // arms
+    if (cheer){ P(g,x,8,1,5,body); P(g,x+9,8,1,5,body); }
+    else if (w>.5){ const k=Math.round(Math.sin(t*9)); P(g,x+8,13+slump,4,1,body); P(g,x+12,12+k,1,1,'#ffffff'); P(g,x,13+slump,2,1,body); }
+    else { P(g,x+1,14+slump,2,1,body); P(g,x+7,14+slump,2,1,body); }
+    // z z z
+    if (w<.5) for (let i=0;i<3;i++){ const ph=(t*.8+i/3)%1; g.globalAlpha=(1-ph)*(1-w*2); const zx=x+9+ph*5, zy=6-ph*6; P(g,zx,zy,2,1,'#c8cff5'); P(g,zx+1,zy+1,1,1,'#c8cff5'); P(g,zx,zy+2,2,1,'#c8cff5'); } g.globalAlpha=1;
+  }
+  // 3 blackboard: proofs get written while awake
+  { const x=X(44), w=a.board; P(g,x,3,25,13,mix('#3a2b24','#7a5236',w)); P(g,x+1,4,23,11,mix('#1d2422','#1f4a3a',w));
+    if (w>0){ const rows=[[2,9],[2,14],[4,7],[2,12]]; const prog = (t*10)%60; let n=0;
+      rows.forEach(([o,len],r)=>{ for(let i=0;i<len;i++){ n++; if (n>prog && w>=1) return; if ((i*7+r)%5===0) continue; g.globalAlpha=w; P(g,x+1+o+i,5+r*2.5,1,1, r===3&&i>9?'#ffd27a':'#e8f2ec'); } });
+      g.globalAlpha=1; }
+    P(g,x+4,16,5,1,mix('#2c2a38','#cfc6b8',w));
+  }
+  // 4 gears
+  { const w=a.gears; const gear=(cx,cy,r,dir,col)=>{ const ang=w>0? t*2*dir*w:0; P(g,cx-r+1,cy-r+1,2*r-1,2*r-1,col); for(let k=0;k<6;k++){ const th=ang+k*Math.PI/3; P(g,cx+Math.round(Math.cos(th)*r),cy+Math.round(Math.sin(th)*r),1,1,col);} P(g,cx,cy,1,1,'#1a1a24'); };
+    gear(X(77),8,4,1,mix('#3d3f52','#d39b4a',w)); gear(X(84),13,3,-1.4,mix('#34364a','#b7c2d6',w)); }
+  // 5 stardust jars on a shelf
+  { const x=X(92), w=a.jars; P(g,x,12,20,1,mix('#2c2a38','#7a5236',w)); const cols=['#8fe8ff','#ffd27a','#d7a6ff'];
+    for(let i=0;i<3;i++){ const jx=x+2+i*6; P(g,jx,7,4,5,mix('#2a2e44','#3a4a6a',w)); P(g,jx+1,6,2,1,'#5a4a3a');
+      const on = Math.max(0, Math.min(1, w*3 - i)); if (on>0){ const pul=(Math.sin(t*3+i*2)+1)/2; g.globalAlpha=on*(.6+.4*pul); P(g,jx+1,8,2,3,cols[i]); g.globalAlpha=on*.25*pul; P(g,jx-1,6,6,7,cols[i]); g.globalAlpha=1; } }
+  }
+  // 6 telescope tilts up toward the window
+  { const x=X(112), w=a.scope; const col=mix('#3d3f52','#e6e9f2',w), dk=mix('#2c2e3c','#6a7890',w);
+    P(g,x+5,15,1,6,dk); P(g,x+2,20,1,1,dk); P(g,x+8,20,1,1,dk); P(g,x+3,18,1,2,dk); P(g,x+7,18,1,2,dk);
+    const ang = (-0.15 - 0.55*w); for(let i=-5;i<9;i++){ const px=x+5+Math.cos(ang)*i, py=14+Math.sin(ang)*i; P(g,px,py,2,2,i>6?dk:col); }
+    if (w>.8 && (t%2)<.15) P(g,x+5+Math.cos(ang)*9+2,14+Math.sin(ang)*9,1,1,'#ffffff');
+  }
+  // 7 window: night sky, constellation, finale comet
+  { const x=X(134), w=a.window; const ww=20, wh=14, y=3;
+    P(g,x-1,y-1,ww+2,wh+2,mix('#2c2a38','#7a5236',Math.max(w,a.scope*.5))); P(g,x,y,ww,wh,mix('#0b0d1d','#17245a',w));
+    for (const s of STARS){ const tw=(Math.sin(t*3+s.p)+1)/2; g.globalAlpha=.25+(.75*tw)*(.3+.7*w); P(g,x+s.x,y+1+s.y,1,1,'#ffffff'); } g.globalAlpha=1;
+    if (w>0){ const pts=[[3,9],[7,5],[11,7],[15,3],[17,8]]; const seg=Math.min(pts.length-1, Math.floor(w*4+((t*.7)%1)*w)); g.strokeStyle='rgba(160,200,255,.7)'; g.lineWidth=.6; g.beginPath(); pts.slice(0,seg+1).forEach(([px,py],i)=> i? g.lineTo(x+px+.5,y+py+.5):g.moveTo(x+px+.5,y+py+.5)); g.stroke(); pts.forEach(([px,py])=>P(g,x+px,y+py,1,1,'#cfe2ff')); }
+    if (max>0){ const ph=(t*.45)%1; const cx=x+ww+2-ph*(ww+8), cy=y+1+ph*8; g.globalAlpha=max; for(let i=0;i<7;i++){ g.globalAlpha=max*(1-i/7); P(g,cx+i,cy-i*.45,1,1,i<2?'#ffffff':'#ffd27a'); } g.globalAlpha=1; }
+    P(g,x+ww/2,y,1,wh,mix('#2c2a38','#7a5236',Math.max(w,a.scope*.5))); P(g,x,y+wh/2,ww,1,mix('#2c2a38','#7a5236',Math.max(w,a.scope*.5)));
+  }
+}
+
+// ---------- slider widget ----------
+const LV5=['低','中','高','超高','Max'], LV6=['低','中','高','超高','极高','Max'];
+function mount(card, labels, startIdx){
+  const cv=card.querySelector('canvas'), track=card.querySelector('[data-track]');
+  const ticks=card.querySelector('[data-ticks]'), title=card.querySelector('[data-title]'), story=card.querySelector('[data-story]');
+  card.querySelector('[data-count]').textContent=labels.length+' 档';
+  const art=document.createElement('canvas'), g=art.getContext('2d');
+  const st={ idx:startIdx, val:startIdx/(labels.length-1), target:startIdx/(labels.length-1), drag:false, wake:{} };
+  OBJ.forEach(o=>st.wake[o.id]=0); st.max=0;
+  labels.forEach((l,i)=>{ const b=document.createElement('button'); b.textContent=l; b.onclick=()=>set(i); ticks.append(b); });
+  function set(i){ st.idx=i; st.target=i/(labels.length-1); render(); }
+  function render(){ [...ticks.children].forEach((b,i)=>b.classList.toggle('on',i===st.idx)); title.textContent='推理强度 · '+labels[st.idx]; }
+  render();
+  const xToRatio = e => { const r=track.getBoundingClientRect(); return Math.max(0,Math.min(1,(e.clientX-r.left-28)/(r.width-56))); };
+  track.addEventListener('pointerdown',e=>{ st.drag=true; track.setPointerCapture(e.pointerId); st.target=xToRatio(e); });
+  track.addEventListener('pointermove',e=>{ if(st.drag) st.target=xToRatio(e); });
+  track.addEventListener('pointerup',()=>{ st.drag=false; set(Math.round(st.target*(labels.length-1))); });
+  let last=performance.now(), acc=0, frameT=0;
+  function frame(now){
+    const dt=Math.min(.05,(now-last)/1000); last=now;
+    st.val += (st.target-st.val)*(st.drag?.45:.2);
+    const css = cv.getBoundingClientRect(); const dpr=Math.min(2,devicePixelRatio||1);
+    const W = Math.round(css.width/2);
+    if (art.width!==W){ art.width=W; art.height=AH; cv.width=Math.round(css.width*dpr); cv.height=Math.round(css.height*dpr); }
+    const pad=14/ (168/W) ; const lensArt = 14 + st.val*(W-28);
+    // per-object wake follows the lens, eased so each wakes with a small beat
+    let lastAwake='none';
+    OBJ.forEach(o=>{ const on = lensArt >= o.c*(W/168) - 2 ? 1:0; st.wake[o.id] += (on-st.wake[o.id])*Math.min(1,dt*5); if (st.wake[o.id]<.002) st.wake[o.id]=0; if(on) lastAwake=o.id; });
+    st.max += ((st.val>.97?1:0)-st.max)*Math.min(1,dt*3);
+    if (story.dataset.k!==lastAwake){ story.dataset.k=lastAwake; story.style.opacity=0; setTimeout(()=>{ story.textContent=STORY[lastAwake]; story.style.opacity=1; },140); }
+    acc+=dt; if (acc>=1/12){ frameT+=acc; acc=0; }
+    g.clearRect(0,0,W,AH); drawScene(g,W,st.wake,frameT,st.max,lensArt);
+    const c=cv.getContext('2d'); c.imageSmoothingEnabled=false; c.setTransform(1,0,0,1,0,0); c.clearRect(0,0,cv.width,cv.height);
+    c.drawImage(art,0,0,cv.width,cv.height);
+    // vignette so the dormant right side reads as asleep
+    const vg=c.createLinearGradient(0,0,cv.width,0); const lx=(lensArt/W);
+    vg.addColorStop(Math.min(.999,lx+.02),'rgba(5,6,18,0)'); vg.addColorStop(1,'rgba(5,6,18,.45)'); c.fillStyle=vg; c.fillRect(0,0,cv.width,cv.height);
+    // detent dots
+    c.setTransform(dpr,0,0,dpr,0,0);
+    const cw=css.width, ch=css.height;
+    labels.forEach((_,i)=>{ const dx=28+i/(labels.length-1)*(cw-56); c.fillStyle= i<=st.idx?'rgba(255,255,255,.85)':'rgba(255,255,255,.25)'; c.beginPath(); c.arc(dx,ch-4,i===st.idx?1.8:1.1,0,7); c.fill(); });
+    // glass lens 48x44 with magnified, slightly dispersed scene
+    const kx=lensArt*2, ky=ch/2, kw=48, kh=44, r=kh/2, mag=st.drag?1.45:1.32;
+    c.save(); c.shadowColor='rgba(0,0,0,.45)'; c.shadowBlur=st.drag?16:10; c.shadowOffsetY=3; c.fillStyle='rgba(0,0,0,.25)'; c.beginPath(); c.roundRect(kx-kw/2,ky-kh/2,kw,kh,r); c.fill(); c.restore();
+    c.save(); c.beginPath(); c.roundRect(kx-kw/2,ky-kh/2,kw,kh,r); c.clip(); c.imageSmoothingEnabled=false;
+    const sw=kw/mag/2, sh=kh/mag/2; const sx=Math.max(0,Math.min(W-sw,lensArt-sw/2)), sy=Math.max(0,Math.min(AH-sh,AH/2-sh/2));
+    c.drawImage(art,sx,sy,sw,sh,kx-kw/2,ky-kh/2,kw,kh);
+    c.globalCompositeOperation='screen'; c.globalAlpha=.22; c.drawImage(art,Math.max(0,sx-1),sy,sw,sh,kx-kw/2-1.5,ky-kh/2,kw,kh); c.drawImage(art,Math.min(W-sw,sx+1),sy,sw,sh,kx-kw/2+1.5,ky-kh/2,kw,kh);
+    c.globalCompositeOperation='source-over'; c.globalAlpha=1;
+    const gg=c.createLinearGradient(kx,ky-kh/2,kx,ky+kh/2); gg.addColorStop(0,'rgba(255,255,255,.42)'); gg.addColorStop(.3,'rgba(255,255,255,.05)'); gg.addColorStop(.8,'rgba(255,255,255,.02)'); gg.addColorStop(1,'rgba(255,255,255,.26)');
+    c.fillStyle=gg; c.fillRect(kx-kw/2,ky-kh/2,kw,kh); c.fillStyle='rgba(255,255,255,.7)'; c.beginPath(); c.ellipse(kx-4,ky-kh*.3,kw*.26,kh*.09,0,0,7); c.fill(); c.restore();
+    c.strokeStyle='rgba(255,255,255,.85)'; c.lineWidth=st.drag?1.8:1.3; c.beginPath(); c.roundRect(kx-kw/2+.6,ky-kh/2+.6,kw-1.2,kh-1.2,r); c.stroke();
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+}
+const cards=document.querySelectorAll('[data-card]');
+mount(cards[0], LV5, 1); mount(cards[1], LV6, 1);
+
+// ---------- storyboard (static frames at each Claude level) ----------
+const frames=document.querySelector('[data-frames]');
+LV5.forEach((l,i)=>{
+  const W=168, lens=14+(i/4)*(W-28); const wake={}; let lastAwake='none';
+  OBJ.forEach(o=>{ const on = lens>=o.c-2; wake[o.id]=on?1:0; if(on) lastAwake=o.id; });
+  const art=document.createElement('canvas'); art.width=W; art.height=AH; const g=art.getContext('2d');
+  drawScene(g,W,wake,7.3+i*.9,i===4?1:0,lens);
+  const out=document.createElement('canvas'); out.width=W*4; out.height=AH*4; const c=out.getContext('2d'); c.imageSmoothingEnabled=false; c.drawImage(art,0,0,out.width,out.height);
+  const vg=c.createLinearGradient(0,0,out.width,0); vg.addColorStop(Math.min(.999,lens/W+.02),'rgba(5,6,18,0)'); vg.addColorStop(1,'rgba(5,6,18,.45)'); c.fillStyle=vg; c.fillRect(0,0,out.width,out.height);
+  const kx=lens*4, ky=out.height/2; c.strokeStyle='rgba(255,255,255,.9)'; c.lineWidth=3; c.beginPath(); c.roundRect(kx-48,ky-44,96,88,44); c.stroke();
+  const f=document.createElement('div'); f.className='frame'; f.append(out);
+  f.insertAdjacentHTML('beforeend',`<b>${l}</b><span>${STORY[lastAwake]}</span>`); frames.append(f);
+});
+</script>
+</body>
+</html>

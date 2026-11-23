@@ -1,0 +1,976 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>V17 强刺激升档方案对比</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font: 13px/1.45 var(--font-sans, -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif);
+    color: var(--foreground, #f4f4f6);
+  }
+  .intro {
+    color: var(--muted-foreground, #9a9aa6);
+    margin: 0 0 12px;
+    font-size: 12.5px;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+  @media (max-width: 620px) {
+    .grid { grid-template-columns: 1fr; }
+  }
+  .card {
+    background: var(--card, #1c1c21);
+    border: 1px solid var(--border, rgba(255,255,255,0.1));
+    border-radius: var(--radius, 14px);
+    padding: 12px 13px 11px;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+  }
+  .top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+  }
+  .title-wrap {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    min-width: 0;
+  }
+  .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    transition: background 140ms ease, box-shadow 140ms ease;
+  }
+  .name {
+    font-weight: 700;
+    font-size: 13.5px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .badge {
+    font-size: 10.5px;
+    font-weight: 600;
+    padding: 1px 6px;
+    border-radius: 999px;
+    background: var(--secondary, rgba(255,255,255,0.08));
+    color: var(--muted-foreground, #a1a1aa);
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .badge.hot {
+    background: rgba(255, 110, 40, 0.18);
+    color: #ff9c5a;
+  }
+  .sub {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11.5px;
+    color: var(--muted-foreground, #9a9aa6);
+    gap: 8px;
+  }
+  .beat {
+    font-weight: 600;
+    color: var(--foreground, #f4f4f6);
+    opacity: 0.92;
+  }
+  .well {
+    position: relative;
+    padding: 3px;
+    border-radius: 999px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(0,0,0,0.38));
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.58), 0 1px 0 rgba(255,255,255,0.06);
+    will-change: transform;
+  }
+  .track {
+    position: relative;
+    width: 100%;
+    height: 50px;
+    border-radius: 999px;
+    overflow: hidden;
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+    box-shadow: inset 0 2px 10px rgba(0,0,0,0.55), inset 0 0 0 0.5px rgba(255,255,255,0.2);
+  }
+  .track:active { cursor: grabbing; }
+  .track canvas {
+    display: block;
+    width: 100%;
+    height: 50px;
+    border-radius: 999px;
+  }
+  .ticks {
+    display: flex;
+    justify-content: space-between;
+    gap: 2px;
+    padding: 0 2px;
+  }
+  .ticks button {
+    border: 0;
+    background: transparent;
+    color: var(--muted-foreground, #8c8c96);
+    font: inherit;
+    font-size: 11px;
+    padding: 2px 6px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 120ms ease, color 120ms ease, transform 120ms ease;
+  }
+  .ticks button:hover {
+    background: var(--secondary, rgba(255,255,255,0.08));
+    color: var(--foreground, #fff);
+  }
+  .ticks button.on {
+    background: var(--secondary, rgba(255,255,255,0.12));
+    color: var(--foreground, #fff);
+    font-weight: 700;
+  }
+  .strip {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 4px;
+    margin-top: 2px;
+  }
+  .thumb {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    cursor: pointer;
+  }
+  .thumb canvas {
+    width: 100%;
+    height: 22px;
+    border-radius: 6px;
+    display: block;
+    border: 1px solid rgba(255,255,255,0.12);
+  }
+  .thumb span {
+    font-size: 9.5px;
+    text-align: center;
+    color: var(--muted-foreground, #8e8e98);
+  }
+  .controls {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 10px;
+    padding: 8px 12px;
+    border-radius: var(--radius, 12px);
+    background: var(--card, #1c1c21);
+    border: 1px solid var(--border, rgba(255,255,255,0.08));
+    font-size: 11.5px;
+    color: var(--muted-foreground, #9a9aa6);
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .btn-demo {
+    border: 0;
+    border-radius: 8px;
+    padding: 5px 11px;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+    background: var(--primary, #ff5a1f);
+    color: var(--primary-foreground, #fff);
+  }
+</style>
+</head>
+<body>
+<p class="intro">可直接拖动任意滑块、点底部 5 档按钮，或点下方「一键演示 5 档连升」体验每次升档的 <b>2 帧定格 + 曝光闪 + 轨道微震 + 旋钮反冲 + 色散爆发 + 整幅换色板</b>。</p>
+
+<div class="grid" id="grid"></div>
+
+<div class="controls">
+  <span>每张卡底部 5 格为静止分镜——哪怕不动，5 档也是 5 个完全不同的高对比世界。</span>
+  <button class="btn-demo" id="demoBtn" type="button">一键演示 5 档连升 → Max</button>
+</div>
+
+<script>
+const LEVELS = ['低', '中', '高', '超高', 'Max'];
+
+const SCHEMES = [
+  {
+    id: 'rocket',
+    title: 'A · 星舰发射栈',
+    tag: '最贴你的火箭构想',
+    hot: true,
+    beats: ['发射台静默待命', '夹钳弹开 · 琥珀点火', 'Max-Q 音爆破云', '电离层 · 等离子入轨', '深空超巡 · 繁星任务'],
+    colors: ['#5378B8', '#FF9B26', '#FF4D1A', '#E83BFF', '#3BF4FF'],
+    flash: ['#7AA7FF', '#FFD170', '#FF9955', '#FF78FF', '#C4FFFF'],
+  },
+  {
+    id: 'reactor',
+    title: 'B · 聚变核心超频',
+    tag: '最贴「推理算力」',
+    hot: false,
+    beats: ['休眠磁环 · 冷态待机', '电光青弧 · 磁场起振', '白热临界 · 烈焰喷射', '品红日冕 · 约束过载', '脉冲星核 · 满载爆发'],
+    colors: ['#5E6F9E', '#00E5FF', '#FF991F', '#FF2AE6', '#FFF3B0'],
+    flash: ['#8DA4FF', '#80F8FF', '#FFE082', '#FF85F5', '#FFFFFF'],
+  },
+  {
+    id: 'eclipse',
+    title: 'C · 日食引力弹弓',
+    tag: '昼夜反转对比最强',
+    hot: false,
+    beats: ['清冷正午 · 静谧晴空', '初亏暮光 · 半轨压暗', '钻石环 · 耀斑炸裂', '日全食 · 黑夜炽冕', '引力透镜 · 新星脉冲'],
+    colors: ['#74B9FF', '#FF9F43', '#FFD966', '#FF3B9A', '#56F0FF'],
+    flash: ['#DFF0FF', '#FFC278', '#FFF5B8', '#FF75C3', '#B8FAFF'],
+  },
+  {
+    id: 'forge',
+    title: 'D · 星钢极热淬火',
+    tag: 'Max 瞬冷反杀最爽',
+    hot: false,
+    beats: ['冷淬玄铁 · 沉重静默', '炉火初红 · 剑脊升温', '重锤火星 · 炽金锻打', '白热过曝 · 临界熔融', '龙息淬火 · 玄钢电锋'],
+    colors: ['#637A96', '#FF5722', '#FFB822', '#FFF4A3', '#29F2FF'],
+    flash: ['#9AB6D8', '#FF8A50', '#FFE066', '#FFFFFF', '#9EFCFF'],
+  },
+];
+
+// Deterministic RNG for particles & stars
+function mkRng(seed){
+  let s = seed;
+  return () => ((s = (s * 16807) % 2147483647) - 1) / 2147483646;
+}
+const R = mkRng(1337);
+const STARS = Array.from({length: 70}, () => ({
+  x: R(), y: R(), r: 0.7 + R() * 1.5, p: R() * 6.28, s: 0.5 + R() * 1.4,
+  c: R() > 0.72 ? '#8AF7FF' : R() > 0.45 ? '#FFE89E' : '#FFFFFF'
+}));
+const SPARKS = Array.from({length: 48}, () => ({
+  x: R(), y: R(), vx: 0.4 + R() * 1.6, vy: (R() - 0.5) * 1.2, sz: 1 + R() * 2, p: R() * 6.28
+}));
+
+// ---------- Scene Drawers (high-saturation, distinct world per tier 0..4) ----------
+function drawRocket(ctx, w, h, tier, ratio, kx, t, shock) {
+  const cy = h / 2;
+  if (tier === 0) {
+    // Low: Cold dark blue launchpad, quiet silhouette, blinking tower beacon
+    const bg = ctx.createLinearGradient(0, 0, w, h);
+    bg.addColorStop(0, '#091124'); bg.addColorStop(1, '#101C36');
+    ctx.fillStyle = bg; ctx.fillRect(0, 0, w, h);
+    // Faint night stars
+    for (let i = 0; i < 16; i++) {
+      const s = STARS[i];
+      ctx.fillStyle = `rgba(180,210,255,${0.2 + 0.25 * Math.sin(t * 2 + s.p)})`;
+      ctx.fillRect(s.x * w, s.y * (h - 14), 1.2, 1.2);
+    }
+    // Pad ground
+    ctx.fillStyle = '#18243E'; ctx.fillRect(0, h - 10, w, 10);
+    // Launch tower + silhouette rocket on left
+    const rx = Math.max(22, kx);
+    ctx.fillStyle = '#243559';
+    ctx.fillRect(rx - 14, 10, 4, h - 18);
+    ctx.fillRect(rx - 14, 18, 10, 2);
+    ctx.fillRect(rx - 14, 30, 10, 2);
+    // Rocket silhouette (standing upright / angled ready)
+    ctx.fillStyle = '#4A6394';
+    ctx.beginPath();
+    ctx.moveTo(rx + 2, 10); ctx.lineTo(rx + 8, 20); ctx.lineTo(rx + 8, h - 10);
+    ctx.lineTo(rx - 4, h - 10); ctx.lineTo(rx - 4, 20); ctx.closePath(); ctx.fill();
+    // Tower red beacon
+    const blink = (Math.sin(t * 3) + 1) * 0.5;
+    ctx.fillStyle = `rgba(255,68,85,${0.35 + 0.65 * blink})`;
+    ctx.beginPath(); ctx.arc(rx - 12, 9, 2.2, 0, 7); ctx.fill();
+  } else if (tier === 1) {
+    // Medium: Clamps open! Amber ignition + billowing white steam across track
+    const bg = ctx.createLinearGradient(0, 0, w, 0);
+    bg.addColorStop(0, '#3D1508'); bg.addColorStop(0.55, '#1D1429'); bg.addColorStop(1, '#0E1529');
+    ctx.fillStyle = bg; ctx.fillRect(0, 0, w, h);
+    // Hot amber radial bloom at engine
+    const g = ctx.createRadialGradient(kx - 10, cy + 4, 2, kx - 10, cy + 4, 95);
+    g.addColorStop(0, '#FFF5C2'); g.addColorStop(0.28, '#FF9E1F'); g.addColorStop(0.65, 'rgba(255,72,16,0.35)'); g.addColorStop(1, 'transparent');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+    // Billowing steam clouds sweeping both ways
+    for (let i = 0; i < 22; i++) {
+      const sp = SPARKS[i];
+      const px = ((sp.x * w + t * 55 * sp.vx) % (w + 40)) - 20;
+      const py = h - 7 - Math.abs(Math.sin(t * 3 + sp.p)) * 16;
+      const rad = 5 + sp.sz * 3.5;
+      ctx.fillStyle = `rgba(255,232,200,${0.18 + 0.14 * Math.sin(t * 5 + sp.p)})`;
+      ctx.beginPath(); ctx.arc(px, py, rad, 0, 7); ctx.fill();
+    }
+    // Horizontal blasting rocket silhouette tilted upward
+    drawRocketBody(ctx, kx + 4, cy, 0.9, '#FFAE2B', '#FFF5C8', t, 28);
+  } else if (tier === 2) {
+    // High: Max-Q breaking clouds! Blazing orange-red flame + Mach shock cone + high cobalt sky
+    const bg = ctx.createLinearGradient(0, 0, w, 0);
+    bg.addColorStop(0, '#7A1800'); bg.addColorStop(0.45, '#C83E0A'); bg.addColorStop(0.75, '#1A3E8C'); bg.addColorStop(1, '#0C1F52');
+    ctx.fillStyle = bg; ctx.fillRect(0, 0, w, h);
+    // High-speed cloud/wind streaks
+    ctx.strokeStyle = 'rgba(255,235,205,0.45)';
+    for (let i = 0; i < 18; i++) {
+      const sp = SPARKS[i];
+      const lx = w - ((t * 240 * sp.vx + sp.x * w) % (w + 60));
+      const ly = 5 + sp.y * (h - 10);
+      ctx.lineWidth = sp.sz * 0.7;
+      ctx.beginPath(); ctx.moveTo(lx, ly); ctx.lineTo(lx + 26 + sp.sz * 10, ly); ctx.stroke();
+    }
+    // Blazing exhaust cone
+    const fl = ctx.createLinearGradient(0, cy, kx, cy);
+    fl.addColorStop(0, 'rgba(255,70,10,0.15)'); fl.addColorStop(0.55, '#FF5E14'); fl.addColorStop(0.88, '#FFD84D'); fl.addColorStop(1, '#FFFFFF');
+    ctx.fillStyle = fl;
+    ctx.beginPath();
+    ctx.moveTo(kx - 4, cy - 11); ctx.lineTo(0, cy - 22 - Math.sin(t * 28) * 3);
+    ctx.lineTo(0, cy + 22 + Math.cos(t * 24) * 3); ctx.lineTo(kx - 4, cy + 11); ctx.closePath(); ctx.fill();
+    // Mach vapor cone ring around rocket nose
+    ctx.strokeStyle = 'rgba(255,255,255,0.92)'; ctx.lineWidth = 2.4;
+    ctx.beginPath(); ctx.ellipse(kx + 8, cy, 8, 22, 0.15, -1.4, 1.4); ctx.stroke();
+    drawRocketBody(ctx, kx + 4, cy, 1.0, '#FF4D1A', '#FFFFFF', t, 46);
+  } else if (tier === 3) {
+    // XHigh: Upper atmosphere / ionosphere! Curved glowing Earth horizon + magenta/cyan plasma plume
+    const bg = ctx.createLinearGradient(0, 0, w, h);
+    bg.addColorStop(0, '#16062E'); bg.addColorStop(0.5, '#2E094F'); bg.addColorStop(1, '#04091C');
+    ctx.fillStyle = bg; ctx.fillRect(0, 0, w, h);
+    // Curved blue atmospheric limb at bottom-left
+    const limb = ctx.createRadialGradient(w * 0.25, h + 95, 78, w * 0.25, h + 95, 128);
+    limb.addColorStop(0, '#0E3B8A'); limb.addColorStop(0.75, '#1DA1FF'); limb.addColorStop(0.92, '#7CEBFF'); limb.addColorStop(1, 'transparent');
+    ctx.fillStyle = limb; ctx.fillRect(0, 0, w, h);
+    // Bright crisp stars emerging
+    for (let i = 0; i < 36; i++) {
+      const s = STARS[i];
+      ctx.fillStyle = s.c;
+      ctx.globalAlpha = 0.4 + 0.6 * Math.abs(Math.sin(t * 3 + s.p));
+      ctx.fillRect(s.x * w, s.y * h * 0.72, s.r, s.r);
+    }
+    ctx.globalAlpha = 1;
+    // Magenta + Cyan plasma plume
+    const pl = ctx.createLinearGradient(0, cy, kx, cy);
+    pl.addColorStop(0, 'transparent'); pl.addColorStop(0.35, 'rgba(255,40,210,0.75)'); pl.addColorStop(0.78, '#00F0FF'); pl.addColorStop(1, '#FFFFFF');
+    ctx.fillStyle = pl;
+    ctx.beginPath();
+    ctx.moveTo(kx - 4, cy - 9); ctx.lineTo(Math.max(0, kx - 150), cy - 18 + Math.sin(t * 30) * 2);
+    ctx.lineTo(Math.max(0, kx - 150), cy + 18 - Math.sin(t * 30) * 2); ctx.lineTo(kx - 4, cy + 9); ctx.closePath(); ctx.fill();
+    // Plasma sparks
+    for (let i = 0; i < 24; i++) {
+      const sp = SPARKS[i];
+      const px = kx - 10 - ((t * 200 * sp.vx + sp.x * 140) % 140);
+      const py = cy + sp.vy * 16;
+      ctx.fillStyle = i % 2 ? '#FF5CF4' : '#5CF6FF';
+      ctx.fillRect(px, py, sp.sz * 2.2, 1.4);
+    }
+    drawRocketBody(ctx, kx + 4, cy, 1.05, '#FF3BF2', '#C9FFFF', t, 52);
+  } else {
+    // Max: Deep space mission! Pitch black cosmos, tiny glowing Earth behind, hyper-vivid starfield + cyan/gold warp + orbiting starship
+    ctx.fillStyle = '#03040C'; ctx.fillRect(0, 0, w, h);
+    // Vivid cosmic nebula wash (high saturation cyan + electric violet)
+    const neb = ctx.createRadialGradient(kx, cy, 6, kx - 40, cy, 190);
+    neb.addColorStop(0, 'rgba(60,248,255,0.55)');
+    neb.addColorStop(0.4, 'rgba(130,52,255,0.38)');
+    neb.addColorStop(0.75, 'rgba(255,40,160,0.18)');
+    neb.addColorStop(1, 'transparent');
+    ctx.fillStyle = neb; ctx.fillRect(0, 0, w, h);
+    // Tiny glowing blue Earth receding on the far left
+    const eg = ctx.createRadialGradient(22, h - 10, 2, 22, h - 10, 18);
+    eg.addColorStop(0, '#8CE8FF'); eg.addColorStop(0.45, '#1D74FF'); eg.addColorStop(0.7, 'rgba(0,170,255,0.3)'); eg.addColorStop(1, 'transparent');
+    ctx.fillStyle = eg; ctx.beginPath(); ctx.arc(22, h - 10, 18, 0, 7); ctx.fill();
+    // High-contrast blazing starfield + cyan/gold warp streaks
+    for (let i = 0; i < STARS.length; i++) {
+      const s = STARS[i];
+      const sx = w - ((s.x * w + t * 180 * s.s) % w);
+      const sy = s.y * h;
+      const len = 6 + s.s * 16;
+      ctx.strokeStyle = s.c;
+      ctx.globalAlpha = 0.55 + 0.45 * Math.sin(t * 5 + s.p);
+      ctx.lineWidth = s.r * 0.9;
+      ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(sx + len, sy); ctx.stroke();
+      if (i % 7 === 0) {
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(sx - 2, sy - 0.5, 4, 1); ctx.fillRect(sx - 0.5, sy - 2, 1, 4);
+      }
+    }
+    ctx.globalAlpha = 1;
+    // Brilliant ion-drive beam spanning the track
+    const beam = ctx.createLinearGradient(34, cy, kx, cy);
+    beam.addColorStop(0, 'transparent'); beam.addColorStop(0.4, 'rgba(80,120,255,0.65)'); beam.addColorStop(0.82, '#3CF7FF'); beam.addColorStop(1, '#FFFFFF');
+    ctx.fillStyle = beam;
+    ctx.fillRect(34, cy - 5, Math.max(0, kx - 34), 10);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(60, cy - 1.8, Math.max(0, kx - 60), 3.6);
+    // Starship + shield flare
+    drawRocketBody(ctx, kx - 2, cy, 1.08, '#3BF4FF', '#FFFFFF', t, 36);
+    // 4-point star flare at nose
+    const fls = 9 + Math.sin(t * 8) * 2;
+    ctx.fillStyle = '#FFFFFF';
+    ctx.beginPath();
+    ctx.moveTo(kx + 12, cy - fls); ctx.quadraticCurveTo(kx + 12, cy, kx + 12 + fls * 1.3, cy);
+    ctx.quadraticCurveTo(kx + 12, cy, kx + 12, cy + fls); ctx.quadraticCurveTo(kx + 12, cy, kx + 12 - fls * 1.3, cy);
+    ctx.quadraticCurveTo(kx + 12, cy, kx + 12, cy - fls); ctx.fill();
+  }
+  drawShockRing(ctx, kx, cy, shock, '#FFFFFF');
+}
+
+function drawRocketBody(ctx, x, y, sc, accent, core, t, flameLen) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(sc, sc);
+  // Flame core
+  const wob = Math.sin(t * 36) * 3;
+  const fg = ctx.createLinearGradient(-flameLen - wob, 0, -6, 0);
+  fg.addColorStop(0, 'transparent'); fg.addColorStop(0.45, accent); fg.addColorStop(1, core);
+  ctx.fillStyle = fg;
+  ctx.beginPath();
+  ctx.moveTo(-8, -5.5); ctx.lineTo(-flameLen - wob, 0); ctx.lineTo(-8, 5.5); ctx.closePath(); ctx.fill();
+  // Fins
+  ctx.fillStyle = accent;
+  ctx.beginPath(); ctx.moveTo(-8, -5); ctx.lineTo(-14, -10); ctx.lineTo(-3, -5); ctx.closePath(); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(-8, 5); ctx.lineTo(-14, 10); ctx.lineTo(-3, 5); ctx.closePath(); ctx.fill();
+  // Fuselage (sleek Starship chrome + dark heatshield)
+  ctx.fillStyle = '#F2F6FF';
+  ctx.beginPath();
+  ctx.moveTo(14, 0); ctx.quadraticCurveTo(6, -6.5, -8, -5.5);
+  ctx.lineTo(-8, 5.5); ctx.quadraticCurveTo(6, 6.5, 14, 0); ctx.fill();
+  ctx.fillStyle = '#1D2436';
+  ctx.fillRect(-7, 1.5, 14, 3.2);
+  // Glowing cockpit window
+  ctx.fillStyle = accent;
+  ctx.beginPath(); ctx.arc(4, -1.2, 2.1, 0, 7); ctx.fill();
+  ctx.restore();
+}
+
+function drawReactor(ctx, w, h, tier, ratio, kx, t, shock) {
+  const cy = h / 2;
+  const palettes = [
+    ['#0A0D18', '#14192B', '#4B5A82'],
+    ['#041824', '#062C42', '#00EEFF'],
+    ['#291103', '#522205', '#FF9F1C'],
+    ['#26052E', '#4F0857', '#FF2AE6'],
+    ['#050817', '#13113A', '#FFF4B8'],
+  ];
+  const [c0, c1, ac] = palettes[tier];
+  const bg = ctx.createLinearGradient(0, 0, w, 0);
+  bg.addColorStop(0, c0); bg.addColorStop(0.5, c1); bg.addColorStop(1, c0);
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, w, h);
+
+  // Containment coils along track
+  const coils = 8;
+  for (let i = 0; i < coils; i++) {
+    const cx = 24 + (i / (coils - 1)) * (w - 48);
+    const active = cx <= kx + 14;
+    ctx.strokeStyle = active ? ac : 'rgba(255,255,255,0.1)';
+    ctx.globalAlpha = active ? (0.35 + tier * 0.14) : 0.25;
+    ctx.lineWidth = active ? 2 : 1.2;
+    ctx.beginPath(); ctx.ellipse(cx, cy, 5, 21, 0, 0, 7); ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+
+  // Core radial energy bloom
+  const rad = 28 + tier * 28;
+  const gl = ctx.createRadialGradient(kx, cy, 2, kx, cy, rad);
+  gl.addColorStop(0, tier >= 2 ? '#FFFFFF' : ac);
+  gl.addColorStop(0.35, ac);
+  gl.addColorStop(1, 'transparent');
+  ctx.fillStyle = gl; ctx.fillRect(0, 0, w, h);
+
+  // Electric arcs / plasma conduits
+  if (tier >= 1) {
+    const arcCount = tier + 1;
+    for (let a = 0; a < arcCount; a++) {
+      ctx.strokeStyle = a === 0 ? '#FFFFFF' : ac;
+      ctx.lineWidth = a === 0 ? 1.8 : 1.1;
+      ctx.beginPath();
+      const span = tier === 4 ? w : kx + 16;
+      ctx.moveTo(0, cy);
+      for (let x = 10; x <= span; x += 14) {
+        const amp = (3 + tier * 3.5) * Math.sin(x * 0.08 + t * (8 + tier * 4) + a * 2.1);
+        ctx.lineTo(x, cy + amp);
+      }
+      ctx.stroke();
+    }
+  } else {
+    // Low: single tiny violet spark
+    const spx = 24 + ((t * 18) % 60);
+    ctx.fillStyle = '#9E7BFF';
+    ctx.fillRect(spx, cy + Math.sin(t * 7) * 5, 2, 2);
+  }
+
+  // Max: Pulsing miniature star + bipolar cyan/gold jets
+  if (tier === 4) {
+    ctx.save();
+    ctx.translate(kx, cy);
+    ctx.rotate(-0.18);
+    const jg = ctx.createLinearGradient(-w * 0.6, 0, w * 0.6, 0);
+    jg.addColorStop(0, 'transparent'); jg.addColorStop(0.35, '#00F0FF'); jg.addColorStop(0.5, '#FFFFFF');
+    jg.addColorStop(0.65, '#FF47E8'); jg.addColorStop(1, 'transparent');
+    ctx.fillStyle = jg; ctx.fillRect(-w * 0.6, -3.5, w * 1.2, 7);
+    ctx.restore();
+    // Spinning white-gold core rings
+    ctx.save(); ctx.translate(kx, cy);
+    for (let r = 0; r < 2; r++) {
+      ctx.rotate(t * (r ? -2.8 : 2.2));
+      ctx.strokeStyle = r ? '#00F0FF' : '#FFF4B8'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.ellipse(0, 0, 20 + r * 8, 7 + r * 3, 0.3, 0, 7); ctx.stroke();
+    }
+    ctx.restore();
+  }
+  drawShockRing(ctx, kx, cy, shock, ac);
+}
+
+function drawEclipse(ctx, w, h, tier, ratio, kx, t, shock) {
+  const cy = h / 2;
+  if (tier === 0) {
+    // Low: Bright crisp cool daylight sky, small distant sun + faint moon
+    const bg = ctx.createLinearGradient(0, 0, w, 0);
+    bg.addColorStop(0, '#8AD0FF'); bg.addColorStop(0.6, '#56A8F5'); bg.addColorStop(1, '#3B82DB');
+    ctx.fillStyle = bg; ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = 'rgba(255,255,255,0.45)';
+    ctx.beginPath(); ctx.ellipse(w * 0.72, 16, 36, 7, 0, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(w * 0.38, 36, 28, 6, 0, 0, 7); ctx.fill();
+    // Sun on right
+    const sg = ctx.createRadialGradient(w - 42, cy, 4, w - 42, cy, 24);
+    sg.addColorStop(0, '#FFFDF0'); sg.addColorStop(0.5, '#FFE07A'); sg.addColorStop(1, 'transparent');
+    ctx.fillStyle = sg; ctx.beginPath(); ctx.arc(w - 42, cy, 24, 0, 7); ctx.fill();
+  } else if (tier === 1) {
+    // Medium: Twilight amber sky, shadow sweeps across left half
+    const bg = ctx.createLinearGradient(0, 0, w, 0);
+    bg.addColorStop(0, '#1B1A3A'); bg.addColorStop(0.48, '#A8421B'); bg.addColorStop(1, '#FFB142');
+    ctx.fillStyle = bg; ctx.fillRect(0, 0, w, h);
+    // Crescent sun partially eclipsed
+    ctx.fillStyle = '#FFF0B8'; ctx.beginPath(); ctx.arc(kx + 18, cy, 16, 0, 7); ctx.fill();
+    ctx.fillStyle = '#1B1A3A'; ctx.beginPath(); ctx.arc(kx + 10, cy, 15, 0, 7); ctx.fill();
+  } else if (tier === 2) {
+    // High: Deep indigo + blazing Diamond Ring flare
+    const bg = ctx.createLinearGradient(0, 0, w, 0);
+    bg.addColorStop(0, '#090D2B'); bg.addColorStop(0.55, '#191D54'); bg.addColorStop(1, '#3B1E5C');
+    ctx.fillStyle = bg; ctx.fillRect(0, 0, w, h);
+    // Sun rim
+    ctx.strokeStyle = '#FFD966'; ctx.lineWidth = 2.6;
+    ctx.beginPath(); ctx.arc(kx, cy, 17, 0, 7); ctx.stroke();
+    ctx.fillStyle = '#060818'; ctx.beginPath(); ctx.arc(kx, cy, 15.5, 0, 7); ctx.fill();
+    // Blinding diamond bead at right rim
+    const bx = kx + 16, by = cy - 4;
+    const dg = ctx.createRadialGradient(bx, by, 1, bx, by, 38);
+    dg.addColorStop(0, '#FFFFFF'); dg.addColorStop(0.22, '#FFF2A6'); dg.addColorStop(0.55, 'rgba(255,150,40,0.45)'); dg.addColorStop(1, 'transparent');
+    ctx.fillStyle = dg; ctx.fillRect(0, 0, w, h);
+    // Starburst spikes
+    ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = 1.6;
+    ctx.beginPath(); ctx.moveTo(bx - 18, by); ctx.lineTo(bx + 26, by); ctx.moveTo(bx, by - 18); ctx.lineTo(bx, by + 18); ctx.stroke();
+  } else if (tier === 3) {
+    // XHigh: TOTALITY! Pitch black hard-cut + blinding white & electric magenta corona
+    ctx.fillStyle = '#03020A'; ctx.fillRect(0, 0, w, h);
+    for (let i = 0; i < 35; i++) {
+      const s = STARS[i]; ctx.fillStyle = s.c; ctx.fillRect(s.x * w, s.y * h, s.r, s.r);
+    }
+    const cg = ctx.createRadialGradient(kx, cy, 13, kx, cy, 64);
+    cg.addColorStop(0, '#FFFFFF'); cg.addColorStop(0.28, '#FF32A8'); cg.addColorStop(0.62, 'rgba(130,30,255,0.45)'); cg.addColorStop(1, 'transparent');
+    ctx.fillStyle = cg; ctx.fillRect(0, 0, w, h);
+    // Jagged solar corona streamers
+    ctx.save(); ctx.translate(kx, cy);
+    for (let k = 0; k < 16; k++) {
+      const a = (k / 16) * Math.PI * 2 + t * 0.4;
+      const len = 22 + ((k * 7) % 16) + Math.sin(t * 6 + k) * 4;
+      ctx.strokeStyle = k % 2 ? '#FFFFFF' : '#FF5EC4';
+      ctx.lineWidth = k % 3 === 0 ? 2 : 1.1;
+      ctx.beginPath(); ctx.moveTo(Math.cos(a) * 14, Math.sin(a) * 14);
+      ctx.lineTo(Math.cos(a) * len, Math.sin(a) * len * 0.72); ctx.stroke();
+    }
+    ctx.fillStyle = '#020206'; ctx.beginPath(); ctx.arc(0, 0, 14, 0, 7); ctx.fill();
+    ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = 1.8; ctx.stroke();
+    ctx.restore();
+  } else {
+    // Max: Gravitational Lensing + Nova Pulsar
+    ctx.fillStyle = '#02040D'; ctx.fillRect(0, 0, w, h);
+    const ng = ctx.createRadialGradient(kx, cy, 2, kx, cy, 130);
+    ng.addColorStop(0, '#FFFFFF'); ng.addColorStop(0.22, '#00F5FF'); ng.addColorStop(0.52, 'rgba(120,40,255,0.45)'); ng.addColorStop(1, 'transparent');
+    ctx.fillStyle = ng; ctx.fillRect(0, 0, w, h);
+    for (let i = 0; i < 60; i++) {
+      const s = STARS[i];
+      ctx.fillStyle = s.c;
+      ctx.globalAlpha = 0.5 + 0.5 * Math.sin(t * 6 + s.p);
+      ctx.fillRect(s.x * w, s.y * h, s.r * 1.1, s.r * 1.1);
+    }
+    ctx.globalAlpha = 1;
+    // Einstein gravitational lensing arcs
+    ctx.save(); ctx.translate(kx, cy);
+    for (let a = 0; a < 4; a++) {
+      ctx.strokeStyle = a % 2 ? '#4DF8FF' : '#FFE885';
+      ctx.lineWidth = 2.2 - a * 0.35;
+      const r = 17 + a * 7;
+      ctx.beginPath(); ctx.arc(0, 0, r, -0.9 + t * (a % 2 ? 1 : -1), 0.7 + t * (a % 2 ? 1 : -1)); ctx.stroke();
+      ctx.beginPath(); ctx.arc(0, 0, r, Math.PI - 0.9 + t * (a % 2 ? 1 : -1), Math.PI + 0.7 + t * (a % 2 ? 1 : -1)); ctx.stroke();
+    }
+    // Nova cross beam
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(-w, -1.6, w * 2, 3.2);
+    ctx.restore();
+  }
+  drawShockRing(ctx, kx, cy, shock, '#FFFFFF');
+}
+
+function drawForge(ctx, w, h, tier, ratio, kx, t, shock) {
+  const cy = h / 2;
+  if (tier === 0) {
+    // Low: Cold brushed steel, muted cool slate
+    const bg = ctx.createLinearGradient(0, 0, w, h);
+    bg.addColorStop(0, '#141923'); bg.addColorStop(1, '#232C3B');
+    ctx.fillStyle = bg; ctx.fillRect(0, 0, w, h);
+    // Blade silhouette
+    ctx.fillStyle = '#38465C';
+    ctx.beginPath(); ctx.moveTo(16, cy - 8); ctx.lineTo(w - 28, cy - 6); ctx.lineTo(w - 12, cy);
+    ctx.lineTo(w - 28, cy + 6); ctx.lineTo(16, cy + 8); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.16)'; ctx.fillRect(16, cy - 1, w - 42, 1.5);
+  } else if (tier === 1) {
+    // Medium: Furnace ember red/orange heating up left of slider
+    const bg = ctx.createLinearGradient(0, 0, w, 0);
+    bg.addColorStop(0, '#591105'); bg.addColorStop(0.55, '#2A1214'); bg.addColorStop(1, '#141822');
+    ctx.fillStyle = bg; ctx.fillRect(0, 0, w, h);
+    const hg = ctx.createLinearGradient(0, cy, kx + 25, cy);
+    hg.addColorStop(0, '#FF4500'); hg.addColorStop(0.7, '#FF8C1A'); hg.addColorStop(1, '#2E384A');
+    ctx.fillStyle = hg;
+    ctx.beginPath(); ctx.moveTo(12, cy - 9); ctx.lineTo(w - 24, cy - 6); ctx.lineTo(w - 10, cy);
+    ctx.lineTo(w - 24, cy + 6); ctx.lineTo(12, cy + 9); ctx.closePath(); ctx.fill();
+  } else if (tier === 2) {
+    // High: Blazing orange-gold forging + flying sparks
+    const bg = ctx.createLinearGradient(0, 0, w, 0);
+    bg.addColorStop(0, '#7A1A00'); bg.addColorStop(0.65, '#C44700'); bg.addColorStop(1, '#2B130B');
+    ctx.fillStyle = bg; ctx.fillRect(0, 0, w, h);
+    const hg = ctx.createLinearGradient(0, cy, w, cy);
+    hg.addColorStop(0, '#FF6E00'); hg.addColorStop(0.6, '#FFD23F'); hg.addColorStop(1, '#FF5500');
+    ctx.fillStyle = hg;
+    ctx.beginPath(); ctx.moveTo(10, cy - 10); ctx.lineTo(w - 22, cy - 7); ctx.lineTo(w - 8, cy);
+    ctx.lineTo(w - 22, cy + 7); ctx.lineTo(10, cy + 10); ctx.closePath(); ctx.fill();
+    for (let i = 0; i < 32; i++) {
+      const sp = SPARKS[i];
+      const sx = (kx + (t * 170 * sp.vx + sp.x * w)) % w;
+      const sy = cy + Math.sin(t * 7 + sp.p) * 20;
+      ctx.fillStyle = i % 2 ? '#FFF7B2' : '#FF8811';
+      ctx.fillRect(sx, sy, sp.sz * 2.5, 1.6);
+    }
+  } else if (tier === 3) {
+    // XHigh: White-hot overexposed molten steel!
+    const bg = ctx.createLinearGradient(0, 0, w, 0);
+    bg.addColorStop(0, '#FF7B00'); bg.addColorStop(0.5, '#FFE45E'); bg.addColorStop(1, '#FF6A00');
+    ctx.fillStyle = bg; ctx.fillRect(0, 0, w, h);
+    const glow = ctx.createRadialGradient(kx, cy, 4, kx, cy, 120);
+    glow.addColorStop(0, '#FFFFFF'); glow.addColorStop(0.5, 'rgba(255,250,200,0.85)'); glow.addColorStop(1, 'transparent');
+    ctx.fillStyle = glow; ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.beginPath(); ctx.moveTo(8, cy - 11); ctx.lineTo(w - 20, cy - 8); ctx.lineTo(w - 6, cy);
+    ctx.lineTo(w - 20, cy + 8); ctx.lineTo(8, cy + 11); ctx.closePath(); ctx.fill();
+  } else {
+    // Max: QUENCH! Dramatic dark midnight-indigo obsidian blade with razor-sharp electric cyan-white spine + rising steam
+    ctx.fillStyle = '#030816'; ctx.fillRect(0, 0, w, h);
+    // Electric cyan aura along blade edge
+    const qg = ctx.createLinearGradient(0, cy - 16, 0, cy + 16);
+    qg.addColorStop(0, 'transparent'); qg.addColorStop(0.4, 'rgba(0,240,255,0.45)');
+    qg.addColorStop(0.5, '#FFFFFF'); qg.addColorStop(0.6, 'rgba(0,240,255,0.45)'); qg.addColorStop(1, 'transparent');
+    ctx.fillStyle = qg; ctx.fillRect(0, cy - 16, w, 32);
+    // Obsidian dark steel blade
+    ctx.fillStyle = '#09142B';
+    ctx.beginPath(); ctx.moveTo(10, cy - 10); ctx.lineTo(w - 22, cy - 7); ctx.lineTo(w - 8, cy);
+    ctx.lineTo(w - 22, cy + 7); ctx.lineTo(10, cy + 10); ctx.closePath(); ctx.fill();
+    // Blinding razor-sharp white-cyan spine
+    ctx.fillStyle = '#38F6FF'; ctx.fillRect(10, cy - 2.4, w - 24, 4.8);
+    ctx.fillStyle = '#FFFFFF'; ctx.fillRect(10, cy - 1, w - 20, 2);
+    // Rising crisp cyan-white quench steam wisps
+    for (let i = 0; i < 28; i++) {
+      const sp = SPARKS[i];
+      const sx = sp.x * w;
+      const sy = h - ((t * 42 * sp.vx + sp.y * h) % h);
+      ctx.fillStyle = `rgba(170,248,255,${0.25 + 0.45 * (sy / h)})`;
+      ctx.fillRect(sx, sy, 1.5, 6);
+    }
+  }
+  drawShockRing(ctx, kx, cy, shock, '#FFFFFF');
+}
+
+function drawShockRing(ctx, kx, cy, shock, color) {
+  if (shock <= 0.01) return;
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.globalAlpha = shock * 0.9;
+  ctx.lineWidth = 2.5 * shock;
+  const r = 18 + (1 - shock) * 90;
+  ctx.beginPath(); ctx.ellipse(kx, cy, r, r * 0.45, 0, 0, 7); ctx.stroke();
+  ctx.restore();
+}
+
+const DRAWERS = { rocket: drawRocket, reactor: drawReactor, eclipse: drawEclipse, forge: drawForge };
+
+// ---------- Mount interactive cards with 180ms Juice Engine ----------
+const grid = document.getElementById('grid');
+const controllers = [];
+
+SCHEMES.forEach((scheme) => {
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.innerHTML = `
+    <div class="top">
+      <div class="title-wrap">
+        <span class="dot" data-dot></span>
+        <span class="name">${scheme.title}</span>
+      </div>
+      <span class="badge ${scheme.hot ? 'hot' : ''}">${scheme.tag}</span>
+    </div>
+    <div class="sub">
+      <span class="beat" data-beat></span>
+      <span data-lvl></span>
+    </div>
+    <div class="well" data-well>
+      <div class="track" data-track><canvas data-cv></canvas></div>
+    </div>
+    <div class="ticks" data-ticks></div>
+    <div class="strip" data-strip></div>
+  `;
+  grid.append(card);
+
+  const dot = card.querySelector('[data-dot]');
+  const beatEl = card.querySelector('[data-beat]');
+  const lvlEl = card.querySelector('[data-lvl]');
+  const well = card.querySelector('[data-well]');
+  const track = card.querySelector('[data-track]');
+  const cv = card.querySelector('[data-cv]');
+  const ticks = card.querySelector('[data-ticks]');
+  const strip = card.querySelector('[data-strip]');
+
+  const off = document.createElement('canvas');
+  const octx = off.getContext('2d');
+  const ctx = cv.getContext('2d');
+
+  const st = {
+    idx: 2,
+    val: 0.5,
+    target: 0.5,
+    drag: false,
+    t: 4.2,
+    // 180ms Juice state
+    hitstop: 0,
+    flash: 0,
+    shake: 0,
+    recoil: 0,
+    chroma: 0,
+    shock: 0,
+    flashColor: scheme.flash[2],
+  };
+
+  function triggerShift(nextIdx, prevIdx) {
+    const up = nextIdx > prevIdx;
+    st.flashColor = scheme.flash[nextIdx];
+    if (up) {
+      // Upshift: 2-frame hitstop (~32ms), single-frame flash, 2px shake, left kickback recoil, chromatic spike
+      st.hitstop = 0.032;
+      st.flash = 0.42;
+      st.shake = 1.0;
+      st.recoil = -6.5;
+      st.chroma = 1.0;
+      st.shock = 1.0;
+    } else {
+      // Downshift: shorter venting / braking without harsh flash
+      st.hitstop = 0;
+      st.flash = 0.12;
+      st.shake = 0.25;
+      st.recoil = 2.5;
+      st.chroma = 0.35;
+      st.shock = 0;
+    }
+  }
+
+  function setIdx(i, withJuice = true) {
+    const clamped = Math.max(0, Math.min(4, i));
+    if (withJuice && clamped !== st.idx) triggerShift(clamped, st.idx);
+    st.idx = clamped;
+    st.target = clamped / 4;
+    syncUi();
+  }
+
+  function syncUi() {
+    const c = scheme.colors[st.idx];
+    dot.style.background = c;
+    dot.style.boxShadow = `0 0 8px ${c}`;
+    beatEl.textContent = scheme.beats[st.idx];
+    lvlEl.textContent = `档位 · ${LEVELS[st.idx]}`;
+    [...ticks.children].forEach((b, i) => b.classList.toggle('on', i === st.idx));
+  }
+
+  LEVELS.forEach((lbl, i) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = lbl;
+    b.onclick = () => setIdx(i, true);
+    ticks.append(b);
+  });
+
+  // Render 5-tier static storyboard strip
+  LEVELS.forEach((lbl, i) => {
+    const th = document.createElement('div');
+    th.className = 'thumb';
+    const tc = document.createElement('canvas');
+    tc.width = 160; tc.height = 50;
+    const tctx = tc.getContext('2d');
+    const ratio = i / 4;
+    const kx = 22 + ratio * (160 - 44);
+    DRAWERS[scheme.id](tctx, 160, 50, i, ratio, kx, 3.1, 0);
+    th.append(tc);
+    const sp = document.createElement('span'); sp.textContent = lbl; th.append(sp);
+    th.onclick = () => setIdx(i, true);
+    strip.append(th);
+  });
+
+  syncUi();
+
+  const xToRatio = (e) => {
+    const r = track.getBoundingClientRect();
+    return Math.max(0, Math.min(1, (e.clientX - r.left - 28) / Math.max(20, r.width - 56)));
+  };
+  track.addEventListener('pointerdown', (e) => {
+    st.drag = true;
+    track.setPointerCapture(e.pointerId);
+    const r = xToRatio(e);
+    st.target = r;
+    const next = Math.round(r * 4);
+    if (next !== st.idx) setIdx(next, true);
+  });
+  track.addEventListener('pointermove', (e) => {
+    if (!st.drag) return;
+    const r = xToRatio(e);
+    st.target = r;
+    const next = Math.round(r * 4);
+    if (next !== st.idx) setIdx(next, true);
+  });
+  track.addEventListener('pointerup', () => {
+    if (!st.drag) return;
+    st.drag = false;
+    setIdx(Math.round(st.target * 4), false);
+  });
+
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min(0.05, Math.max(0.001, (now - last) / 1000));
+    last = now;
+
+    // Read layout clientWidth (never getBoundingClientRect) so popover transform never thrashes canvas
+    const w = Math.max(160, track.clientWidth || 320);
+    const h = 50;
+    const dpr = Math.min(2, devicePixelRatio || 1);
+    const cw = Math.round(w * dpr), ch = Math.round(h * dpr);
+    if (cv.width !== cw || cv.height !== ch) {
+      cv.width = cw; cv.height = ch;
+      off.width = cw; off.height = ch;
+    }
+
+    if (st.hitstop > 0) {
+      st.hitstop = Math.max(0, st.hitstop - dt);
+    } else {
+      st.t += dt;
+      st.val += (st.target - st.val) * (st.drag ? 0.45 : 0.28);
+      st.flash = Math.max(0, st.flash - dt * 4.5);
+      st.shake = Math.max(0, st.shake - dt * 6.2);
+      st.recoil *= Math.pow(0.001, dt);
+      st.chroma = Math.max(0, st.chroma - dt * 7.5);
+      st.shock = Math.max(0, st.shock - dt * 4.8);
+    }
+
+    // Track micro-shake (1-2px) on the pill well only
+    if (st.shake > 0.02) {
+      const dx = (Math.sin(now * 0.09) * 1.8 * st.shake).toFixed(2);
+      const dy = (Math.cos(now * 0.13) * 1.3 * st.shake).toFixed(2);
+      well.style.transform = `translate3d(${dx}px,${dy}px,0)`;
+    } else if (well.style.transform) {
+      well.style.transform = '';
+    }
+
+    const pad = 28;
+    const kx = pad + st.val * (w - pad * 2) + st.recoil;
+    const ky = h / 2;
+
+    octx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    octx.clearRect(0, 0, w, h);
+    DRAWERS[scheme.id](octx, w, h, st.idx, st.val, kx, st.t, st.shock);
+
+    // Detent dots
+    for (let i = 0; i < 5; i++) {
+      const dx = pad + (i / 4) * (w - pad * 2);
+      octx.fillStyle = i <= st.idx ? 'rgba(255,255,255,0.92)' : 'rgba(255,255,255,0.28)';
+      octx.beginPath(); octx.arc(dx, h - 4.5, i === st.idx ? 1.9 : 1.1, 0, 7); octx.fill();
+    }
+
+    // Single-frame tier flash
+    if (st.flash > 0.01) {
+      octx.save();
+      octx.fillStyle = st.flashColor;
+      octx.globalAlpha = st.flash;
+      octx.fillRect(0, 0, w, h);
+      octx.restore();
+    }
+
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, cw, ch);
+    ctx.drawImage(off, 0, 0);
+
+    // Liquid glass lens (48x44) with magnified refraction & dynamic chromatic dispersion burst
+    ctx.save();
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const kw = 48 + st.chroma * 3;
+    const kh = 44 - st.chroma * 1.5;
+    const kr = kh / 2;
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,0.48)'; ctx.shadowBlur = st.drag ? 16 : 10; ctx.shadowOffsetY = 3;
+    ctx.fillStyle = 'rgba(0,0,0,0.25)';
+    ctx.beginPath(); ctx.roundRect(kx - kw / 2, ky - kh / 2, kw, kh, kr); ctx.fill();
+    ctx.restore();
+
+    ctx.save();
+    ctx.beginPath(); ctx.roundRect(kx - kw / 2, ky - kh / 2, kw, kh, kr); ctx.clip();
+    const mag = st.drag ? 1.42 : 1.3;
+    const sw = (kw / mag) * dpr, sh = (kh / mag) * dpr;
+    const sx = Math.max(0, Math.min(cw - sw, kx * dpr - sw / 2));
+    const sy = Math.max(0, Math.min(ch - sh, ky * dpr - sh / 2));
+    ctx.drawImage(off, sx, sy, sw, sh, kx - kw / 2, ky - kh / 2, kw, kh);
+
+    const disp = 1.6 + st.chroma * 2.8;
+    ctx.globalCompositeOperation = 'screen';
+    ctx.globalAlpha = 0.24 + st.chroma * 0.28;
+    ctx.drawImage(off, Math.max(0, sx - disp * dpr), sy, sw, sh, kx - kw / 2 - disp, ky - kh / 2, kw, kh);
+    ctx.drawImage(off, Math.min(cw - sw, sx + disp * dpr), sy, sw, sh, kx - kw / 2 + disp, ky - kh / 2, kw, kh);
+    ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
+
+    const gg = ctx.createLinearGradient(kx, ky - kh / 2, kx, ky + kh / 2);
+    gg.addColorStop(0, 'rgba(255,255,255,0.46)'); gg.addColorStop(0.3, 'rgba(255,255,255,0.06)');
+    gg.addColorStop(0.8, 'rgba(255,255,255,0.02)'); gg.addColorStop(1, 'rgba(255,255,255,0.28)');
+    ctx.fillStyle = gg; ctx.fillRect(kx - kw / 2, ky - kh / 2, kw, kh);
+    ctx.fillStyle = 'rgba(255,255,255,0.74)';
+    ctx.beginPath(); ctx.ellipse(kx - 4, ky - kh * 0.3, kw * 0.26, kh * 0.09, 0, 0, 7); ctx.fill();
+    ctx.restore();
+
+    const rg = ctx.createLinearGradient(kx, ky - kh / 2, kx, ky + kh / 2);
+    rg.addColorStop(0, 'rgba(255,255,255,0.95)');
+    rg.addColorStop(0.55, 'rgba(255,255,255,0.35)');
+    rg.addColorStop(1, scheme.colors[st.idx]);
+    ctx.strokeStyle = rg; ctx.lineWidth = st.drag || st.chroma > 0.2 ? 2.0 : 1.4;
+    ctx.beginPath(); ctx.roundRect(kx - kw / 2 + 0.7, ky - kh / 2 + 0.7, kw - 1.4, kh - 1.4, kr); ctx.stroke();
+    ctx.restore();
+
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+
+  controllers.push({ setIdx });
+});
+
+// One-click 5-tier escalation demo across all 4 cards
+let demoTimer = null;
+document.getElementById('demoBtn').onclick = () => {
+  if (demoTimer) clearInterval(demoTimer);
+  let step = 0;
+  controllers.forEach(c => c.setIdx(0, false));
+  demoTimer = setInterval(() => {
+    step++;
+    if (step > 4) { clearInterval(demoTimer); demoTimer = null; return; }
+    controllers.forEach(c => c.setIdx(step, true));
+  }, 680);
+};
+</script>
+</body>
+</html>

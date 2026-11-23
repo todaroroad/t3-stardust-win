@@ -1,0 +1,96 @@
+.trail-approval {
+  color: var(--foreground);
+}
+.trail-approval:focus-visible,
+.trail-approval button:focus-visible,
+.trail-approval-code:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.trail-approval-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+.trail-approval-heading > span {
+  margin-left: auto;
+  color: var(--muted-foreground);
+  font-size: 11px;
+}
+.trail-approval-risk {
+  display: inline-block;
+  padding: 2px 7px;
+  background: var(--secondary);
+  border-radius: 8px;
+  color: var(--muted-foreground);
+  margin-bottom: 8px;
+  font-size: 11px;
+}
+.trail-approval p {
+  margin: 0 0 8px;
+  overflow-wrap: anywhere;
+  color: var(--muted-foreground);
+}
+.trail-approval-code {
+  background: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 9px;
+  font-size: 11px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  overflow: auto;
+  max-height: 24rem;
+}
+.trail-approval-code[data-expanded="false"] {
+  max-height: 7rem;
+  overflow: hidden;
+}
+.trail-approval-expand {
+  margin-top: 6px;
+  color: var(--primary);
+  cursor: pointer;
+}
+.trail-approval-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+.trail-approval-actions button {
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+  cursor: pointer;
+}
+.trail-approval-actions button[data-decision="accept"] {
+  background: var(--primary);
+  color: var(--primary-foreground);
+  border-color: var(--primary);
+}
+.trail-approval small {
+  display: block;
+  margin-top: 9px;
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+.trail-approval [role="alert"] {
+  color: var(--destructive);
+  margin-top: 8px;
+}
+.trail-approval-result {
+  margin: 5px 0 8px 30px;
+  color: var(--muted-foreground);
+  font-size: 11px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .trail-approval,
+  .trail-approval-result {
+    animation: none !important;
+    transition: none !important;
+  }
+}

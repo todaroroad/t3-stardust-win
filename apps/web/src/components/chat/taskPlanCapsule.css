@@ -1,0 +1,1333 @@
+@import "./taskTrailApproval.css";
+
+/* Floating task-plan capsule above the composer. Three corner radii (20 > 14 > 8, each inside
+ * the one around it by the 6px pad), integer type sizes (13/12/11), no looping animation. */
+.plan-anchor {
+  position: relative;
+  height: 0;
+  z-index: 20;
+  container-type: inline-size;
+}
+.plan-anchor-slot {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 8px;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+/* 32px circular scroll-to-end button sharing the float-anchor coordinate frame */
+.scroll-end-button {
+  position: absolute;
+  bottom: 4px;
+  left: calc(50% - 16px);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 0;
+  padding: 0;
+  color: color-mix(in srgb, var(--muted-foreground) 70%, var(--foreground));
+  background: color-mix(in srgb, var(--card) 88%, transparent);
+  -webkit-backdrop-filter: blur(24px) saturate(1.6);
+  backdrop-filter: blur(24px) saturate(1.6);
+  box-shadow:
+    0 0 0 1px var(--border),
+    0 1px 2px rgb(0 0 0 / 0.06),
+    0 4px 12px -4px rgb(0 0 0 / 0.12);
+  cursor: pointer;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(6px);
+  transition:
+    opacity 160ms cubic-bezier(0.4, 0, 0.2, 1),
+    transform 160ms cubic-bezier(0.4, 0, 0.2, 1),
+    left 180ms cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 140ms ease,
+    color 140ms ease,
+    visibility 0s 160ms;
+}
+@supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  .scroll-end-button {
+    background: var(--card);
+  }
+}
+.scroll-end-button[data-show="true"] {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: none;
+  transition-duration: 180ms, 180ms, 180ms, 140ms, 140ms, 0s;
+  transition-timing-function:
+    cubic-bezier(0.22, 1, 0.36, 1),
+    cubic-bezier(0.22, 1, 0.36, 1),
+    cubic-bezier(0.22, 1, 0.36, 1),
+    ease,
+    ease,
+    linear;
+}
+.scroll-end-button:hover {
+  color: var(--foreground);
+  background: var(--card);
+}
+.scroll-end-button:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.plan-anchor-slot:has(.plan-capsule:not([data-visible="false"])) .scroll-end-button {
+  left: calc(100% - 32px);
+}
+@container (max-width: 679px) {
+  .plan-anchor-slot:has(.plan-capsule[data-open="true"]:not([data-visible="false"]))
+    .scroll-end-button {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+  }
+}
+.scroll-end-dot {
+  position: absolute;
+  top: -1px;
+  right: -1px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--primary);
+  box-shadow: 0 0 0 2px var(--background);
+}
+@media (prefers-reduced-motion: reduce) {
+  .scroll-end-button {
+    transform: none;
+    transition-duration: 160ms, 0s, 160ms, 0s, 0s, 0s;
+  }
+}
+.plan-capsule,
+.plan-summary {
+  --plan-width: 440px;
+  --plan-ease-open: cubic-bezier(0.32, 0.72, 0, 1);
+  --plan-ease-close: cubic-bezier(0.4, 0, 0.2, 1);
+  --plan-ease-swap: cubic-bezier(0.22, 1, 0.36, 1);
+  --plan-open: 360ms;
+  --plan-close: 240ms;
+  --plan-detail-open: 320ms;
+  --plan-detail-close: 220ms;
+  --plan-fade-in: 200ms;
+  --plan-fade-out: 140ms;
+  --plan-shift: 8px;
+  --plan-accent: var(--primary);
+  --plan-accent-text: color-mix(in srgb, var(--primary) 60%, var(--foreground));
+  --plan-warn-text: color-mix(in srgb, var(--warning) 40%, var(--foreground));
+  --plan-err-text: color-mix(in srgb, var(--destructive) 50%, var(--foreground));
+  --plan-ok-text: color-mix(in srgb, var(--success) 60%, var(--foreground));
+  --plan-muted: color-mix(in srgb, var(--muted-foreground) 70%, var(--foreground));
+  --plan-hint: var(--primary);
+  color: var(--foreground);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.plan-capsule {
+  position: relative;
+  width: min(var(--plan-width), 100%);
+  min-width: 0;
+  pointer-events: auto;
+  /* No end fill: a filling opacity animation makes this element a backdrop root, and the card's
+     backdrop-filter would then blur nothing behind it. */
+  animation: plan-appear var(--plan-fade-in) var(--plan-ease-swap) backwards;
+  transition:
+    width var(--plan-close) var(--plan-ease-close),
+    opacity var(--plan-fade-in) var(--plan-ease-swap),
+    transform var(--plan-fade-in) var(--plan-ease-swap),
+    visibility 0s;
+}
+.plan-capsule *,
+.plan-capsule *::before,
+.plan-capsule *::after,
+.plan-summary *,
+.plan-summary *::before,
+.plan-summary *::after {
+  box-sizing: border-box;
+}
+.plan-capsule[data-open="true"] {
+  --plan-width: 600px;
+  transition:
+    width var(--plan-open) var(--plan-ease-open),
+    opacity var(--plan-fade-in) var(--plan-ease-swap),
+    transform var(--plan-fade-in) var(--plan-ease-swap),
+    visibility 0s;
+}
+.plan-capsule[data-visible="false"] {
+  opacity: 0;
+  transform: translateY(var(--plan-shift));
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    width 0s,
+    opacity var(--plan-fade-out) var(--plan-ease-close),
+    transform var(--plan-fade-out) var(--plan-ease-close),
+    visibility 0s var(--plan-fade-out);
+}
+.plan-capsule[data-mode="need"] {
+  --plan-hint: var(--warning);
+}
+.plan-capsule[data-mode="problem"] {
+  --plan-hint: var(--destructive);
+}
+@keyframes plan-appear {
+  from {
+    opacity: 0;
+    transform: translateY(var(--plan-shift));
+  }
+}
+.plan-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 20px;
+  background: color-mix(in srgb, var(--card) 88%, transparent);
+  -webkit-backdrop-filter: blur(24px) saturate(1.6);
+  backdrop-filter: blur(24px) saturate(1.6);
+  box-shadow:
+    0 0 0 1px var(--border),
+    inset 0 0 0 1px color-mix(in srgb, var(--background) 50%, transparent),
+    0 1px 2px rgb(0 0 0 / 0.05),
+    0 8px 24px -12px rgb(0 0 0 / 0.14);
+}
+/* The deeper shadow fades in on a separate layer; box-shadow itself is never animated. */
+.plan-shadow {
+  position: absolute;
+  inset: 0;
+  border-radius: 20px;
+  box-shadow:
+    0 2px 6px rgb(0 0 0 / 0.06),
+    0 22px 48px -14px rgb(0 0 0 / 0.26);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--plan-close) var(--plan-ease-close);
+}
+.plan-capsule[data-open="true"] .plan-shadow {
+  opacity: 1;
+  transition-duration: var(--plan-open);
+  transition-timing-function: var(--plan-ease-open);
+}
+/* One 700ms outline pulse when attention is first needed. */
+.plan-hint {
+  position: absolute;
+  inset: 0;
+  border-radius: 20px;
+  pointer-events: none;
+  z-index: 1;
+}
+.plan-hint[data-hint="true"] {
+  animation: plan-hint 700ms var(--plan-ease-swap) 1 both;
+}
+@keyframes plan-hint {
+  from {
+    box-shadow: inset 0 0 0 2px var(--plan-hint);
+  }
+  to {
+    box-shadow: inset 0 0 0 2px transparent;
+  }
+}
+.plan-panel {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--plan-close) var(--plan-ease-close);
+}
+.plan-capsule[data-open="true"] .plan-panel {
+  grid-template-rows: 1fr;
+  transition: grid-template-rows var(--plan-open) var(--plan-ease-open);
+}
+.plan-panel-clip {
+  min-height: 0;
+  overflow: hidden;
+}
+.plan-panel-body {
+  display: flex;
+  flex-direction: column;
+  max-height: clamp(150px, calc(100dvh - 300px), 480px);
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity var(--plan-fade-out) var(--plan-ease-close),
+    visibility 0s var(--plan-fade-out);
+}
+.plan-capsule[data-open="true"] .plan-panel-body {
+  opacity: 1;
+  visibility: visible;
+  transition:
+    opacity var(--plan-fade-in) var(--plan-ease-swap) 60ms,
+    visibility 0s;
+}
+.plan-panel-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px 6px 16px;
+  font-size: 12px;
+  color: var(--plan-muted);
+}
+.plan-panel-head strong {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--foreground);
+}
+.plan-panel-spacer {
+  flex: 1;
+}
+.plan-capsule kbd {
+  font:
+    11px/1 ui-monospace,
+    "SF Mono",
+    Menlo,
+    monospace;
+  padding: 3px 5px;
+  border-radius: 8px;
+  background: var(--secondary);
+  border: 1px solid var(--border);
+  color: var(--plan-muted);
+}
+.plan-panel-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 0 6px 6px;
+  scrollbar-width: thin;
+}
+
+.plan-bar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 40px;
+  padding: 0 14px 0 12px;
+  border-radius: 20px;
+  text-align: left;
+  cursor: pointer;
+}
+.plan-bar:hover {
+  background: color-mix(in srgb, var(--foreground) 4%, transparent);
+}
+.plan-capsule :focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.plan-bar:focus-visible,
+.plan-stage-row:focus-visible {
+  outline-offset: -2px;
+}
+.plan-ring {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  overflow: visible;
+}
+.plan-ring circle,
+.plan-ring path {
+  fill: none;
+}
+.plan-ring-track {
+  stroke: color-mix(in srgb, var(--foreground) 22%, transparent);
+  stroke-width: 2;
+}
+.plan-ring-arc {
+  stroke: var(--plan-accent);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-dasharray: var(--plan-percent, 0) 100;
+  transform: rotate(-90deg);
+  transform-origin: 9px 9px;
+  transition: stroke-dasharray 400ms var(--plan-ease-open);
+}
+.plan-ring-dash {
+  stroke: var(--warning);
+  stroke-width: 2;
+  stroke-dasharray: 3 3.2;
+  opacity: 0;
+}
+.plan-ring .plan-ring-fill {
+  fill: var(--success);
+  opacity: 0;
+}
+.plan-ring-check {
+  stroke: #fff;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0;
+}
+.plan-ring-alert {
+  stroke: var(--destructive);
+  stroke-width: 2;
+  stroke-linecap: round;
+  opacity: 0;
+}
+.plan-ring[data-mode="need"] .plan-ring-track,
+.plan-ring[data-mode="need"] .plan-ring-arc {
+  opacity: 0;
+}
+.plan-ring[data-mode="need"] .plan-ring-dash {
+  opacity: 1;
+}
+.plan-ring[data-mode="problem"] .plan-ring-arc {
+  stroke: var(--destructive);
+}
+.plan-ring[data-mode="problem"] .plan-ring-alert {
+  opacity: 1;
+}
+.plan-ring[data-mode="done"] .plan-ring-fill,
+.plan-ring[data-mode="done"] .plan-ring-check {
+  opacity: 1;
+}
+.plan-ring[data-mode="done"] .plan-ring-track,
+.plan-ring[data-mode="done"] .plan-ring-arc {
+  opacity: 0;
+}
+.plan-title {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  height: 20px;
+  overflow: hidden;
+}
+.plan-title > span {
+  position: absolute;
+  inset: 0;
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 20px;
+}
+.plan-title[data-swapping="true"] .plan-title-in {
+  animation: plan-title-in 300ms var(--plan-ease-swap) both;
+}
+.plan-title-out {
+  animation: plan-title-out 200ms var(--plan-ease-close) both;
+}
+@keyframes plan-title-in {
+  from {
+    opacity: 0;
+    transform: translateY(var(--plan-shift));
+  }
+}
+@keyframes plan-title-out {
+  to {
+    opacity: 0;
+    transform: translateY(calc(var(--plan-shift) * -0.75));
+  }
+}
+.plan-pill {
+  flex: none;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--secondary);
+  color: var(--plan-muted);
+  font-size: 11px;
+  line-height: 18px;
+  white-space: nowrap;
+}
+.plan-pill[data-tone="need"] {
+  background: color-mix(in srgb, var(--warning) 16%, transparent);
+  color: var(--plan-warn-text);
+}
+.plan-pill[data-tone="problem"] {
+  background: color-mix(in srgb, var(--destructive) 14%, transparent);
+  color: var(--plan-err-text);
+}
+.plan-segments {
+  display: flex;
+  gap: 3px;
+  width: 68px;
+  flex: none;
+}
+.plan-segments i {
+  flex: 1;
+  height: 4px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--foreground) 14%, transparent);
+  transition: background-color 400ms var(--plan-ease-open);
+}
+.plan-segments i[data-status="done"] {
+  background: var(--foreground);
+}
+.plan-segments i[data-status="run"] {
+  background: var(--plan-accent);
+}
+.plan-segments i[data-status="need"] {
+  background: var(--warning);
+}
+.plan-segments i[data-status="problem"] {
+  background: var(--destructive);
+}
+.plan-capsule[data-mode="done"] .plan-segments i {
+  background: var(--success);
+}
+.plan-count {
+  flex: none;
+  min-width: 26px;
+  text-align: right;
+  color: var(--plan-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.plan-chevron {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  color: var(--plan-muted);
+  transition: transform var(--plan-close) var(--plan-ease-close);
+}
+.plan-capsule[data-open="true"] .plan-chevron {
+  transform: rotate(180deg);
+  transition-duration: var(--plan-open);
+  transition-timing-function: var(--plan-ease-open);
+}
+
+.plan-stages {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.plan-stage-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 36px;
+  padding: 0 10px;
+  border-radius: 14px;
+  text-align: left;
+}
+button.plan-stage-row {
+  cursor: pointer;
+}
+button.plan-stage-row:hover {
+  background: color-mix(in srgb, var(--foreground) 4%, transparent);
+}
+.plan-stage-mark {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border: 1.5px solid color-mix(in srgb, var(--foreground) 28%, transparent);
+  border-radius: 50%;
+}
+.plan-stage-mark svg {
+  width: 10px;
+  height: 10px;
+  fill: none;
+  stroke: var(--card);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.plan-stage-mark[data-status="done"] {
+  background: var(--foreground);
+  border-color: var(--foreground);
+}
+.plan-stage-mark[data-status="run"] {
+  border-color: var(--plan-accent);
+  background: radial-gradient(circle, var(--plan-accent) 38%, transparent 42%);
+}
+.plan-stage-mark[data-status="need"] {
+  border-style: dashed;
+  border-color: var(--warning);
+}
+.plan-stage-mark[data-status="problem"] {
+  border-color: var(--destructive);
+  background: color-mix(in srgb, var(--destructive) 14%, transparent);
+}
+.plan-stage-mark[data-status="problem"]::after {
+  content: "";
+  width: 2px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--destructive);
+}
+.plan-stage-name {
+  flex: none;
+  max-width: 55%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 13px;
+}
+.plan-stage[data-status="todo"] .plan-stage-name {
+  color: var(--plan-muted);
+}
+.plan-stage[data-current="true"] .plan-stage-name {
+  font-weight: 600;
+}
+.plan-stage-summary {
+  min-width: 0;
+  margin-left: auto;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--plan-muted);
+  font-size: 12px;
+}
+.plan-stage-summary[data-tone="run"] {
+  color: var(--plan-accent-text);
+}
+.plan-stage-summary[data-tone="need"] {
+  color: var(--plan-warn-text);
+}
+.plan-stage-summary[data-tone="problem"] {
+  color: var(--plan-err-text);
+}
+.plan-stage-chevron {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  color: var(--plan-muted);
+  transition: transform var(--plan-detail-close) var(--plan-ease-close);
+}
+.plan-stage[data-open="true"] .plan-stage-chevron {
+  transform: rotate(90deg);
+  transition-duration: var(--plan-detail-open);
+  transition-timing-function: var(--plan-ease-open);
+}
+.plan-detail {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--plan-detail-close) var(--plan-ease-close);
+}
+.plan-stage[data-open="true"] .plan-detail {
+  grid-template-rows: 1fr;
+  transition: grid-template-rows var(--plan-detail-open) var(--plan-ease-open);
+}
+.plan-detail-clip {
+  min-height: 0;
+  overflow: hidden;
+}
+.plan-detail-body {
+  padding: 2px 0 6px;
+  opacity: 0;
+  transition: opacity var(--plan-fade-out) ease;
+}
+.plan-stage[data-open="true"] .plan-detail-body {
+  opacity: 1;
+  transition: opacity var(--plan-fade-in) ease 40ms;
+}
+/* A stage's operations scroll inside a fixed window instead of growing the panel. */
+.plan-operations {
+  max-height: 176px;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.plan-operations .task-command-activities {
+  margin: 0 10px 0 34px;
+}
+.plan-detail-body > :not(.plan-operations) {
+  margin-inline: 4px;
+}
+
+/* Text inside stage details keeps at least 4.5:1 on every theme's card. */
+:is(.plan-capsule, .plan-summary)
+  :is(
+    .task-command-path,
+    .task-command-status,
+    .task-command-more,
+    .task-command-toggle,
+    .task-command-icon,
+    .trail-approval p,
+    .trail-approval small,
+    .trail-approval-risk,
+    .trail-approval-heading > span,
+    .trail-approval-expand
+  ) {
+  color: var(--plan-muted);
+}
+:is(.plan-capsule, .plan-summary)
+  .task-command-row[data-status="failed"]:not([data-failure="no-result"])
+  :is(.task-command-label, .task-command-status, .task-command-icon) {
+  color: var(--plan-err-text);
+}
+
+/* Cards a stage can hold: an approval or a question to answer. */
+.combo-decision {
+  margin: 4px 0 8px 30px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--card);
+}
+.combo-decision p {
+  margin-bottom: 10px;
+}
+.combo-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.combo-options button {
+  flex: 1 1 100px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px;
+  cursor: pointer;
+  text-align: left;
+  background: var(--card);
+}
+.combo-options button[aria-pressed="true"] {
+  outline: 1px solid var(--foreground);
+}
+.combo-options button:focus-visible,
+.combo-decision button:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.combo-options img {
+  width: 100%;
+  height: 80px;
+  object-fit: contain;
+  margin-bottom: 6px;
+}
+.combo-options small {
+  display: block;
+  color: var(--plan-muted);
+  margin-top: 3px;
+}
+.combo-decision button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.combo-decision-more {
+  margin-top: 10px;
+  color: var(--plan-muted);
+  cursor: pointer;
+}
+
+/* 瓷白 Porcelain has no material: a plain surface and a hairline. */
+html[data-theme-id="porcelain"] .plan-card {
+  background: var(--card);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: 0 0 0 1px var(--border);
+}
+html[data-theme-id="porcelain"] .plan-shadow {
+  box-shadow: 0 8px 24px -16px rgb(0 0 0 / 0.2);
+}
+@media (prefers-reduced-transparency: reduce) {
+  .plan-card {
+    background: var(--card);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+@media (max-width: 480px) {
+  .plan-segments {
+    width: 36px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .plan-capsule {
+    --plan-open: 160ms;
+    --plan-close: 160ms;
+    --plan-detail-open: 160ms;
+    --plan-detail-close: 160ms;
+    --plan-shift: 0px;
+  }
+  .plan-ring-arc,
+  .plan-segments i,
+  .plan-hint[data-hint="true"],
+  .plan-title[data-swapping="true"] .plan-title-in,
+  .plan-title-out {
+    animation: none;
+    transition: none;
+  }
+  .plan-title-out {
+    display: none;
+  }
+}
+
+/* History row: the finished plan, one line, openable. */
+.plan-summary {
+  --plan-ease-open: cubic-bezier(0.32, 0.72, 0, 1);
+  --plan-ease-close: cubic-bezier(0.4, 0, 0.2, 1);
+  --plan-open: 360ms;
+  --plan-close: 240ms;
+  --plan-detail-open: 320ms;
+  --plan-detail-close: 220ms;
+  --plan-fade-in: 200ms;
+  --plan-fade-out: 140ms;
+  border-radius: 20px;
+  background: var(--card);
+  box-shadow: 0 0 0 1px var(--border);
+  overflow: hidden;
+}
+.plan-summary-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 40px;
+  padding: 0 14px 0 12px;
+  text-align: left;
+  cursor: pointer;
+}
+.plan-summary-bar:hover {
+  background: color-mix(in srgb, var(--foreground) 4%, transparent);
+}
+.plan-summary :focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
+}
+.plan-summary-check {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--success);
+  color: #fff;
+}
+.plan-summary-check svg {
+  width: 12px;
+  height: 12px;
+  stroke-width: 2.5;
+}
+.plan-summary-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 13px;
+  font-weight: 600;
+}
+.plan-summary-chevron {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  color: var(--plan-muted);
+  transition: transform var(--plan-close) var(--plan-ease-close);
+}
+.plan-summary[data-open="true"] .plan-summary-chevron {
+  transform: rotate(180deg);
+  transition-duration: var(--plan-open);
+  transition-timing-function: var(--plan-ease-open);
+}
+.plan-summary-body {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--plan-close) var(--plan-ease-close);
+}
+.plan-summary[data-open="true"] .plan-summary-body {
+  grid-template-rows: 1fr;
+  transition: grid-template-rows var(--plan-open) var(--plan-ease-open);
+}
+.plan-summary-clip {
+  min-height: 0;
+  overflow: hidden;
+}
+.plan-summary-scroll {
+  max-height: min(50vh, 420px);
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 0 6px 6px;
+}
+html[data-theme-id="porcelain"] .plan-summary {
+  background: transparent;
+}
+@media (prefers-reduced-motion: reduce) {
+  .plan-summary {
+    --plan-open: 160ms;
+    --plan-close: 160ms;
+    --plan-detail-open: 160ms;
+    --plan-detail-close: 160ms;
+  }
+}
+
+/* Grouped tool sub-items (shared structure across themes) */
+.plan-head-badge,
+.plan-stage-badge,
+.plan-bar-ico {
+  display: none;
+}
+.plan-collapse-btn {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  padding: 0;
+  cursor: pointer;
+}
+.plan-step-sub {
+  margin: 4px 10px 4px 25px;
+  padding-left: 10px;
+  border-left: 1.5px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.plan-tool-chip {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 11.5px;
+  color: var(--plan-muted);
+  font-family: var(--font-mono);
+  flex-wrap: wrap;
+}
+.plan-tool-tag {
+  font-family: var(--font-sans);
+  font-size: 10.5px;
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: var(--secondary);
+  color: var(--plan-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.plan-tool-items {
+  display: inline;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.plan-step-sub .plan-tool-item.task-command-row {
+  display: inline;
+  padding: 0;
+  margin: 0;
+  gap: 0;
+  min-height: 0;
+  font-size: inherit;
+  color: inherit;
+}
+.plan-tool-item[data-status="failed"]:not([data-failure="no-result"]) {
+  color: var(--plan-err-text);
+}
+.plan-tool-sep {
+  opacity: 0.7;
+}
+.plan-tool-file {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: none;
+}
+.plan-tool-file:hover {
+  color: var(--foreground);
+  text-decoration: underline;
+}
+
+/* ==================== V9 Plan A (Apple Theme) ==================== */
+html[data-theme-id="apple"] .plan-capsule {
+  --plan-width: 520px;
+  width: min(520px, 100%);
+  pointer-events: none;
+  transition:
+    opacity var(--plan-fade-in) var(--plan-ease-swap),
+    transform var(--plan-fade-in) var(--plan-ease-swap),
+    visibility 0s;
+}
+html[data-theme-id="apple"] .plan-capsule[data-open="true"] {
+  --plan-width: 520px;
+  width: min(520px, 100%);
+}
+html[data-theme-id="apple"] .plan-shadow {
+  display: none;
+}
+html[data-theme-id="apple"] .plan-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  overflow: visible;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+html[data-theme-id="apple"] .plan-hint {
+  display: none;
+}
+html[data-theme-id="apple"] .plan-panel {
+  display: block;
+  width: 100%;
+  position: absolute;
+  bottom: 44px;
+  left: 0;
+  transform-origin: bottom center;
+  opacity: 0;
+  transform: translateY(12px) scale(0.92);
+  filter: blur(4px);
+  pointer-events: none;
+  visibility: hidden;
+  transition:
+    transform 360ms var(--apple-spring, cubic-bezier(0.3, 0.7, 0.2, 1)),
+    opacity 220ms ease,
+    filter 220ms ease,
+    visibility 0s 220ms;
+}
+html[data-theme-id="apple"] .plan-capsule[data-open="true"] .plan-panel {
+  position: relative;
+  bottom: auto;
+  left: auto;
+  margin-bottom: 8px;
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  filter: blur(0px);
+  pointer-events: auto;
+  visibility: visible;
+  transition:
+    transform 360ms var(--apple-spring, cubic-bezier(0.3, 0.7, 0.2, 1)),
+    opacity 220ms ease,
+    filter 220ms ease,
+    visibility 0s;
+}
+html[data-theme-id="apple"] .plan-panel-clip {
+  overflow: visible;
+}
+html[data-theme-id="apple"] .plan-panel-body {
+  width: 100%;
+  max-height: min(480px, calc(100dvh - 120px));
+  background: var(--apple-glass-strong, rgba(255, 255, 255, 0.95));
+  -webkit-backdrop-filter: blur(26px) saturate(1.7);
+  backdrop-filter: blur(26px) saturate(1.7);
+  border-radius: 18px;
+  box-shadow: var(
+    --apple-float-shadow,
+    0 0 0 0.5px rgba(0, 0, 0, 0.09),
+    0 16px 40px -8px rgba(0, 0, 0, 0.16),
+    0 4px 12px rgba(0, 0, 0, 0.05)
+  );
+  border: 0.5px solid var(--apple-line, rgba(0, 0, 0, 0.085));
+  overflow: hidden;
+  opacity: 1;
+  visibility: visible;
+  transition: none;
+}
+html[data-theme-id="apple"] .plan-panel-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 14px 9px;
+  border-bottom: 0.5px solid var(--apple-hair, rgba(0, 0, 0, 0.055));
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--foreground);
+  flex-wrap: wrap;
+}
+html[data-theme-id="apple"] .plan-panel-head strong {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--foreground);
+}
+html[data-theme-id="apple"] .plan-head-meta {
+  color: var(--muted-foreground);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+html[data-theme-id="apple"] .plan-head-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 21px;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+html[data-theme-id="apple"] .plan-head-badge[data-tone="ok"] {
+  background: rgba(52, 199, 89, 0.13);
+  color: #1d8a3f;
+}
+html[data-theme-id="apple"] .plan-head-badge[data-tone="info"] {
+  background: rgba(0, 122, 255, 0.12);
+  color: #007aff;
+}
+html[data-theme-id="apple"].dark .plan-head-badge[data-tone="ok"] {
+  background: rgba(48, 209, 88, 0.16);
+  color: #30d158;
+}
+html[data-theme-id="apple"].dark .plan-head-badge[data-tone="info"] {
+  background: rgba(10, 132, 255, 0.18);
+  color: #0a84ff;
+}
+html[data-theme-id="apple"] .plan-collapse-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 550;
+  background: var(--apple-fill, rgba(118, 118, 128, 0.095));
+  color: var(--foreground);
+  white-space: nowrap;
+  transition:
+    background 180ms,
+    transform 160ms var(--apple-spring, cubic-bezier(0.3, 0.7, 0.2, 1));
+}
+html[data-theme-id="apple"] .plan-collapse-btn:hover {
+  background: var(--apple-fill-hover, rgba(118, 118, 128, 0.155));
+}
+html[data-theme-id="apple"] .plan-collapse-btn:active {
+  transform: scale(0.95);
+}
+html[data-theme-id="apple"] .plan-esc-kbd {
+  display: none;
+}
+html[data-theme-id="apple"] .plan-panel-scroll {
+  padding: 6px;
+}
+html[data-theme-id="apple"] .plan-stages {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+html[data-theme-id="apple"] .plan-stage {
+  border-radius: 11px;
+  padding: 8px 10px;
+  transition: background 160ms;
+}
+html[data-theme-id="apple"] .plan-stage:hover {
+  background: var(--apple-fill, rgba(118, 118, 128, 0.095));
+}
+html[data-theme-id="apple"] .plan-stage-row {
+  min-height: 0;
+  padding: 0;
+  gap: 9px;
+  border-radius: 0;
+  font-size: 12.8px;
+}
+html[data-theme-id="apple"] button.plan-stage-row:hover {
+  background: transparent;
+}
+html[data-theme-id="apple"] .plan-stage-mark,
+html[data-theme-id="apple"] .plan-bar-ico {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+}
+html[data-theme-id="apple"] .plan-stage-mark svg,
+html[data-theme-id="apple"] .plan-bar-ico svg {
+  width: 10px;
+  height: 10px;
+  fill: none;
+  stroke: var(--card);
+  stroke-width: 2.3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+html[data-theme-id="apple"] .plan-stage-mark[data-status="done"],
+html[data-theme-id="apple"] .plan-bar-ico[data-mode="done"] {
+  background: var(--foreground);
+  border: 0;
+  color: var(--card);
+}
+html[data-theme-id="apple"] .plan-stage-mark[data-status="run"],
+html[data-theme-id="apple"] .plan-bar-ico[data-mode="run"] {
+  border: 2px solid var(--primary);
+  background: color-mix(in srgb, var(--primary) 10%, transparent);
+}
+html[data-theme-id="apple"] .plan-stage-mark[data-status="run"]::after,
+html[data-theme-id="apple"] .plan-bar-ico[data-mode="run"]::after {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--primary);
+}
+html[data-theme-id="apple"] .plan-stage-mark[data-status="todo"],
+html[data-theme-id="apple"] .plan-bar-ico[data-mode="idle"] {
+  border: 1.5px solid #9a9aa1;
+  background: transparent;
+}
+html[data-theme-id="apple"].dark .plan-stage-mark[data-status="todo"],
+html[data-theme-id="apple"].dark .plan-bar-ico[data-mode="idle"] {
+  border-color: #76767d;
+}
+html[data-theme-id="apple"] .plan-stage-mark[data-status="need"],
+html[data-theme-id="apple"] .plan-bar-ico[data-mode="need"] {
+  border: 2px dashed var(--warning);
+  background: color-mix(in srgb, var(--warning) 14%, transparent);
+}
+html[data-theme-id="apple"] .plan-stage-mark[data-status="problem"],
+html[data-theme-id="apple"] .plan-bar-ico[data-mode="problem"] {
+  border: 2px solid var(--destructive);
+  background: color-mix(in srgb, var(--destructive) 12%, transparent);
+}
+html[data-theme-id="apple"] .plan-stage-mark[data-status="problem"]::after,
+html[data-theme-id="apple"] .plan-bar-ico[data-mode="problem"]::after {
+  content: "";
+  width: 2px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--destructive);
+}
+html[data-theme-id="apple"] .plan-stage-name {
+  flex: 1;
+  min-width: 0;
+  max-width: none;
+  font-size: 12.8px;
+  font-weight: 520;
+  color: var(--foreground);
+}
+html[data-theme-id="apple"] .plan-stage[data-status="todo"] .plan-stage-name {
+  color: var(--foreground);
+}
+html[data-theme-id="apple"] .plan-stage-summary,
+html[data-theme-id="apple"] .plan-stage-chevron {
+  display: none;
+}
+html[data-theme-id="apple"] .plan-stage-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 21px;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  flex: none;
+  background: var(--apple-fill, rgba(118, 118, 128, 0.095));
+  color: var(--muted-foreground);
+}
+html[data-theme-id="apple"] .plan-stage-badge[data-tone="run"] {
+  background: color-mix(in srgb, var(--primary) 10%, transparent);
+  color: var(--primary);
+}
+html[data-theme-id="apple"] .plan-stage-badge[data-tone="need"] {
+  background: rgba(255, 149, 0, 0.14);
+  color: #c25400;
+}
+html[data-theme-id="apple"] .plan-stage-badge[data-tone="problem"] {
+  background: rgba(255, 59, 48, 0.12);
+  color: #d70015;
+}
+html[data-theme-id="apple"].dark .plan-stage-badge[data-tone="need"] {
+  background: rgba(255, 159, 10, 0.18);
+  color: #ff9f0a;
+}
+html[data-theme-id="apple"].dark .plan-stage-badge[data-tone="problem"] {
+  background: rgba(255, 69, 58, 0.16);
+  color: #ff453a;
+}
+html[data-theme-id="apple"] .plan-detail-body {
+  padding: 0;
+}
+html[data-theme-id="apple"] .plan-step-sub {
+  margin: 6px 0 0 25px;
+  padding-left: 10px;
+  border-left: 1.5px solid var(--apple-line, rgba(0, 0, 0, 0.085));
+  gap: 4px;
+}
+html[data-theme-id="apple"] .plan-tool-chip {
+  font-size: 11.5px;
+  color: var(--muted-foreground);
+}
+html[data-theme-id="apple"] .plan-tool-tag {
+  background: var(--apple-fill, rgba(118, 118, 128, 0.095));
+  color: var(--muted-foreground);
+}
+html[data-theme-id="apple"] .plan-bar {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  width: auto;
+  max-width: 100%;
+  height: 36px;
+  padding: 0 13px;
+  border-radius: 999px;
+  background: var(--apple-glass-strong, rgba(255, 255, 255, 0.95));
+  -webkit-backdrop-filter: blur(22px) saturate(1.7);
+  backdrop-filter: blur(22px) saturate(1.7);
+  box-shadow: var(
+    --apple-capsule-shadow,
+    0 0 0 0.5px rgba(0, 0, 0, 0.08),
+    0 2px 6px rgba(0, 0, 0, 0.05),
+    0 8px 20px -8px rgba(0, 0, 0, 0.12)
+  );
+  border: 0.5px solid var(--apple-line, rgba(0, 0, 0, 0.085));
+  font-size: 12.5px;
+  font-weight: 560;
+  color: var(--foreground);
+  transition: transform 240ms var(--apple-spring, cubic-bezier(0.3, 0.7, 0.2, 1));
+}
+html[data-theme-id="apple"] .plan-bar:hover {
+  background: var(--apple-glass-strong, rgba(255, 255, 255, 0.95));
+  transform: translateY(-1px);
+}
+html[data-theme-id="apple"] .plan-ring,
+html[data-theme-id="apple"] .plan-chevron {
+  display: none;
+}
+html[data-theme-id="apple"] .plan-title {
+  flex: 0 1 auto;
+  height: auto;
+  overflow: hidden;
+  min-width: 0;
+}
+html[data-theme-id="apple"] .plan-title > span {
+  position: static;
+  font-size: 12.5px;
+  font-weight: 560;
+  line-height: 1.4;
+}
+html[data-theme-id="apple"] .plan-title-out {
+  display: none;
+}
+html[data-theme-id="apple"] .plan-segments {
+  display: inline-flex;
+  gap: 3px;
+  width: auto;
+  align-items: center;
+}
+html[data-theme-id="apple"] .plan-segments i {
+  flex: none;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--apple-fill-hover, rgba(118, 118, 128, 0.155));
+  transition: all 300ms var(--apple-spring, cubic-bezier(0.3, 0.7, 0.2, 1));
+}
+html[data-theme-id="apple"] .plan-segments i[data-status="done"] {
+  background: var(--foreground);
+}
+html[data-theme-id="apple"] .plan-segments i[data-status="run"] {
+  width: 14px;
+  border-radius: 999px;
+  background: var(--primary);
+}
+html[data-theme-id="apple"] .plan-count {
+  min-width: auto;
+  font-size: 12.5px;
+  font-weight: 560;
+  color: var(--foreground);
+}
+@media (prefers-reduced-motion: reduce) {
+  html[data-theme-id="apple"] .plan-panel,
+  html[data-theme-id="apple"] .plan-bar,
+  html[data-theme-id="apple"] .plan-segments i {
+    transition: none;
+  }
+}

@@ -1,0 +1,477 @@
+/* Desktop skins: activity strip + artifact viewer details.
+ * Motion rules (after macOS / Claude / Codex): only transform and opacity animate, so the compositor
+ * moves pre-drawn layers and nothing repaints per frame; loops are seamless (no visible restart);
+ * enter springs, exit eases; idle threads run nothing. Skin art is static. */
+
+:root {
+  --skin-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --skin-ease-in-out: cubic-bezier(0.37, 0, 0.63, 1);
+  --skin-ease-in: cubic-bezier(0.55, 0, 1, 0.45);
+}
+
+.skin-activity-anchor {
+  position: relative;
+  height: 0;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.skin-activity-band {
+  position: absolute;
+  inset-inline: 6px;
+  bottom: 6px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  font-size: 12px;
+  color: var(--muted-foreground);
+  animation: skin-line-in 420ms var(--skin-ease-out) both;
+}
+.skin-activity-band[data-state="leaving"] {
+  animation: skin-line-out 280ms var(--skin-ease-in) both;
+}
+.skin-activity-lines {
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+}
+.skin-activity-label {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  animation: skin-line-in 420ms var(--skin-ease-out) both;
+}
+.skin-activity-old {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  animation: skin-line-out 280ms var(--skin-ease-in) both;
+}
+.skin-activity-count {
+  flex-shrink: 0;
+  font-size: 10px;
+  opacity: 0.65;
+}
+.skin-activity-glint {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  mask-image: linear-gradient(90deg, transparent 32%, #000 50%, transparent 68%);
+  animation: skin-glint 2.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  animation-play-state: var(--visible-animation-state, paused);
+  will-change: var(--visible-animation-will-change, auto);
+}
+.skin-activity-glint > span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--foreground);
+  animation: skin-glint-counter 2.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  animation-play-state: var(--visible-animation-state, paused);
+  will-change: var(--visible-animation-will-change, auto);
+}
+.skin-activity-done {
+  flex-shrink: 0;
+  fill: none;
+  stroke: var(--success);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 16;
+  stroke-dashoffset: 16;
+  animation: skin-check-draw 500ms var(--skin-ease-out) forwards;
+}
+@keyframes skin-line-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+@keyframes skin-line-out {
+  to {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+@keyframes skin-glint {
+  from {
+    transform: translateX(-100%);
+  }
+  70%,
+  to {
+    transform: translateX(100%);
+  }
+}
+@keyframes skin-glint-counter {
+  from {
+    transform: translateX(100%);
+  }
+  70%,
+  to {
+    transform: translateX(-100%);
+  }
+}
+@keyframes skin-check-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .skin-activity-label,
+  .skin-activity-old,
+  .skin-activity-band {
+    animation-name: skin-opacity-in;
+  }
+  .skin-activity-old,
+  .skin-activity-band[data-state="leaving"] {
+    animation-name: skin-opacity-out;
+  }
+}
+@keyframes skin-opacity-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes skin-opacity-out {
+  to {
+    opacity: 0;
+  }
+}
+
+/* Artifact viewer filmstrip: no system scrollbar, cards that match the app. */
+.artifact-filmstrip {
+  scrollbar-width: none;
+  scroll-behavior: smooth;
+}
+
+.artifact-filmstrip::-webkit-scrollbar {
+  display: none;
+}
+
+/* Paging in the viewer cross-fades the incoming image instead of popping it in. */
+.artifact-viewer-image {
+  animation: artifact-image-in 240ms var(--skin-ease-out) both;
+}
+
+@keyframes artifact-image-in {
+  from {
+    opacity: 0;
+    transform: scale(0.985);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skin-activity-done {
+    animation: none !important;
+    transition: none !important;
+  }
+  .skin-activity-glint {
+    display: none;
+  }
+  .skin-activity-band[data-state="done"] .skin-activity-done,
+  .skin-activity-band[data-state="leaving"] .skin-activity-done {
+    stroke-dashoffset: 0;
+  }
+  .artifact-filmstrip {
+    scroll-behavior: auto;
+  }
+  .artifact-viewer-image {
+    animation: none !important;
+  }
+}
+
+/* Task trail in the conversation. Motion only marks a state change (a step finishing, a wait
+ * starting, the state word changing); nothing loops, and the running clock is text, not paint. */
+.task-trail-check {
+  animation: task-trail-pop 320ms var(--skin-ease-out) both;
+}
+.task-trail-check path {
+  stroke-dasharray: 24;
+  stroke-dashoffset: 24;
+  animation: skin-check-draw 360ms 80ms var(--skin-ease-out) forwards;
+}
+.task-trail-await {
+  animation: task-trail-pop 480ms cubic-bezier(0.3, 1.4, 0.5, 1) both;
+}
+.task-trail-pill-label {
+  display: inline-block;
+  animation: task-trail-word-in 300ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.task-trail-note {
+  animation: skin-line-in 360ms var(--skin-ease-out) both;
+}
+@keyframes task-trail-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.55);
+  }
+}
+@keyframes task-trail-word-in {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .task-trail-check,
+  .task-trail-check path,
+  .task-trail-await,
+  .task-trail-pill-label,
+  .task-trail-note {
+    animation: none !important;
+  }
+  .task-trail-check path {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* 石墨纸 Graphite: the trail is the one raised white card on the paper; the sidebar gets a top
+ * light like frosted glass. Static shadows only; nothing here animates. */
+html[data-theme-id="graphite"] {
+  @variant light {
+    .task-trail {
+      border-color: transparent;
+      box-shadow:
+        0 0 0 1px rgb(28 27 25 / 0.075),
+        0 1px 2px rgb(30 28 24 / 0.06),
+        0 8px 24px -12px rgb(30 28 24 / 0.18);
+    }
+    [data-thread-details-panel="inline"] {
+      box-shadow: inset 1px 0 0 rgb(28 27 25 / 0.06);
+    }
+  }
+}
+
+/* Floating paper (石墨纸 Graphite, 暗房 Darkroom). Keep the measured sidebar width and resize
+ * rail intact: padding moves the paper inward rather than changing the rail/container position
+ * or the offcanvas collapse distance. */
+@media (min-width: 768px) {
+  :is(html[data-theme-id="graphite"], html[data-theme-id="darkroom"]) {
+    [data-slot="sidebar-container"][data-app-sidebar] {
+      padding: 8px;
+      border-inline-end: 0;
+    }
+    [data-slot="sidebar-container"][data-app-sidebar] > [data-slot="sidebar-inner"] {
+      border: 1px solid var(--sidebar-border);
+      border-radius: 12px;
+    }
+    /* The canvas already reserves a 12px gap around this floating panel. Keep its measured
+     * position and height; only change the material and corner radius inside that frame. */
+    [data-thread-details-panel="inline"] [data-thread-details-card] {
+      border-radius: 12px;
+      background: var(--sidebar);
+      box-shadow: inset 0 0 0 1px var(--sidebar-border);
+    }
+  }
+  /* 瓷白 Porcelain: no material. The panel keeps its frame but drops glass and shadow. */
+  html[data-theme-id="porcelain"] {
+    [data-thread-details-panel="inline"] [data-thread-details-card] {
+      border-radius: 12px;
+      background: var(--sidebar);
+      backdrop-filter: none;
+      box-shadow: inset 0 0 0 1px var(--sidebar-border);
+    }
+  }
+}
+
+/* 暗房 Darkroom: a faint top light on the panels and a raised trail card on the near-black desk. */
+html[data-theme-id="darkroom"] [data-thread-details-panel="inline"] [data-thread-details-card] {
+  background-image: linear-gradient(180deg, rgb(255 255 255 / 0.055), transparent 140px);
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+}
+html[data-theme-id="darkroom"] {
+  [data-slot="sidebar-inner"][data-sidebar="sidebar"] {
+    background-image: linear-gradient(180deg, rgb(255 255 255 / 0.04), transparent 140px);
+    background-size: 100% 100%;
+    background-repeat: no-repeat;
+  }
+  .task-trail {
+    border-color: transparent;
+    box-shadow:
+      0 0 0 1px rgb(255 255 255 / 0.07),
+      0 10px 30px -12px rgb(0 0 0 / 0.6);
+  }
+}
+
+/* 瓷白 Porcelain: the trail drops its card and sits in the text like a document list. */
+html[data-theme-id="porcelain"] .task-trail {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  padding-inline: 0;
+}
+
+/* Selected conversation: a 2px notch on the row's left edge; ink on paper, red in the darkroom. */
+:is(html[data-theme-id="graphite"], html[data-theme-id="darkroom"], html[data-theme-id="porcelain"])
+  [data-thread-item]
+  > [data-sidebar="menu-sub-button"][data-active="true"]::before {
+  content: "";
+  position: absolute;
+  inset-block: 8px;
+  left: 0;
+  width: 2px;
+  border-radius: 2px;
+  background: var(--color-foreground);
+}
+html[data-theme-id="darkroom"]
+  [data-thread-item]
+  > [data-sidebar="menu-sub-button"][data-active="true"]::before {
+  background: #e5484d;
+}
+
+/* Inspector tabs: one shared slider under the pressed tab; it moves only when the tab changes. */
+[data-inspector-tabs] {
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--color-input) 40%, transparent);
+}
+[data-inspector-tabs] > [data-slot="toggle-group"] {
+  background: transparent;
+}
+[data-inspector-tabs] [data-slot="toggle"][data-pressed] {
+  background: transparent;
+  box-shadow: none;
+}
+[data-inspector-tab-slider] {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  left: 2px;
+  width: calc((100% - 4px - (var(--inspector-tab-count) - 1) * 2px) / var(--inspector-tab-count));
+  transform: translateX(calc(var(--inspector-tab-index) * (100% + 2px)));
+  border-radius: var(--radius-md);
+  background: var(--color-background);
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 0.1),
+    0 0 0 1px color-mix(in srgb, var(--color-border) 60%, transparent);
+  transition: transform 420ms cubic-bezier(0.3, 1.35, 0.45, 1);
+}
+.dark [data-inspector-tab-slider] {
+  background: color-mix(in srgb, var(--color-input) 72%, transparent);
+  box-shadow: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-inspector-tab-slider] {
+    transition: none;
+  }
+}
+
+/* The macOS interface style paints the sidebar with its own wallpaper-tinted glass, which would
+ * hide the paper. In the three paper themes the glass takes the theme's desk and paper instead. */
+html[data-interface-style="macos"]:is(
+    [data-theme-id="graphite"],
+    [data-theme-id="darkroom"],
+    [data-theme-id="porcelain"]
+  )
+  [data-slot="sidebar-inner"] {
+  border-radius: 12px;
+}
+/* Graphite: desk, side papers and the conversation come from one warm-grey paper set; no
+ * cool wallpaper tint and no top light that would turn the side papers a different white. */
+html[data-interface-style="macos"][data-theme-id="graphite"] {
+  --liquid-backdrop: #e9e8e4;
+  --liquid-sidebar: var(--sidebar);
+  --liquid-inspector: var(--sidebar);
+  --liquid-material: rgb(255 255 255 / 0.7);
+  --liquid-selection: rgb(28 27 25 / 0.06);
+  --liquid-edge: rgb(28 27 25 / 0.075);
+  --liquid-highlight: rgb(255 255 255 / 0.6);
+}
+html[data-interface-style="macos"][data-theme-id="graphite"].dark {
+  --liquid-backdrop: #0e0e0f;
+  --liquid-sidebar: var(--sidebar);
+  --liquid-inspector: var(--sidebar);
+  --liquid-material: rgb(32 32 35 / 0.8);
+  --liquid-selection: rgb(255 255 255 / 0.07);
+  --liquid-edge: rgb(255 255 255 / 0.07);
+  --liquid-highlight: rgb(255 255 255 / 0.06);
+}
+html[data-interface-style="macos"][data-theme-id="darkroom"] {
+  --liquid-backdrop: #0e0e0f;
+  --liquid-sidebar:
+    linear-gradient(180deg, rgb(255 255 255 / 0.07), transparent 140px), rgb(32 32 35 / 0.72);
+  --liquid-material: rgb(32 32 35 / 0.8);
+  --liquid-selection: rgb(255 255 255 / 0.07);
+  --liquid-edge: rgb(255 255 255 / 0.07);
+  --liquid-highlight: rgb(255 255 255 / 0.07);
+}
+html[data-interface-style="macos"][data-theme-id="porcelain"] {
+  --liquid-backdrop: #ffffff;
+  --liquid-sidebar: #fbfbfa;
+  --liquid-material: #ffffff;
+  --liquid-selection: #f3f3f2;
+  --liquid-edge: rgb(0 0 0 / 0.07);
+  --liquid-highlight: transparent;
+  --liquid-shadow: none;
+}
+
+/* Finite workbench feedback; the tint is a static layer whose opacity alone animates. */
+.composer-artifact-enter {
+  transform-origin: bottom;
+  animation: composer-artifact-enter 350ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@keyframes composer-artifact-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scaleY(0.6);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.workbench-inbox-exit {
+  pointer-events: none;
+  animation: workbench-inbox-exit 350ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+@keyframes workbench-inbox-exit {
+  to {
+    opacity: 0;
+    transform: translateX(-16px);
+  }
+}
+.artifact-wall-row::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: color-mix(in srgb, var(--primary) 10%, transparent);
+  opacity: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .composer-artifact-enter,
+  .workbench-inbox-exit {
+    animation: none;
+  }
+}
+
+@keyframes resume-card-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.resume-card-enter {
+  animation: resume-card-enter 350ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+:has(> [data-resume-card])
+  [data-composer-banner-stack][data-artifact-compact]
+  [data-composer-banner-row] {
+  flex-wrap: nowrap;
+}
+@media (prefers-reduced-motion: reduce) {
+  .resume-card-enter {
+    animation: none;
+  }
+}
