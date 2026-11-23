@@ -195,7 +195,7 @@ describe("quota topbar interactions", () => {
     await using screen = await render(<Harness fresh={fresh} />);
     const cached = screen.container.querySelector('[data-quota-id="0"]');
     expect(cached?.textContent).toContain("62%");
-    expect(cached?.textContent).toMatch(/Readings expired · \d{2}:\d{2}/);
+    expect(cached?.textContent).not.toMatch(/Readings expired/);
     expect(cached?.hasAttribute("data-stale")).toBe(true);
     expect(cached?.getAttribute("aria-label")).toMatch(/Cached \d{1,2}:\d{2}.* 62%/);
     await screen.getByRole("button", { name: "View quotas" }).click();
@@ -225,6 +225,9 @@ describe("quota topbar interactions", () => {
         e.getAttribute("data-quota-id"),
       ),
     ).toEqual(["1", "0", "2"]);
+    await expect
+      .element(page.getByRole("switch", { name: "Sort by remaining quota" }))
+      .not.toBeChecked();
     await page.getByRole("checkbox", { name: /Pin Cursor.*Account 1/ }).click();
     await page.getByRole("checkbox", { name: /Pin Grok.*Account 1/ }).click();
     await expect
@@ -316,7 +319,12 @@ it("uses remaining quota arcs and the Apple 30 percent threshold without changin
     <QuotaTopbarView
       accounts={fresh}
       now={now}
-      preferences={{ ...DEFAULT_QUOTA_PREFERENCES, pinsEdited: true, pins: ["0", "1", "2", "3"] }}
+      preferences={{
+        ...DEFAULT_QUOTA_PREFERENCES,
+        pinsEdited: true,
+        pins: ["0", "1", "2", "3"],
+        sortByRemaining: false,
+      }}
       onPreferences={noop}
       onRefresh={noop}
       onUsage={noop}
@@ -455,7 +463,12 @@ it("implements V9 Plan A Apple quiet mode, focused-row switch, and active-chip t
       expect(popup.querySelector("[data-focused]")?.getAttribute("aria-label")).toContain(
         "Claude 小号 3",
       );
-      expect(parseInt(popup.style.transformOrigin, 10)).toBeGreaterThan(codexOrigin);
+      // Chips sort by remaining quota, so compare against where the chips actually sit.
+      const claudeRight =
+        claudeChip.getBoundingClientRect().left > codexChip.getBoundingClientRect().left;
+      const claudeOriginNow = parseInt(popup.style.transformOrigin, 10);
+      if (claudeRight) expect(claudeOriginNow).toBeGreaterThan(codexOrigin);
+      else expect(claudeOriginNow).toBeLessThan(codexOrigin);
     });
 
     // Clicking the active chip closes cleanly while preserving transform-origin.

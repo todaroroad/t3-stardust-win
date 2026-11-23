@@ -171,7 +171,11 @@ const QUIT_CONFIRMATION_MODE_LABELS: Record<QuitConfirmationMode, string> = {
 
 const DEFAULT_DRIVER_KIND = ProviderDriverKind.make("codex");
 function AboutVersionSection() {
-  return <UpstreamAboutVersionSection />;
+  return (
+    <>
+      <UpstreamAboutVersionSection />
+    </>
+  );
 }
 
 function UpstreamAboutVersionSection() {

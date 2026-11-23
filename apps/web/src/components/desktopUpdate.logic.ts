@@ -8,7 +8,7 @@ import { channelSwitchLabel } from "./sidebar/updateEverything.logic";
 
 export type DesktopUpdateButtonAction = "download" | "install" | "none";
 
-const DEFAULT_DESKTOP_RELEASE_REPOSITORY = "zds-xiaoxin/xiaoxin-t3code";
+const DEFAULT_DESKTOP_RELEASE_REPOSITORY = "todaroroad/t3-stardust-win";
 const GITHUB_REPOSITORY_SEGMENT = /^[A-Za-z0-9._-]+$/u;
 
 function isValidRepositorySegment(value: string | undefined): value is string {

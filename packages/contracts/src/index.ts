@@ -82,5 +82,6 @@ export * from "./artifactWall.ts";
 
 export * from "./diskSpace.ts";
 export * from "./storageManagement.ts";
+export * from "./storageTidy.ts";
 
 export * from "./sidebarCategories.ts";

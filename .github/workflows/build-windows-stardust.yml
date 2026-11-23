@@ -1,25 +1,176 @@
-name: Build T3 Stardust Windows
+name: Sync Upstream & Release T3 Stardust Windows
 
 on:
+  schedule:
+    # Daily check at 20:30 UTC (04:30 CST / 06:30 AEST) for new zds-xiaoxin/xiaoxin-t3code commits
+    - cron: "30 20 * * *"
   push:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      force_rebuild:
+        description: "Force rebuild & release even if upstream SHA has not changed"
+        required: false
+        default: false
+        type: boolean
+
+concurrency:
+  group: stardust-windows-release
+  cancel-in-progress: false
 
 permissions:
   contents: write
   actions: read
 
 jobs:
+  prepare_source:
+    name: Sync Upstream & Resolve Version
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    outputs:
+      should_build: ${{ steps.sync.outputs.should_build }}
+      checkout_sha: ${{ steps.sync.outputs.checkout_sha }}
+      release_version: ${{ steps.sync.outputs.release_version }}
+      upstream_sha: ${{ steps.sync.outputs.upstream_sha }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          fetch-depth: 1
+
+      - name: Sync upstream & compute monotonic release version
+        id: sync
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          FORCE_REBUILD: ${{ inputs.force_rebuild == true && 'true' || 'false' }}
+        run: |
+          set -euo pipefail
+
+          UPSTREAM_REPO="zds-xiaoxin/xiaoxin-t3code"
+          UPSTREAM_SHA="$(gh api "repos/${UPSTREAM_REPO}/commits/main" --jq '.sha')"
+          RECORDED_SHA=""
+          if [[ -f .stardust-upstream-sha ]]; then
+            RECORDED_SHA="$(tr -d '[:space:]' < .stardust-upstream-sha)"
+          fi
+
+          echo "Upstream main SHA : ${UPSTREAM_SHA}"
+          echo "Recorded local SHA: ${RECORDED_SHA:-<none>}"
+
+          NEEDS_UPSTREAM_SYNC="false"
+          if [[ "${EVENT_NAME}" == "schedule" || "${EVENT_NAME}" == "workflow_dispatch" ]]; then
+            if [[ "${UPSTREAM_SHA}" != "${RECORDED_SHA}" ]]; then
+              NEEDS_UPSTREAM_SYNC="true"
+            elif [[ "${EVENT_NAME}" == "schedule" ]]; then
+              echo "Already synced to upstream ${UPSTREAM_SHA}. Skipping build."
+              echo "should_build=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            elif [[ "${FORCE_REBUILD}" != "true" ]]; then
+              echo "Already synced to upstream ${UPSTREAM_SHA} and force_rebuild=false. Skipping build."
+              echo "should_build=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          fi
+
+          if [[ "${NEEDS_UPSTREAM_SYNC}" == "true" ]]; then
+            echo "Syncing fresh upstream tree from ${UPSTREAM_REPO}@${UPSTREAM_SHA}..."
+            OVERLAY_BACKUP="$(mktemp -d)"
+            cp -R stardust-win "$OVERLAY_BACKUP/stardust-win"
+            cp -R .github "$OVERLAY_BACKUP/.github"
+
+            UPSTREAM_DIR="$(mktemp -d)"
+            git init "$UPSTREAM_DIR"
+            git -C "$UPSTREAM_DIR" remote add upstream "https://github.com/${UPSTREAM_REPO}.git"
+            git -C "$UPSTREAM_DIR" fetch --no-tags --depth=1 upstream "$UPSTREAM_SHA"
+            git -C "$UPSTREAM_DIR" sparse-checkout set --no-cone '/*' '!/.repos/'
+            git -C "$UPSTREAM_DIR" -c checkout.workers=0 checkout --detach FETCH_HEAD
+            rm -rf "$UPSTREAM_DIR/.git" "$UPSTREAM_DIR/.repos" "$UPSTREAM_DIR/.github/workflows"
+
+            # Replace tracked working tree cleanly while preserving .git
+            find . -mindepth 1 -maxdepth 1 ! -name '.git' -exec rm -rf {} +
+            cp -a "$UPSTREAM_DIR/." .
+            rm -rf .github/workflows
+            mkdir -p .github
+            cp -R "$OVERLAY_BACKUP/.github/workflows" .github/workflows
+            cp -R "$OVERLAY_BACKUP/stardust-win" ./stardust-win
+            rm -rf "$UPSTREAM_DIR" "$OVERLAY_BACKUP"
+
+            node stardust-win/apply-overlay.mjs
+            printf '%s\n' "$UPSTREAM_SHA" > .stardust-upstream-sha
+          fi
+
+          # Compute strictly monotonic semver X.Y.Z for electron-updater
+          RELEASE_VERSION="$(node -e '
+            const fs = require("node:fs");
+            const { execFileSync } = require("node:child_process");
+
+            function parseVer(v) {
+              const m = /^v?(\d+)\.(\d+)\.(\d+)$/.exec(String(v).trim());
+              return m ? [Number(m[1]), Number(m[2]), Number(m[3])] : null;
+            }
+            function cmp(a, b) {
+              for (let i = 0; i < 3; i++) {
+                if (a[i] !== b[i]) return a[i] - b[i];
+              }
+              return 0;
+            }
+
+            const baseRaw = fs.existsSync(".stardust-base-version")
+              ? fs.readFileSync(".stardust-base-version", "utf8").trim()
+              : "1.2.3";
+            const base = parseVer(baseRaw) || [1, 2, 3];
+
+            let tags = [];
+            try {
+              const out = execFileSync(
+                "gh",
+                ["release", "list", "--repo", process.env.GITHUB_REPOSITORY, "--limit", "50", "--json", "tagName,isDraft"],
+                { encoding: "utf8" }
+              );
+              tags = JSON.parse(out)
+                .filter((r) => !r.isDraft)
+                .map((r) => parseVer(r.tagName))
+                .filter(Boolean);
+            } catch {}
+
+            tags.sort(cmp);
+            const highest = tags.length > 0 ? tags[tags.length - 1] : null;
+            let next = base;
+            if (highest && cmp(next, highest) <= 0) {
+              next = [highest[0], highest[1], highest[2] + 1];
+            }
+            process.stdout.write(next.join("."));
+          ')"
+
+          printf '%s\n' "$RELEASE_VERSION" > .stardust-version
+          echo "Resolved monotonic release version: ${RELEASE_VERSION}"
+
+          if [[ -n "$(git status --porcelain)" ]]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add -A
+            git commit -m "chore(sync): sync upstream ${UPSTREAM_SHA:0:7} for T3 Stardust v${RELEASE_VERSION} [skip ci]"
+            git push origin HEAD:main
+          fi
+
+          CHECKOUT_SHA="$(git rev-parse HEAD)"
+          echo "should_build=true" >> "$GITHUB_OUTPUT"
+          echo "checkout_sha=${CHECKOUT_SHA}" >> "$GITHUB_OUTPUT"
+          echo "release_version=${RELEASE_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "upstream_sha=${UPSTREAM_SHA}" >> "$GITHUB_OUTPUT"
+
   build_bundle:
     name: Build Web & Server Bundle
+    needs: [prepare_source]
+    if: needs.prepare_source.outputs.should_build == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - name: Checkout
         shell: bash
         env:
-          CHECKOUT_REF: ${{ github.sha }}
+          CHECKOUT_REF: ${{ needs.prepare_source.outputs.checkout_sha }}
           GIT_TERMINAL_PROMPT: "0"
         run: |
           set -euo pipefail
@@ -39,6 +190,7 @@ jobs:
               echo "${name}=${value}" >> "$GITHUB_ENV"
             fi
           done
+          echo "T3CODE_DESKTOP_UPDATE_REPOSITORY=${GITHUB_REPOSITORY}" >> "$GITHUB_ENV"
 
       - name: Setup Vite+
         uses: voidzero-dev/setup-vp@250f29ce396baf5e8f24498e17c0dfdebabc26eb
@@ -54,10 +206,20 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y libsecret-1-dev pkg-config
 
       - name: Align package versions
-        run: node scripts/update-release-package-versions.ts "1.2.1"
+        env:
+          RELEASE_VERSION: ${{ needs.prepare_source.outputs.release_version }}
+        run: node scripts/update-release-package-versions.ts "${RELEASE_VERSION}"
 
       - name: Build JS bundle
         run: vp run build:desktop
+
+      - name: Verify zero third-party telemetry endpoints in compiled bundle
+        run: |
+          if grep -rn "xiaoxin666\|api/stardust" apps/server/dist apps/desktop/dist-electron; then
+            echo "ERROR: Unexpected third-party endpoint found in compiled bundle!"
+            exit 1
+          fi
+          echo "Privacy verification passed: zero xiaoxin666 / api/stardust references."
 
       - name: Upload JS bundle
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
@@ -70,15 +232,16 @@ jobs:
           retention-days: 3
 
   package_windows:
-    name: Package Windows x64 Installer
-    needs: [build_bundle]
+    name: Package Windows x64 Installer & Update Feed
+    needs: [prepare_source, build_bundle]
+    if: needs.prepare_source.outputs.should_build == 'true'
     runs-on: windows-2025
     timeout-minutes: 60
     steps:
       - name: Checkout
         shell: bash
         env:
-          CHECKOUT_REF: ${{ github.sha }}
+          CHECKOUT_REF: ${{ needs.prepare_source.outputs.checkout_sha }}
           GIT_TERMINAL_PROMPT: "0"
         run: |
           set -euo pipefail
@@ -98,6 +261,7 @@ jobs:
               echo "${name}=${value}" >> "$GITHUB_ENV"
             fi
           done
+          echo "T3CODE_DESKTOP_UPDATE_REPOSITORY=${GITHUB_REPOSITORY}" >> "$GITHUB_ENV"
 
       - name: Setup Vite+
         uses: voidzero-dev/setup-vp@250f29ce396baf5e8f24498e17c0dfdebabc26eb
@@ -143,7 +307,9 @@ jobs:
           }
 
       - name: Align package versions
-        run: node scripts/update-release-package-versions.ts "1.2.1"
+        env:
+          RELEASE_VERSION: ${{ needs.prepare_source.outputs.release_version }}
+        run: node scripts/update-release-package-versions.ts "${RELEASE_VERSION}"
 
       - name: Download JS bundle
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
@@ -151,55 +317,85 @@ jobs:
           name: js-bundle
           path: apps
 
-      - name: Build Windows NSIS Installer
+      - name: Build Windows NSIS Installer & electron-updater Metadata
         shell: bash
         env:
           pnpm_config_cache_dir: ${{ runner.temp }}/pnpm-metadata
           T3CODE_DESKTOP_WEB_ASSET_BRAND: production
           T3CODE_DESKTOP_REUSE_RESOURCE_MONITOR: ${{ steps.resource_monitor_cache.outputs.cache-hit == 'true' }}
+          RELEASE_VERSION: ${{ needs.prepare_source.outputs.release_version }}
         run: |
           vp run dist:desktop:artifact \
             --platform win \
             --target nsis \
             --arch x64 \
-            --build-version "1.2.1" \
+            --build-version "${RELEASE_VERSION}" \
             --skip-build \
             --verbose
 
-      - name: Prepare release files & SHA256
+      - name: Verify electron-updater feed (latest.yml + blockmap + installer) & compute SHA256
         shell: pwsh
+        env:
+          RELEASE_VERSION: ${{ needs.prepare_source.outputs.release_version }}
         run: |
+          $ErrorActionPreference = "Stop"
           New-Item -ItemType Directory -Force -Path release-publish | Out-Null
-          Get-ChildItem release\*.exe | ForEach-Object {
-            Copy-Item $_.FullName -Destination "release-publish\$($_.Name)"
+
+          $exeName = "T3-Stardust-${env:RELEASE_VERSION}-x64.exe"
+          $requiredFiles = @(
+            "release\$exeName",
+            "release\$exeName.blockmap",
+            "release\latest.yml"
+          )
+          foreach ($f in $requiredFiles) {
+            if (-not (Test-Path $f)) {
+              Get-ChildItem release | Select-Object Name, Length
+              throw "Required auto-update artifact missing: $f"
+            }
+            Copy-Item $f -Destination "release-publish\$(Split-Path $f -Leaf)"
           }
+
+          Write-Output "=== Generated latest.yml ==="
+          Get-Content "release-publish\latest.yml"
+
           Push-Location release-publish
-          $lines = Get-ChildItem *.exe | ForEach-Object {
+          $lines = Get-ChildItem -File | Where-Object { $_.Name -ne "SHA256SUMS.txt" } | Sort-Object Name | ForEach-Object {
             $h = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower()
             "$h  $($_.Name)"
           }
-          $lines | Set-Content -Encoding utf8NoBOM SHA256SUMS.txt
+          [System.IO.File]::WriteAllLines((Join-Path $PWD "SHA256SUMS.txt"), $lines, (New-Object System.Text.UTF8Encoding($false)))
           Get-Content SHA256SUMS.txt
           Pop-Location
 
       - name: Upload Windows Installer Artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: T3-Stardust-Windows-x64
+          name: "T3-Stardust-${{ needs.prepare_source.outputs.release_version }}-Windows-x64"
           path: release-publish/*
           if-no-files-found: error
 
-      - name: Publish to GitHub Releases
+      - name: Publish GitHub Release with electron-updater Feed
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ needs.prepare_source.outputs.release_version }}
+          UPSTREAM_SHA: ${{ needs.prepare_source.outputs.upstream_sha }}
         run: |
           set -euo pipefail
-          tag="v1.2.1-win"
+          tag="v${RELEASE_VERSION}"
+          notes="T3 星尘版 v${RELEASE_VERSION} Windows x64 自动同步构建（上游基准：zds-xiaoxin/xiaoxin-t3code@${UPSTREAM_SHA:0:7}）：
+          - 独立安装 ID（com.todaroroad.t3stardust）：可直接双击安装，与官方 T3 Code (Beta) 并排共存、互不覆盖，且共用全部聊天记录与登录态
+          - 原生应用内自动更新（electron-updater）：支持在「设置 → 关于」中自动检测更新、差分下载（.blockmap）并一键重启更新
+          - 定制增强：星尘三芒星渐变思考图标 + 每段思考耗时与 Token 用量统计徽章
+          - 隐私净空：已移除全部第三方统计上报与无效轮询"
+
           if ! gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release create "$tag" \
+            gh release create "$tag" release-publish/* \
               --repo "$GITHUB_REPOSITORY" \
-              --title "T3 Stardust v1.2.1 for Windows (x64)" \
-              --notes "T3 星尘版 v1.2.1 Windows x64 定制构建：包含完整 V18 星舰流体推理滑块、Composer V9、顶栏额度胶囊、四分页费用限额看板，以及新增的星尘三芒星思考图标与每段思考耗时/Token 用量统计徽章。"
+              --title "T3 Stardust v${RELEASE_VERSION} for Windows (x64)" \
+              --notes "$notes" \
+              --latest
+          else
+            gh release upload "$tag" release-publish/* --repo "$GITHUB_REPOSITORY" --clobber
+            gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --latest
           fi
-          gh release upload "$tag" release-publish/* --repo "$GITHUB_REPOSITORY" --clobber

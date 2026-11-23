@@ -242,7 +242,8 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
   --animate-skeleton: skeleton 2.4s infinite;
   /* Duty-cycled indicator animations: long holds with stepped ramps, so the
      compositor updates discrete frames instead of every vsync. */
-  --animate-status-pulse: status-pulse 2s infinite;
+  /* Running dots stay lit without pulsing: the pulse repainted for as long as a thread ran (~4% CPU). */
+  --animate-status-pulse: none;
   --animate-status-ping: status-ping 2s infinite;
   /* Stash pulses hold a highlight for 1.2s; the row then eases back over 200ms, the count snaps.
      The row alternates two identical keyframes so each stash restarts it without a remount. */
@@ -347,21 +348,6 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
     from,
     85.7% {
       color: var(--color-primary);
-    }
-  }
-  @keyframes status-pulse {
-    0%,
-    40% {
-      opacity: 1;
-      animation-timing-function: steps(6);
-    }
-    50%,
-    90% {
-      opacity: 0.5;
-      animation-timing-function: steps(6);
-    }
-    100% {
-      opacity: 1;
     }
   }
   @keyframes status-ping {
@@ -620,35 +606,6 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
       color-mix(in srgb, var(--stage-fade) 96%, transparent) 85%,
       var(--stage-fade) 93%
     );
-  }
-}
-
-@keyframes live-tool-shine {
-  from {
-    background-position:
-      -4.5rem 0,
-      0 0;
-  }
-  to {
-    background-position:
-      calc(100% + 4.5rem) 0,
-      0 0;
-  }
-}
-
-@utility live-tool-shine {
-  @media (prefers-reduced-motion: no-preference) and (forced-colors: none) {
-    color: transparent;
-    background-image:
-      linear-gradient(to right, transparent, var(--contrast-foreground), transparent),
-      linear-gradient(var(--contrast-secondary-label), var(--contrast-secondary-label));
-    background-size:
-      4.5rem 100%,
-      100% 100%;
-    background-repeat: no-repeat;
-    background-clip: text;
-    animation: live-tool-shine 2.2s steps(30) infinite;
-    animation-play-state: var(--visible-animation-state, paused);
   }
 }
 
@@ -2031,10 +1988,6 @@ code {
   margin: 0.65rem 0;
 }
 
-.chat-markdown-math-display .katex-display {
-  margin: 0;
-}
-
 :is(.chat-markdown, .composer-tiptap) h1,
 :is(.chat-markdown, .composer-tiptap) h2,
 :is(.chat-markdown, .composer-tiptap) h3,
@@ -2454,6 +2407,15 @@ code {
 .chat-markdown :is(th, td) {
   max-width: 24rem;
   overflow-wrap: break-word;
+}
+
+.chat-markdown [data-markdown-math] {
+  font-weight: normal;
+  font-style: normal;
+}
+
+.chat-markdown [data-markdown-math] > svg {
+  font-size: 1.21em;
 }
 
 /* Formula cells keep their natural width and scroll with the table. */

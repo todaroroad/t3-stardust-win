@@ -1556,9 +1556,106 @@ describe("updateFeedPointsUpstream", () => {
       }),
     );
     assert.isTrue(upstream({ provider: "generic", url: "https://updates.t3.codes/latest" }));
-    assert.isFalse(
-      upstream({ provider: "github", owner: "zds-xiaoxin", repo: "xiaoxin-t3code" }),
-    );
+    assert.isFalse(upstream({ provider: "github", owner: "zds-xiaoxin", repo: "xiaoxin-t3code" }));
     assert.isFalse(upstream({ provider: "generic", url: "https://mirror.example.com/t3" }));
+  });
+});
+
+describe("DesktopUpdates with the T3 Stardust macOS updater", () => {
+  const stardustFeed = { runningVersion: "1.2.1", customBuild: "C109-stardust" };
+
+  it.effect("compares community versions on the stable track, whatever the build version", () => {
+    const harness = makeHarness({
+      stardustFeed,
+      appVersion: "0.1.11-nightly.20261122.4756",
+      savedChannel: "nightly",
+    });
+
+    return Effect.scoped(
+      Effect.gen(function* () {
+        const updates = yield* DesktopUpdates.DesktopUpdates;
+        yield* updates.configure;
+        const initial = yield* updates.getState;
+        assert.isTrue(initial.enabled);
+        assert.equal(initial.currentVersion, "1.2.1");
+        assert.equal(initial.channel, "latest");
+
+        harness.emit("update-available", { version: "1.2.2", releaseNotes: "1. **Faster**" });
+        yield* flushCallbacks;
+        const offered = yield* updates.getState;
+        assert.equal(offered.status, "available");
+        assert.equal(offered.availableVersion, "1.2.2");
+
+        const nightly = yield* updates.setChannel("nightly").pipe(Effect.flip);
+        assert.equal(nightly._tag, "DesktopUpdateChannelManagedError");
+      }),
+    ).pipe(Effect.provide(Layer.merge(TestClock.layer(), harness.layer)));
+  });
+
+  it.effect("records the community version for the install-did-not-apply check", () => {
+    const harness = makeHarness({ stardustFeed, appVersion: "0.1.11-nightly.20261122.4756" });
+
+    return Effect.scoped(
+      Effect.gen(function* () {
+        const updates = yield* DesktopUpdates.DesktopUpdates;
+        yield* updates.configure;
+        harness.emit("update-downloaded", { version: "1.2.2" });
+        yield* flushCallbacks;
+        assert.isTrue((yield* updates.install).accepted);
+        assert.deepEqual(
+          [...harness.installRecords.values()].map((record) => JSON.parse(record)),
+          [{ fromVersion: "1.2.1", targetVersion: "1.2.2" }],
+        );
+      }),
+    ).pipe(Effect.provide(Layer.merge(TestClock.layer(), harness.layer)));
+  });
+
+  it.effect("downloads in the background and installs on quit once auto-install is on", () => {
+    const autoInstallOnAppQuit: Array<boolean> = [];
+    const harness = makeHarness({ stardustFeed, autoInstallOnAppQuit });
+
+    return Effect.scoped(
+      Effect.gen(function* () {
+        const updates = yield* DesktopUpdates.DesktopUpdates;
+        yield* updates.configure;
+        assert.deepEqual(autoInstallOnAppQuit, [false]);
+        harness.emit("update-available", { version: "1.2.2" });
+        yield* flushCallbacks;
+        assert.equal(harness.downloadCount(), 0);
+
+        yield* updates.setAutoInstall(true);
+        for (let i = 0; i < 5; i += 1) yield* flushCallbacks;
+        assert.deepEqual(autoInstallOnAppQuit, [false, true]);
+        assert.equal(harness.downloadCount(), 1);
+
+        yield* updates.setAutoInstall(false);
+        assert.deepEqual(autoInstallOnAppQuit, [false, true, false]);
+      }),
+    ).pipe(Effect.provide(Layer.merge(TestClock.layer(), harness.layer)));
+  });
+
+  it.effect("needs no app-update.yml and ignores an upstream one", () => {
+    const env = { T3CODE_DESKTOP_MOCK_UPDATES: "false" };
+    const upstreamYml = "provider: github\nowner: pingdotgg\nrepo: t3code\n";
+    const stardust = makeHarness({ stardustFeed, env });
+    const stardustWithUpstreamYml = makeHarness({ stardustFeed, env, appUpdateYml: upstreamYml });
+    const official = makeHarness({ env, appUpdateYml: upstreamYml });
+    const stateOf = (harness: ReturnType<typeof makeHarness>) =>
+      Effect.scoped(
+        Effect.gen(function* () {
+          const updates = yield* DesktopUpdates.DesktopUpdates;
+          yield* updates.configure;
+          return yield* updates.getState;
+        }),
+      ).pipe(Effect.provide(Layer.merge(TestClock.layer(), harness.layer)));
+
+    return Effect.gen(function* () {
+      assert.isTrue((yield* stateOf(stardust)).enabled);
+      assert.isTrue((yield* stateOf(stardustWithUpstreamYml)).enabled);
+      assert.deepEqual(stardustWithUpstreamYml.feedUrls(), []);
+      const blocked = yield* stateOf(official);
+      assert.isFalse(blocked.enabled);
+      assert.include(blocked.message ?? "", "upstream T3 Code project");
+    });
   });
 });

@@ -11,7 +11,7 @@
 
 <p align="center">
   <a href="https://www.xiaoxin666.cn/stardust"><strong>Website & Interactive Workshop</strong></a> ·
-  <a href="#download">Download v1.2.1</a> ·
+  <a href="#download">Download v1.2.3</a> ·
   <a href="#highlights">Highlights</a> ·
   <a href="#workshop">Stardust Kit</a> ·
   <a href="#compare">vs Official</a> ·
@@ -149,7 +149,7 @@ Only source-verified differences are listed below:
 
 > **Requirements**: macOS 13+ · Apple Silicon (M1 / M2 / M3 / M4)
 
-- **Direct Download**: [T3-Stardust-v1.2.1-macOS-arm64.zip](https://github.com/zds-xiaoxin/xiaoxin-t3code/releases/download/v1.2.1/T3-Stardust-v1.2.1-macOS-arm64.zip) · [Releases & SHA256SUMS.txt](https://github.com/zds-xiaoxin/xiaoxin-t3code/releases/tag/v1.2.0) · [Release Notes](docs/community/v1.2.0/RELEASE.en.md)
+- **Direct Download**: [T3-Stardust-v1.2.3-macOS-arm64.zip](https://github.com/zds-xiaoxin/xiaoxin-t3code/releases/download/v1.2.3/T3-Stardust-v1.2.3-macOS-arm64.zip) · [Releases & SHA256SUMS.txt](https://github.com/zds-xiaoxin/xiaoxin-t3code/releases/tag/v1.2.3) · [Release Notes](docs/community/v1.2.3/RELEASE.en.md)
 
 1. Download the ZIP and `SHA256SUMS.txt` into the same folder and verify:
    ```bash

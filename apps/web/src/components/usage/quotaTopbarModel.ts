@@ -6,12 +6,17 @@ import * as Schema from "effect/Schema";
 import { quotaReadingStale } from "./usageQuotaPresentation";
 
 export const QUOTA_PREFERENCES_KEY = "t3code:quota-topbar:v1";
+/** The top bar refreshes readings every 10 minutes while visible, so a reading this young still counts as current. */
+export const QUOTA_TOPBAR_FRESH_MS = 30 * 60_000;
+export const QUOTA_TOPBAR_REFRESH_MS = 10 * 60_000;
 export const QuotaPreferencesSchema = Schema.Struct({
   pins: Schema.NullOr(Schema.Array(Schema.String)),
   pinsEdited: Schema.optionalKey(Schema.Boolean),
   windows: Schema.Record(Schema.String, Schema.String),
   showNames: Schema.Boolean,
   followSession: Schema.optionalKey(Schema.Boolean),
+  /** False once the user reorders pins by hand; their order then wins over remaining quota. */
+  sortByRemaining: Schema.optionalKey(Schema.Boolean),
 });
 export type QuotaPreferences = typeof QuotaPreferencesSchema.Type;
 export const DEFAULT_QUOTA_PREFERENCES: QuotaPreferences = {
@@ -20,6 +25,7 @@ export const DEFAULT_QUOTA_PREFERENCES: QuotaPreferences = {
   windows: {},
   showNames: true,
   followSession: true,
+  sortByRemaining: true,
 };
 export function quotaPins(
   preferences: QuotaPreferences,
@@ -107,7 +113,13 @@ export function quotaState(
   const reset = Date.parse(window.resetsAt ?? "");
   if (Number.isFinite(reset) && reset <= now)
     return { remaining: Math.round(100 - window.usedPercent), state: "reset" as const };
-  const stale = quotaReadingStale(account.limits, now, account.connected, account.failed);
+  // Shift `now` so the shared 10-minute rule becomes the top bar's 30-minute freshness window.
+  const stale = quotaReadingStale(
+    account.limits,
+    now - (QUOTA_TOPBAR_FRESH_MS - 10 * 60_000),
+    account.connected,
+    account.failed,
+  );
   return {
     remaining: Math.round(100 - Math.max(0, Math.min(100, window.usedPercent))),
     state: stale ? ("stale" as const) : ("current" as const),
@@ -147,4 +159,29 @@ export function createQuotaAccountsSelector() {
     previous = quotaAccounts(presentations);
     return previous;
   };
+}
+
+/**
+ * The open thread's account first, then the most remaining quota first, unreadable accounts last.
+ * Ties keep their original order.
+ */
+export function sortQuotaAccounts(
+  accounts: readonly QuotaAccount[],
+  preferences: QuotaPreferences,
+  now: number,
+  followedId: string | null,
+): QuotaAccount[] {
+  const rank = (account: QuotaAccount) => {
+    if (account.id === followedId) return Number.POSITIVE_INFINITY;
+    const { remaining } = quotaState(account, quotaWindow(account, preferences), now);
+    return remaining ?? -1;
+  };
+  if (preferences.sortByRemaining === false) {
+    // Manual order: keep the pinned order, with only the open thread's account moved to the front.
+    return accounts.toSorted((a, b) => Number(b.id === followedId) - Number(a.id === followedId));
+  }
+  return accounts
+    .map((account, index) => ({ account, index, rank: rank(account) }))
+    .toSorted((a, b) => b.rank - a.rank || a.index - b.index)
+    .map(({ account }) => account);
 }

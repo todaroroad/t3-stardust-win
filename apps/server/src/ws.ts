@@ -1,6 +1,7 @@
 import { suggestSidebarCategories } from "./textGeneration/SidebarCategorySuggestions.ts";
 import * as DiskSpace from "./diskSpace.ts";
 import * as StorageManagement from "./storageManagement.ts";
+import * as StorageTidy from "./storageTidyService.ts";
 import {
   GitCommandError,
   OrchestrationDispatchCommandError,
@@ -1573,6 +1574,7 @@ export const layerWsRpc = (
       const storageCleanup = yield* StorageCleanup.StorageCleanup;
       const diskSpace = yield* DiskSpace.DiskSpace;
       const storageManagement = yield* StorageManagement.StorageManagement;
+      const storageTidy = yield* StorageTidy.StorageTidy;
       const databaseStorage = yield* DatabaseStorage.DatabaseStorage;
       const serverSettings = yield* ServerSettings.ServerSettingsService;
       const secretResolver = yield* SecretResolver.SecretResolver;
@@ -2737,6 +2739,8 @@ export const layerWsRpc = (
         [WS_METHODS.serverGetDiskSpace]: (input) => diskSpace.report(input),
         [WS_METHODS.serverInspectStorage]: (input) => storageManagement.inspect(input),
         [WS_METHODS.serverManageStorage]: (input) => storageManagement.manage(input),
+        [WS_METHODS.serverStorageTidyState]: () => storageTidy.state,
+        [WS_METHODS.serverStorageTidyAct]: (input) => storageTidy.act(input),
         [WS_METHODS.serverRunStorageCleanup]: () => storageCleanup.runNow,
         [WS_METHODS.serverGetStorageCleanupReport]: () => storageCleanup.reports,
         [WS_METHODS.serverGetDatabaseStorage]: () => databaseStorage.status,

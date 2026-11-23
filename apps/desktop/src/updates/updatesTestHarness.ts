@@ -46,6 +46,10 @@ export interface UpdatesHarnessOptions {
   readonly savedChannel?: DesktopAppSettings.DesktopSettings["updateChannel"];
   /** Adds a WSL backend beside the primary, as on a Windows host with WSL enabled. */
   readonly wslBackend?: boolean;
+  /** Runs as T3 Stardust's macOS updater, which reports the running community version. */
+  readonly stardustFeed?: ElectronUpdater.StardustUpdateFeed;
+  /** Records setAutoInstallOnAppQuit calls. */
+  readonly autoInstallOnAppQuit?: Array<boolean>;
 }
 
 export function makeHarness(options: UpdatesHarnessOptions = {}) {
@@ -83,7 +87,10 @@ export function makeHarness(options: UpdatesHarnessOptions = {}) {
         feedUrls.push(options);
       }),
     setAutoDownload: () => Effect.void,
-    setAutoInstallOnAppQuit: () => Effect.void,
+    setAutoInstallOnAppQuit: (value) =>
+      Effect.sync(() => {
+        options.autoInstallOnAppQuit?.push(value);
+      }),
     setChannel: () => Effect.void,
     setAllowPrerelease: () => Effect.void,
     allowDowngrade: Effect.sync(() => allowDowngrade),
@@ -118,6 +125,7 @@ export function makeHarness(options: UpdatesHarnessOptions = {}) {
             removeListener(eventName, listener as unknown as (...args: readonly unknown[]) => void);
           }),
       ).pipe(Effect.asVoid),
+    ...(options.stardustFeed ? { stardustFeed: options.stardustFeed } : {}),
   } satisfies ElectronUpdater.ElectronUpdater["Service"]);
 
   const layerWindow = Layer.succeed(ElectronWindow.ElectronWindow, {

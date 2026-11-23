@@ -39,6 +39,7 @@ export type SettingsPath =
   | "/settings/access"
   | "/settings/secrets"
   | "/settings/maintenance"
+  | "/settings/storage"
   | "/settings/labs"
   | "/settings/about"
   | "/settings/archived";
@@ -115,6 +116,7 @@ export const SETTINGS_SECTION_LABELS: Readonly<Record<SettingsPath, string>> = {
   "/settings/access": msg("Sharing & access"),
   "/settings/secrets": msg("Secrets"),
   "/settings/maintenance": msg("Maintenance"),
+  "/settings/storage": msg("Storage & cleanup"),
   "/settings/labs": msg("Labs"),
   "/settings/about": msg("About"),
   "/settings/voice": msg("Voice"),
@@ -172,7 +174,13 @@ const ALL_SETTINGS_NAV_GROUPS: ReadonlyArray<SettingsNavGroup> = [
   {
     heading: msg("More"),
     headingHidden: true,
-    paths: ["/settings/maintenance", "/settings/labs", "/settings/about", "/settings/archived"],
+    paths: [
+      "/settings/maintenance",
+      "/settings/storage",
+      "/settings/labs",
+      "/settings/about",
+      "/settings/archived",
+    ],
   },
 ];
 
@@ -272,6 +280,26 @@ export const SETTINGS_SEARCH_ITEMS = [
     to: "/settings/general",
     searchTerms: [
       "\u4FEE\u6539\u8BB0\u5F55 \u5DE5\u4F5C\u65B9\u5F0F \u9884\u8BBE \u64A4\u9500 preset undo history",
+    ],
+  },
+  {
+    id: "storage-tidy",
+    title: msg("Storage & cleanup"),
+    to: "/settings/storage",
+    scope: "environment-defaults",
+    searchTerms: [
+      msg(
+        "disk space free scan clean up cleanup caches mole worktrees session transcripts tmp rollback backups builds trash safe review",
+      ),
+    ],
+  },
+  {
+    id: "storage-tidy-settings",
+    title: msg("Cleanup preferences"),
+    to: "/settings/storage",
+    scope: "environment-defaults",
+    searchTerms: [
+      msg("rescue first build folder keep newest rollback copies bak orig"),
     ],
   },
   {
@@ -549,6 +577,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     targetId: "boring-sidebar",
     searchTerms: [msg("beta boring sidebar folder rows multiline branch pull request details")],
   },
+
   {
     id: "tool-call-visibility",
     title: msg("Tool calls in chat"),
@@ -1574,13 +1603,13 @@ const SETTINGS_CATEGORY_SCOPES: Readonly<Record<SettingsPath, SettingsSearchScop
   "/settings/secrets": null,
   "/settings/scheduled-tasks": null,
   "/settings/maintenance": null,
+  "/settings/storage": null,
   "/settings/labs": null,
   "/settings/about": null,
   "/settings/archived": "project-defaults",
 };
 const RENAMED_SETTINGS_PATHS: Readonly<Record<string, SettingsPath>> = {
   "/settings/integrations": "/settings/browser",
-  "/settings/storage": "/settings/maintenance",
   "/settings/beta": "/settings/labs",
 };
 const SPLIT_SETTINGS_PATHS: ReadonlySet<string> = new Set([
@@ -1588,6 +1617,8 @@ const SPLIT_SETTINGS_PATHS: ReadonlySet<string> = new Set([
   "/settings/appearance",
   "/settings/source-control",
   "/settings/connections",
+  // Storage is a page of its own again; only anchors of rows that moved away still redirect.
+  "/settings/storage",
   ...Object.keys(RENAMED_SETTINGS_PATHS),
 ]);
 // Section anchors that moved but are not search results themselves.

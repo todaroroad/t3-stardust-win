@@ -30,7 +30,10 @@ import { METRIC_OPTIONS, WINDOW_OPTIONS } from "../usage/usageShortcuts";
 const usageCommandOrder = new Map<KeybindingCommand, number>(
   [
     "usage.open" as const,
-    ...[...METRIC_OPTIONS, ...WINDOW_OPTIONS].map((option) => option.command),
+    ...METRIC_OPTIONS.map((option) => option.command),
+    // Opens Settings → Storage & cleanup; it no longer selects a usage metric.
+    "usage.disk" as const,
+    ...WINDOW_OPTIONS.map((option) => option.command),
   ].map((command, index) => [command, index]),
 );
 
@@ -500,7 +503,9 @@ const COMMAND_LABELS: Partial<Record<KeybindingCommand, string>> = {
 
 // Whole labels: search titles keep the encoded message, which cannot nest another one.
 const USAGE_COMMAND_LABELS: Record<
-  (typeof METRIC_OPTIONS)[number]["command"] | (typeof WINDOW_OPTIONS)[number]["command"],
+  | (typeof METRIC_OPTIONS)[number]["command"]
+  | (typeof WINDOW_OPTIONS)[number]["command"]
+  | "usage.disk",
   string
 > = {
   "usage.cost": msg("Usage: Cost"),

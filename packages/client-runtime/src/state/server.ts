@@ -1503,6 +1503,18 @@ export function createServerEnvironmentAtoms<R, E>(
       tag: WS_METHODS.serverManageStorage,
       concurrency: { mode: "singleFlight", key: ({ environmentId }) => environmentId },
     }),
+    storageTidyState: createEnvironmentRpcQueryAtomFamily(runtime, {
+      label: "environment-data:server:storage-tidy-state",
+      tag: WS_METHODS.serverStorageTidyState,
+      staleTimeMs: 0,
+      idleTtlMs: 0,
+      execute: (input) => request(WS_METHODS.serverStorageTidyState, input),
+    }),
+    storageTidyAct: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:server:storage-tidy-act",
+      tag: WS_METHODS.serverStorageTidyAct,
+      concurrency: { mode: "singleFlight", key: ({ environmentId }) => environmentId },
+    }),
     diskSpace: createEnvironmentRpcQueryAtomFamily(runtime, {
       label: "environment-data:server:disk-space",
       tag: WS_METHODS.serverGetDiskSpace,

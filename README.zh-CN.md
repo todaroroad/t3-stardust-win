@@ -11,7 +11,7 @@
 
 <p align="center">
   <a href="https://www.xiaoxin666.cn/stardust"><strong>产品官网与积木工坊</strong></a> ·
-  <a href="#download">下载 v1.2.1</a> ·
+  <a href="#download">下载 v1.2.3</a> ·
   <a href="#highlights">核心亮点</a> ·
   <a href="#workshop">星尘积木工坊</a> ·
   <a href="#compare">与官方对比</a> ·
@@ -149,7 +149,7 @@
 
 > **系统要求**：macOS 13 及以上 · Apple Silicon（M1 / M2 / M3 / M4）
 
-- **安装包下载**：[T3-Stardust-v1.2.1-macOS-arm64.zip](https://github.com/zds-xiaoxin/xiaoxin-t3code/releases/download/v1.2.1/T3-Stardust-v1.2.1-macOS-arm64.zip) · [Releases 发行页 & SHA256SUMS.txt](https://github.com/zds-xiaoxin/xiaoxin-t3code/releases/tag/v1.2.0) · [详细发行说明](docs/community/v1.2.0/RELEASE.zh.md)
+- **安装包下载**：[T3-Stardust-v1.2.3-macOS-arm64.zip](https://github.com/zds-xiaoxin/xiaoxin-t3code/releases/download/v1.2.3/T3-Stardust-v1.2.3-macOS-arm64.zip) · [Releases 发行页 & SHA256SUMS.txt](https://github.com/zds-xiaoxin/xiaoxin-t3code/releases/tag/v1.2.3) · [详细发行说明](docs/community/v1.2.3/RELEASE.zh.md)
 
 ### 快速校验与安装
 1. 下载 ZIP 与 `SHA256SUMS.txt` 到同一目录，终端校验完整性：

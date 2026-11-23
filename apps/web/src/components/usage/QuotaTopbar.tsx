@@ -34,16 +34,20 @@ import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import {
   DEFAULT_QUOTA_PREFERENCES,
   QUOTA_PREFERENCES_KEY,
+  QUOTA_TOPBAR_FRESH_MS,
+  QUOTA_TOPBAR_REFRESH_MS,
   QuotaPreferencesSchema,
   createQuotaAccountsSelector,
   quotaPins,
   quotaShownIds,
   quotaState,
   quotaWindow,
+  sortQuotaAccounts,
   type QuotaAccount,
   type QuotaPreferences,
 } from "./quotaTopbarModel";
 import styles from "./quotaTopbar.module.css";
+import { useStableCallback } from "../../hooks/useStableCallback";
 import { quotaPlanLabel, quotaWindowLabel } from "./usageQuotaPresentation";
 
 function windowName(window: NonNullable<ReturnType<typeof quotaWindow>>, compact = false) {
@@ -258,7 +262,12 @@ export function QuotaTopbarView({
   }, [open]);
   const pins = quotaPins(preferences, accounts);
   const shown = quotaShownIds(preferences, accounts, current);
-  const selected = shown.ids.flatMap((id) => accounts.find((a) => a.id === id) ?? []);
+  const selected = sortQuotaAccounts(
+    shown.ids.flatMap((id) => accounts.find((a) => a.id === id) ?? []),
+    preferences,
+    now,
+    shown.followedId,
+  );
   const update = (patch: Partial<QuotaPreferences>) => onPreferences({ ...preferences, ...patch });
   const choose = (id: string, checked: boolean) => {
     if (checked && pins.length >= 4) {
@@ -274,7 +283,7 @@ export function QuotaTopbarView({
       target = index + delta;
     if (index < 0 || target < 0 || target >= next.length) return;
     [next[index], next[target]] = [next[target]!, next[index]!];
-    update({ pins: next, pinsEdited: true });
+    update({ pins: next, pinsEdited: true, sortByRemaining: false });
   };
   const show = (id: string | null, from: HTMLElement | null) => {
     originRef.current = from;
@@ -299,7 +308,8 @@ export function QuotaTopbarView({
     }, QUOTA_OPEN_SETTLE_MS);
   };
   const title = copy("Quotas");
-  const displayAccounts = view === "all" ? accounts : selected;
+  const displayAccounts =
+    view === "all" ? sortQuotaAccounts(accounts, preferences, now, shown.followedId) : selected;
   const selectedWindows = selected.map((account) => quotaWindow(account, preferences));
   const windowLabels = [
     ...new Set(selectedWindows.flatMap((window) => (window ? [windowName(window)] : []))),
@@ -334,20 +344,7 @@ export function QuotaTopbarView({
               : "";
           // "unknown" means nothing readable at all; showing the failed check's time as an
           // expired reading misleads, so it reads as unavailable instead.
-          const staleText =
-            status.state === "unknown"
-              ? copy("Temporarily unreadable")
-              : status.state !== "current"
-                ? copy("Readings expired · {time}", {
-                    time: Number.isFinite(checkedAt)
-                      ? new Date(checkedAt).toLocaleTimeString(readUiLocale(), {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                          hourCycle: "h23",
-                        })
-                      : copy("Unknown time"),
-                  })
-                : null;
+          const staleText = status.state === "unknown" ? copy("Temporarily unreadable") : null;
           const label = copy("{provider} · {plan} · {window} · {state}{time} · {remaining}%", {
             provider: fullName(account),
             plan: quotaPlanLabel(account.alias),
@@ -619,6 +616,15 @@ export function QuotaTopbarView({
                   />
                 </div>
                 <div className={styles["quota-name-setting"]}>
+                  <label htmlFor="quota-sort-remaining">{copy("Sort by remaining quota")}</label>
+                  <Switch
+                    id="quota-sort-remaining"
+                    size="sm"
+                    checked={preferences.sortByRemaining !== false}
+                    onCheckedChange={(value) => update({ sortByRemaining: value })}
+                  />
+                </div>
+                <div className={styles["quota-name-setting"]}>
                   <label htmlFor="quota-follow-session">
                     {copy("Follow the open thread's account")}
                   </label>
@@ -834,7 +840,7 @@ export function QuotaTopbar() {
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- Maintain the visibility listener and minute timer that advance quota age labels.
   useEffect(() => {
     if (!panelOpen) return;
-    // Only the age labels advance; the top bar never schedules provider probes.
+    // While the popup is open only the age labels advance; probes come from the visible-only refresh timer.
     const advance = () => {
       if (!document.hidden) setNow(Date.now());
     };
@@ -850,7 +856,7 @@ export function QuotaTopbar() {
     if (panelOpen) return;
     const time = Math.max(now, Date.now());
     const expiries = accounts
-      .map((account) => Date.parse(account.limits?.checkedAt ?? "") + 600_001)
+      .map((account) => Date.parse(account.limits?.checkedAt ?? "") + QUOTA_TOPBAR_FRESH_MS + 1)
       .filter((at) => Number.isFinite(at) && at > time);
     if (!expiries.length) return;
     const timer = window.setTimeout(() => setNow(Date.now()), Math.min(...expiries) - time);
@@ -887,6 +893,24 @@ export function QuotaTopbar() {
       setRefreshing(false);
     });
   };
+  const autoRefresh = useStableCallback(() => refresh(true));
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- Own the visible-only quota refresh timer so readings stay current without opening the popup.
+  useEffect(() => {
+    // Every 10 minutes while the window is visible, and on return to it. `refreshUsageLimits`
+    // already skips automatic refreshes within 5 minutes of the last one, so this never probes faster.
+    const tick = () => {
+      if (!document.hidden) void autoRefresh();
+    };
+    const timer = window.setInterval(tick, QUOTA_TOPBAR_REFRESH_MS);
+    document.addEventListener("visibilitychange", tick);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", tick);
+    };
+  }, [autoRefresh]);
+  // Until some login reports a quota (fresh install, nothing signed in, or no readable limits),
+  // an empty "Remaining quota" pill is only clutter.
+  if (!accounts.some((account) => (account.limits?.windows.length ?? 0) > 0)) return null;
   return (
     <div className={styles["quota-topbar-host"]}>
       <QuotaTopbarView

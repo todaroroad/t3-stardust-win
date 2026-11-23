@@ -1,3 +1,4 @@
+import { ThoughtUsageBadge } from "./ThoughtUsageBadge";
 
 import { conversationLabel } from "~/i18n/conversationLabel";
 import { useUiText } from "~/i18n/useUiText";
@@ -77,10 +78,9 @@ import {
   workEntryRawCommand,
   buildToolCallExpandedBody,
   workEntryIconName,
-  thoughtPreviewPlugins,
+  thoughtPreviewMarkdown,
   THOUGHT_PREVIEW_SOURCE_MAX_LENGTH,
 } from "./TimelineWorkEntryRow.logic";
-import { ThoughtUsageBadge } from "./ThoughtUsageBadge";
 
 export function useThreadReadTarget(entry: TimelineWorkEntry, environmentId: EnvironmentId) {
   const rawThreadId = threadReadTargetId(entry);
@@ -199,49 +199,27 @@ const toolCallExpandedBodyClassName =
 
 const stopRowToggle = (e: { stopPropagation: () => void }) => e.stopPropagation();
 
-export function ReasoningTraceContent({
-  entries,
-  showStandaloneHeader = false,
-}: {
-  entries: ReadonlyArray<TimelineWorkEntry>;
-  showStandaloneHeader?: boolean | undefined;
-}) {
+export function ReasoningTraceContent({ entries }: { entries: ReadonlyArray<TimelineWorkEntry> }) {
   const ctx = use(TimelineRowCtx);
-  const uiText = useUiText();
   const { isWorking, latestRunId } = use(TimelineRowActivityCtx);
   const isStreaming = (entry: TimelineWorkEntry) =>
     isWorking && entry.runId === latestRunId && entry.toolLifecycleStatus === "inProgress";
   return (
     <WorkLogDetails followLive={entries.some(isStreaming)}>
       {entries.map((entry) => (
-        <div key={entry.id} className="space-y-1">
-          {showStandaloneHeader ? (
-            <div className="flex items-center justify-between gap-2 pb-0.5 text-xs text-muted-foreground">
-              <span className="inline-flex items-center gap-1.5 font-medium">
-                <ToolActivityIconView
-                  icon={undefined}
-                  fallbackName="brain"
-                  className="block size-4 shrink-0"
-                  muted={false}
-                />
-                {isStreaming(entry) ? uiText("Thinking") : uiText("Thought")}
-              </span>
-              <ThoughtUsageBadge workEntry={entry} />
-            </div>
-          ) : null}
-          <ChatMarkdown
-            className="text-foreground"
-            text={entry.detail ?? ""}
-            cwd={ctx.markdownCwd}
-            threadRef={ctx.threadRef ?? undefined}
-            skills={ctx.skills}
-            isStreaming={isStreaming(entry)}
-            headingLevelOffset={MESSAGE_HEADING_LEVEL}
-            onUseArtifactTemplate={ctx.onUseArtifactTemplate}
-            onImageExpand={ctx.onImageExpand}
-            lineBreaks
-          />
-        </div>
+        <ChatMarkdown
+          key={entry.id}
+          className="text-foreground"
+          text={entry.detail ?? ""}
+          cwd={ctx.markdownCwd}
+          threadRef={ctx.threadRef ?? undefined}
+          skills={ctx.skills}
+          isStreaming={isStreaming(entry)}
+          headingLevelOffset={MESSAGE_HEADING_LEVEL}
+          onUseArtifactTemplate={ctx.onUseArtifactTemplate}
+          onImageExpand={ctx.onImageExpand}
+          lineBreaks
+        />
       ))}
     </WorkLogDetails>
   );
@@ -624,10 +602,10 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
                   )}
                   cwd={ctx.markdownCwd}
                   parseRawHtml={false}
-                  extraRemarkPlugins={
+                  extensions={
                     workEntry.toolLifecycleStatus === "inProgress"
-                      ? thoughtPreviewPlugins(gt("Thinking"))
-                      : thoughtPreviewPlugins(gt("Thought"))
+                      ? thoughtPreviewMarkdown(gt("Thinking"))
+                      : thoughtPreviewMarkdown(gt("Thought"))
                   }
                 />
               ) : threadLabel ? (

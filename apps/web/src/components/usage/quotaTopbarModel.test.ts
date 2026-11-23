@@ -14,6 +14,7 @@ import {
   quotaShownIds,
   quotaState,
   quotaWindow,
+  sortQuotaAccounts,
 } from "./quotaTopbarModel";
 
 const now = Date.parse("2026-10-24T12:00:00Z");
@@ -162,9 +163,13 @@ describe("quota topbar data", () => {
     const a = quotaAccounts(present([provider()], "disconnected"))[0]!;
     expect(quotaState(a, quotaWindow(a, DEFAULT_QUOTA_PREFERENCES), now).state).toBe("stale");
     const live = { ...a, connected: true };
+    // The top bar refreshes every 10 minutes while visible, so readings stay current for 30.
     expect(quotaState(live, quotaWindow(live, DEFAULT_QUOTA_PREFERENCES), now + 660000).state).toBe(
-      "stale",
+      "current",
     );
+    expect(
+      quotaState(live, quotaWindow(live, DEFAULT_QUOTA_PREFERENCES), now + 31 * 60_000).state,
+    ).toBe("stale");
   });
   it("keeps expired values marked refresh-due instead of resetting to 100", () => {
     const a = quotaAccounts(present([provider()]))[0]!;
@@ -294,5 +299,25 @@ describe("quota topbar data", () => {
       );
       expect(lone.map(limitPoolId)).toEqual(["claudeAgent"]);
     });
+  });
+});
+
+describe("quota topbar order", () => {
+  it("puts the open thread's account first, then the most remaining quota, unreadable last", () => {
+    const base = quotaAccounts(present([provider()]))[0]!;
+    const withUsed = (id: string, used: number | null) => ({
+      ...base,
+      id,
+      limits: {
+        ...base.limits!,
+        windows:
+          used === null ? [] : base.limits!.windows.map((w) => ({ ...w, usedPercent: used })),
+      },
+    });
+    const accounts = [withUsed("a", 90), withUsed("b", 20), withUsed("c", null), withUsed("d", 50)];
+    const order = (followed: string | null) =>
+      sortQuotaAccounts(accounts, DEFAULT_QUOTA_PREFERENCES, now, followed).map((a) => a.id);
+    expect(order(null)).toEqual(["b", "d", "a", "c"]);
+    expect(order("a")).toEqual(["a", "b", "d", "c"]);
   });
 });

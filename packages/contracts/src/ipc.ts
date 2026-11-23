@@ -1249,6 +1249,11 @@ export interface DesktopBridge {
   downloadUpdate: () => Promise<DesktopUpdateActionResult>;
   /** With a version, installs only that downloaded build. */
   installUpdate: (expectedVersion?: string) => Promise<DesktopUpdateActionResult>;
+  /**
+   * T3 Stardust: download offered updates in the background and install them when the app quits.
+   * Optional so older desktop shells keep satisfying the bridge.
+   */
+  setUpdateAutoInstall?: (enabled: boolean) => Promise<DesktopUpdateState>;
   onUpdateState: (listener: (state: DesktopUpdateState) => void) => () => void;
   cliCommand: {
     getState: () => Promise<DesktopCliCommandState>;

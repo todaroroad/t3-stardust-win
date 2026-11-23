@@ -1,5 +1,6 @@
 import * as DiskSpace from "./diskSpace.ts";
 import * as StorageManagement from "./storageManagement.ts";
+import * as StorageTidy from "./storageTidyService.ts";
 import * as SecretResolver from "@t3tools/secret-provider-core/server/SecretResolver";
 import * as NodeHttpServer from "@effect/platform-node/NodeHttpServer";
 import { WebSocket } from "@effect/platform-node/NodeWS";
@@ -824,6 +825,7 @@ it.effect("shell snapshots omit idle children and older settled threads only on 
 const layerUnusedConfigRpcServices = Layer.mergeAll(
   Layer.mock(DiskSpace.DiskSpace)({}),
   Layer.mock(StorageManagement.StorageManagement)({}),
+  Layer.mock(StorageTidy.StorageTidy)({}),
   Layer.mock(DocumentText.DocumentText)({}),
   Layer.mock(ServerSecretStore.ServerSecretStore)({}),
   Layer.mock(SecretCheck.SecretCheck)({}),

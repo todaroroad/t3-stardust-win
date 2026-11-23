@@ -1,56 +1,18 @@
 /*
- * V11 logo A: "T3 Stardust" in the app icon's holographic blue → violet → rose → amber.
- * The gradient is one seamless period (first stop == last stop) tiled twice the text width and
- * scrolled by exactly one period with linear timing, so the sheen flows left → right without a
- * pause, a restart jump, or a second color pass.
+ * Quiet sidebar brand: "T3" in the secondary label colour; the sparkle from the app icon carries
+ * the only brand colour, so the composer and conversation keep the user's attention.
+ * Static on purpose (an animated sheen here measured ~30% CPU at idle).
  */
 [data-stardust-wordmark] {
-  --stardust-holo: linear-gradient(
-    90deg,
-    #4285f4 0%,
-    #7b7fe0 14%,
-    #9b72cb 28%,
-    #d96570 46%,
-    #ff8a5b 58%,
-    #d96570 70%,
-    #9b72cb 84%,
-    #4285f4 100%
-  );
-  background-image: var(--stardust-holo);
-  background-size: 200% 100%;
-  background-repeat: repeat-x;
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  -webkit-text-fill-color: transparent;
-  animation: stardust-wordmark-flow 9s linear infinite;
-  will-change: background-position;
+  color: var(--color-secondary-label);
 }
-/* Over the photo backdrop the same hues are lifted so the mark stays legible. */
+[data-stardust-wordmark] [data-stardust-star] {
+  color: #9b72cb;
+}
+/* Over the photo backdrop the mark stays legible. */
 [data-stardust-wordmark][data-on-backdrop] {
-  --stardust-holo: linear-gradient(
-    90deg,
-    #8ab4ff 0%,
-    #a9a6ff 14%,
-    #c3a6f0 28%,
-    #f29aa3 46%,
-    #ffb48f 58%,
-    #f29aa3 70%,
-    #c3a6f0 84%,
-    #8ab4ff 100%
-  );
+  color: rgb(255 255 255 / 80%);
 }
-@keyframes stardust-wordmark-flow {
-  from {
-    background-position: 0% 0;
-  }
-  /* With a 200% tile, -200% moves the pattern right by exactly one tile width: frame N == frame 0. */
-  to {
-    background-position: -200% 0;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  [data-stardust-wordmark] {
-    animation: none;
-  }
+[data-stardust-wordmark][data-on-backdrop] [data-stardust-star] {
+  color: #c3a6f0;
 }

@@ -89,7 +89,9 @@ export const SidebarChromeHeader = memo(function SidebarChromeHeader({
         <div className="flex shrink-0 items-center gap-1">
           <SidebarBrand onBackdrop={backdropVariant !== null} />
           {isElectron ? (
-            <div className="hidden items-center md:flex">
+            // Back/forward stay out of sight until the pointer is in the sidebar (or a key focuses
+            // them), so the titlebar row reads as traffic lights, toggle and brand only.
+            <div className="hidden items-center opacity-0 transition-opacity duration-150 focus-within:opacity-100 md:flex [[data-app-sidebar]:hover_&]:opacity-100">
               <HistoryNavigationButton direction="back" onBackdrop={backdropVariant !== null} />
               <HistoryNavigationButton direction="forward" onBackdrop={backdropVariant !== null} />
             </div>
@@ -190,16 +192,29 @@ function SidebarBrand({ onBackdrop }: { onBackdrop: boolean }) {
     </Link>
   );
 }
-/** The English product wordmark; it is a name, not copy, so it is never translated. */
-const STARDUST_WORDMARK = "T3 Stardust";
+/**
+ * A quiet brand mark: "T3" in the secondary label colour plus the app icon's sparkle, the only
+ * brand colour. It is a name, not copy, so it is never translated. Static: no animation.
+ */
 function SidebarBrandMark({ onBackdrop }: { onBackdrop: boolean }) {
   return (
     <span
       data-stardust-wordmark
       data-on-backdrop={onBackdrop || undefined}
-      className="truncate text-sm font-bold tracking-tight [text-box:trim-both_cap_alphabetic] supports-[text-box:trim-both_cap_alphabetic]:py-1"
+      className="inline-flex items-center gap-0.75 text-sm font-semibold tracking-tight [text-box:trim-both_cap_alphabetic] supports-[text-box:trim-both_cap_alphabetic]:py-1"
     >
-      {STARDUST_WORDMARK}
+      T3
+      <svg
+        aria-hidden="true"
+        data-stardust-star=""
+        viewBox="0 0 16 16"
+        className="size-[11px] shrink-0"
+      >
+        <path
+          d="M8 0c.4 3.9 2.1 5.6 6 6-3.9.4-5.6 2.1-6 6-.4-3.9-2.1-5.6-6-6 3.9-.4 5.6-2.1 6-6z"
+          fill="currentColor"
+        />
+      </svg>
     </span>
   );
 }

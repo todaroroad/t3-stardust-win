@@ -1,6 +1,7 @@
 import * as SpotlightSearch from "./orchestration-v2/SpotlightSearch.ts";
 import * as DiskSpace from "./diskSpace.ts";
 import * as StorageManagement from "./storageManagement.ts";
+import * as StorageTidy from "./storageTidyService.ts";
 import * as UsageProjectAttribution from "./usage/UsageProjectAttribution.ts";
 import * as ArtifactWallHttp from "./artifacts/http.ts";
 import * as ProviderEventLoggers from "@t3tools/provider-core/server/ProviderEventLoggers";
@@ -730,6 +731,7 @@ const layerRuntimeCoreDependenciesBase = Layer.mergeAll(
   layerStorageCleanup,
   DiskSpace.layer.pipe(Layer.provide(ProcessRunner.layer)),
   StorageManagement.layer.pipe(Layer.provide(layerStorageCleanup)),
+  StorageTidy.layer.pipe(Layer.provide(layerStorageCleanup)),
   DatabaseStorage.layer.pipe(
     Layer.provide(ProjectionMaintenance.layer),
     Layer.provide(layerServerRestart),

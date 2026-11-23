@@ -69,6 +69,8 @@ const RPC_AGGREGATES = {
   [WS_METHODS.serverGetDiskSpace]: "server",
   [WS_METHODS.serverInspectStorage]: "server",
   [WS_METHODS.serverManageStorage]: "server",
+  [WS_METHODS.serverStorageTidyState]: "server",
+  [WS_METHODS.serverStorageTidyAct]: "server",
   [WS_METHODS.serverReclaimDatabaseSpace]: "server",
   [WS_METHODS.peerLinksList]: "peerLinks",
   [WS_METHODS.peerLinksNames]: "peerLinks",

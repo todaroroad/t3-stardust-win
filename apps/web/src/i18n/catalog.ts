@@ -8335,6 +8335,52 @@ export const zhCN: Readonly<Record<string, string>> = {
   ". Your local source may contain additional changes.": "。此编号不代表本地源码未改动。",
   "View release notes": "查看发行说明",
   "Open download page": "前往下载页",
+  "Update not installed": "更新未安装",
+  "The update couldn’t be installed. Try again later.": "这次没能安装更新，请稍后再试。",
+  "It downloads in the background and installs the next time you quit.":
+    "会在后台下载，下次退出时自动安装。",
+  "Update now in one click, or review the notes first.": "一键即可更新，也可以先看看更新说明。",
+  "Update and restart": "更新并重启",
+  "View update notes": "查看更新说明",
+  "T3 Stardust {version} is ready": "T3 星尘版 {version} 已准备好",
+  "It installs the next time you quit T3 Stardust.": "下次退出 T3 星尘版时自动安装。",
+  "Restart now": "立即重启更新",
+  "Standard mode updates in one click: download, verify, replace and restart. Source mode only links to source changes.":
+    "标准模式一键更新：自动下载、校验、替换并重启。源码模式只提供源码变更链接。",
+  "Standard · One-click update": "标准 · 一键更新",
+  "Download updates automatically and install on next launch": "自动下载更新，下次启动时安装",
+  "Downloads and verifies new versions in the background, then installs them when you quit. The next launch opens the new version.":
+    "在后台下载并校验新版本，退出时安装，下次打开就是新版本。",
+  "Downloading {version}… {percent}%": "正在下载 {version}… {percent}%",
+  "Current {current} · {version} is downloaded and ready to install":
+    "当前 {current} · {version} 已下载，可以安装",
+  "Current {current} · New version {version}": "当前 {current} · 新版本 {version}",
+  "Downloading {percent}%": "正在下载 {percent}%",
+  "Preparing update…": "正在准备更新…",
+  "Updating keeps your conversations and settings. The previous version is kept as a backup and restored automatically if the update fails.":
+    "更新不会影响对话和设置。旧版本会留作备份，更新失败时自动恢复。",
+  "Couldn’t reach GitHub to check for updates. Try again later.":
+    "暂时连不上 GitHub，无法检查更新，请稍后再试。",
+  "The latest release information is invalid.": "最新版本信息无效。",
+  "The latest release has no verifiable Mac Apple Silicon build.":
+    "最新版本没有可校验的 Mac Apple Silicon 安装包。",
+  "The downloaded update failed its checksum. It was deleted; try again.":
+    "下载的更新包校验失败，已删除，请重试。",
+  "Couldn’t unpack the downloaded update. Try again.": "更新包解压失败，请重试。",
+  "The downloaded update is not T3 Stardust, so it was not installed.":
+    "下载的更新包不是 T3 星尘版，已停止安装。",
+  "The downloaded update does not match the release version, so it was not installed.":
+    "下载的更新包与发布版本号不一致，已停止安装。",
+  "The downloaded update failed its code signature check, so it was not installed.":
+    "下载的更新包未通过代码签名校验，已停止安装。",
+  "T3 Stardust can’t replace itself in this folder. Move it to Applications or a folder you can write to, then try again.":
+    "T3 星尘版无法在当前文件夹中替换自己。请把它移到「应用程序」或其他你有写入权限的文件夹后再试。",
+  "macOS is running T3 Stardust from a temporary location. Move it to the Applications folder, open it from there, then try again.":
+    "macOS 正在临时位置运行 T3 星尘版。请把它拖到「应用程序」文件夹，从那里打开后再试。",
+  "No downloaded update is ready to install.": "还没有下载好的更新可以安装。",
+  "Couldn’t start the update installer. Your current version is unchanged.":
+    "无法启动更新安装程序，当前版本没有变化。",
+  "T3 Stardust only offers stable releases.": "T3 星尘版只提供正式版更新。",
   "View source changes": "查看源码差异",
   "Review and merge the changes in your fork before building. Replacing the app can overwrite your customizations.":
     "请在自己的 fork 中审阅并合并所需修改，再构建；整包覆盖可能替换你的代码改造。",
@@ -9315,6 +9361,7 @@ export const zhCN: Readonly<Record<string, string>> = {
   "small item (<50 MB)": "个小项（<50 MB）",
   "small items (<50 MB)": "个小项（<50 MB）",
   "Follow the open thread's account": "跟随当前会话的账号",
+  "Sort by remaining quota": "按剩余额度排序",
   "{count} failure": "{count} 条失败",
   "{count} failures": "{count} 条失败",
   "{count} more step": "另外 {count} 步",
@@ -9662,7 +9709,270 @@ export const zhCN: Readonly<Record<string, string>> = {
     "每天发送一次随机安装 ID、应用版本和系统类型，不保存聊天、账号、项目或 IP 地址。可以随时在「设置 → 关于」里关闭。",
   "Turn off": "关闭统计",
   "Count me as an active Stardust user": "计入星尘版活跃用户",
-  "On by default. Once a day sends a random install ID, the app version and your system type to xiaoxin666.cn so the author knows how many people use T3 Stardust. No chats, accounts, projects or IP addresses are stored.":
-    "默认开启。每天向 xiaoxin666.cn 发送一次随机安装 ID、应用版本和系统类型，让作者知道有多少人在用 T3 星尘版。不保存聊天、账号、项目或 IP 地址。",
+  "On by default. Once a day sends a random install ID, the app version and your system type to removed.local so the author knows how many people use T3 Stardust. No chats, accounts, projects or IP addresses are stored.":
+    "默认开启。每天向 removed.local 发送一次随机安装 ID、应用版本和系统类型，让作者知道有多少人在用 T3 星尘版。不保存聊天、账号、项目或 IP 地址。",
   "{version} available · {action}": "发现 {version}；{action}",
+  "Sending when ready": "就绪后发送",
+  "Sending message": "正在发送消息",
+  "Edit or press Esc to cancel": "编辑，或按 Esc 取消",
+  "{count, plural, one {Sending once image is ready} other {Sending once {count} images are ready}}":
+    "{count, plural, one {图片就绪后发送} other {{count} 张图片就绪后发送}}",
+  "Capacity of {name}": "{name} 的容量",
+  "Used now": "现在已用",
+  "{size} free": "剩余 {size}",
+  "{size} free in 7 days": "7 天后剩余 {size}",
+  "Cleanup failed": "清理未完成",
+  "Cleanup finished": "清理完成",
+  "Actually freed": "实际释放",
+  "(Rebuildable caches deleted {deleted} − {written} written to this disk for rescue and archives)":
+    "（已删除的可重建缓存 {deleted} − 抢救与归档写入本盘 {written}）",
+  "Still in Trash {size}": "废纸篓暂存 {size}",
+  "freed when it is emptied on {date}": "{date}自动清空后释放",
+  "Before": "清理前",
+  "{percent}% used · {size} free": "已用 {percent}% · 剩余 {size}",
+  "After": "清理后",
+  "{percent}% used · {size} free (Trash still holds {pending})":
+    "已用 {percent}% · 剩余 {size}（废纸篓仍占 {pending}）",
+  "In 7 days": "7 天后",
+  "About {percent}% used · {size} free": "预计已用 {percent}% · 剩余 {size}",
+  "Measured free space: {before} → {after}. This includes anything else the disk did meanwhile.":
+    "磁盘实测剩余：{before} → {after}。其间磁盘上其他活动的变化也包含在内。",
+  "Items in Trash can be undone for 7 days": "废纸篓里的部分，7 天内可撤销",
+  "Everything was put back.": "已全部放回原处。",
+  "The 7 days are over and this app emptied its Trash batch, so it can no longer be restored.":
+    "7 天已过，本应用已清空自己放进废纸篓的这一批，无法再还原。",
+  "{count} items · {size} in Trash · emptied automatically after {days} more days, and cannot be restored after that.":
+    "{count} 项 · 废纸篓里 {size} · 再过 {days} 天自动清空，之后无法还原。",
+  "Caches deleted directly ({size}) are not covered by undo. The apps rebuild them when needed.":
+    "已直接删除的 {size} 可重建缓存不在撤销范围内，用到时会自动重新生成。",
+  "Undo what went to Trash": "撤销废纸篓里的部分",
+  "Rescued {count} files · {size}": "已抢救 {count} 个文件 · {size}",
+  "{count} places with uncommitted changes": "含 {count} 处未提交改动",
+  "{count} transcript archives": "{count} 份会话归档",
+  "{name}: {count} uncommitted files": "{name}：{count} 个文件未提交",
+  "Saved in {path}. It uses space on this disk, and that is already counted above.":
+    "存放在 {path}，占用本盘空间，已计入上面的实际释放。",
+  "Open archive": "打开归档",
+  "What this run did": "本次清理明细",
+  "Deleted": "已删除",
+  "In Trash": "在废纸篓",
+  "Disks": "磁盘",
+  "Internal": "内置",
+  "External": "外置",
+  "Disk information is not available yet.": "暂时取不到磁盘信息。",
+  "About 30 seconds": "约 30 秒",
+  "{size} total": "共 {size}",
+  "{used} used": "已用 {used}",
+  "{free} free": "剩余 {free}",
+  "Free": "可用空间",
+  "Press Scan to start. Scanning only reads; it never changes a file. You choose what to clean afterwards. Before worktrees and build backups are cleaned, screenshots, previews and uncommitted changes are rescued first.":
+    "点中间的按钮开始。扫描只读，不会改动任何文件；结果出来后由你勾选。清理 worktree 与构建备份前，会先抢救截图、预览和未提交的改动。",
+  "That folder cannot be used. Choose an existing folder on this computer, other than your home folder or the disk root.":
+    "这个文件夹不能用。请选择本机上已存在的文件夹，不能是主目录或磁盘根目录。",
+  "Another cleanup step is still running. Try again in a moment.": "另一项清理仍在进行，请稍后再试。",
+  "Scan first, then choose what to clean.": "请先扫描，再选择要清理的内容。",
+  "This cleanup can no longer be undone.": "这次清理已无法撤销。",
+  "Nothing could be put back. The items may have been emptied from Trash or the original folders changed.":
+    "没有能放回的内容。可能已从废纸篓清空，或原来的文件夹已改变。",
+  "The archive folder could not be found.": "找不到归档文件夹。",
+  "Cleanup could not continue. Nothing was removed.": "清理未能继续，没有删除任何内容。",
+  "Storage information is unavailable. Nothing was changed.": "暂时无法读取存储信息，未改动任何内容。",
+  "Reading storage information…": "正在读取存储信息…",
+  "Command copied": "命令已复制",
+  "Could not copy the command": "无法复制命令",
+  "System and app caches (Mole rules)": "系统与应用缓存（Mole 规则）",
+  "Developer caches": "开发工具缓存",
+  "Agent worktrees": "智能体 worktree",
+  "Agent temporary folders": "智能体临时目录",
+  "AI session transcripts": "AI 会话记录",
+  "Rollback copies and build backups": "改造与构建备份",
+  "System cache lists come from the preview of the open-source tool Mole (tw93/Mole, GPL-3.0). T3 Stardust carries out the removal and supports undo. This feature is not affiliated with the Mole project.":
+    "系统缓存清单来自开源工具 Mole（tw93/Mole，GPL-3.0）的预览结果，由 T3 Stardust 执行并支持撤销。本功能与 Mole 项目无隶属关系。",
+  "Deletion is decided by fixed rules, not by an AI model.": "删除由固定规则决定，不由 AI 模型决定。",
+  "Safe to clean": "放心清",
+  "Take a look": "看一眼",
+  "Remind only": "只提醒不动",
+  "Caches that rebuild themselves. Deleted directly, and the space comes back at once.":
+    "可自动重建的缓存。直接删除，空间立刻释放。",
+  "Probably removable, but they may hold something you still want. They go to Trash and can be undone for 7 days, but Trash still occupies the disk until this app empties it after 7 days.":
+    "大概率可以清，但可能有你还想留的东西。默认移到废纸篓（7 天内可撤销，但废纸篓里的文件仍占着磁盘，到期由本应用清空后才释放）。",
+  "Shown so you know about them. This page never deletes them.": "只是让你知道它们的存在，本页不会删除。",
+  "{selected} of {total} selected": "已选 {selected}/{total}",
+  "Select all in {tier}": "全选「{tier}」",
+  "Uncommitted · rescued first": "含未提交 · 先抢救",
+  "What it is": "这是什么",
+  "Produced by": "来源工具",
+  "Last used": "上次使用",
+  "Why it is left alone": "为什么不动",
+  "Why it can go": "为什么可以清",
+  "How to get it back": "怎么恢复",
+  "Paths ({count})": "路径（{count} 处）",
+  "and {count} more": "另有 {count} 处",
+  "Mole is not installed": "未安装 Mole",
+  "Install it to add a list of system and app caches here. Nothing is installed automatically.":
+    "安装后，这里会多出一份系统与应用缓存清单。不会自动安装任何东西。",
+  "Install Mole": "安装 Mole",
+  "Rescue first, then clean": "先抢救，再清理",
+  "Runs before deleting": "删除前自动执行",
+  "Before deleting, this saves a copy: {assets} visual assets · {repos} places with uncommitted changes ({files} files) → {path}":
+    "删除前会先归档：{assets} 个可视化素材 · {repos} 处未提交改动（{files} 个文件）→ {path}",
+  "The current selection rescues {count} assets ({size}). Folders with uncommitted changes only appear in Take a look, never in Safe to clean.":
+    "当前勾选先抢救 {count} 个素材（{size}）。含未提交改动的目录只会出现在「看一眼」，不进「放心清」。",
+  "Rescue first": "先抢救",
+  "Freed now": "立即释放",
+  "In Trash {size}, freed in 7 days": "进废纸篓 {size}，7 天后释放",
+  "About {free} free afterwards": "剩余约 {free}",
+  "Scan again": "重新扫描",
+  "Move to Trash": "移到废纸篓",
+  "Clean selected": "清理已选项",
+  "Delete and free the space": "直接删除并释放",
+  "Mole could not finish its preview, so its cache list is missing. The rest of the scan is unaffected.":
+    "Mole 没能完成预览，所以缺少它的缓存清单。其余扫描结果不受影响。",
+  "{ignored} listed paths are outside this app's safe rules and were ignored":
+    "清单里有 {ignored} 处不在本应用的安全规则内，已忽略",
+  "The scan stopped at its time limit, so this list may be incomplete. Scan again to continue.":
+    "扫描到时间上限就停了，这份清单可能不完整。可以再扫描一次。",
+  "Cleanup preferences": "清理偏好",
+  "Keep the newest rollback copies": "回滚备份默认保留最新",
+  "Old app copies, .bak-pre-* and .orig files, and older builds in My build folder: keep this many per source.":
+    "旧应用备份、.bak-pre-* / .orig 文件，以及「我的构建目录」里的历史构建，每个来源保留这么多份。",
+  "Keep fewer": "少留一份",
+  "Keep more": "多留一份",
+  "My build folder": "我的构建目录",
+  "A folder of old build generations, for example c97-build, c98-build. Leave it empty to skip builds.":
+    "存放历史构建的文件夹，例如 c97-build、c98-build。留空则不处理构建。",
+  "Last cleanup: {size} is still in Trash": "上次清理：{size} 仍在废纸篓里",
+  "You can undo it for {days} more days. After that this app empties its Trash batch.":
+    "还可以撤销 {days} 天，之后本应用会清空这一批。",
+  "Storage & cleanup": "存储与清理",
+  "See what is taking up the disk first, then clean only what can be safely recovered or rebuilt.":
+    "先看清磁盘被什么占着，再只清理能安全找回或重建的东西。",
+  "Checked {checked} of {total} places": "已检查 {checked}/{total} 处",
+  "Cleaning…": "正在清理…",
+  "{done} of {total} items": "已处理 {done}/{total} 项",
+  "Keep this page open. Items are re-checked one by one right before they are touched.":
+    "请保持本页打开。每一项在动手前都会重新检查一遍。",
+  "Set My build folder in the preferences below to include older builds and rollback copies.":
+    "在下方偏好里设置「我的构建目录」，就能把历史构建和回滚备份也纳入。",
+  "T3 data": "T3 数据",
+  "User app caches": "用户应用缓存",
+  "App caches": "应用缓存",
+  "Browser caches": "浏览器缓存",
+  "Developer tool caches": "开发者工具缓存",
+  "Apps and utility caches": "应用与工具缓存",
+  "Caches inside Application Support": "应用支持目录里的缓存",
+  "Other caches": "其他缓存",
+  "Unknown date": "未知时间",
+  "{count} locations · listed by Mole's rules": "{count} 处 · 来自 Mole 规则",
+  "Cache files that apps and tools rebuild by themselves when they need them.":
+    "应用和工具用到时会自动重建的缓存文件。",
+  "Mole (tw93/Mole), run as a separate program in preview mode": "Mole（tw93/Mole），以独立程序的预览模式运行",
+  "Caches are rebuilt automatically, so removing them loses nothing.": "缓存会自动重建，删除不会丢任何东西。",
+  "Nothing to restore. The apps recreate what they need; the next launch may be a little slower.":
+    "无需恢复。应用会自己重新生成，下次启动可能稍慢一点。",
+  "Developer download and build cache": "开发工具下载与构建缓存",
+  "Downloaded packages and build products kept so installs and builds go faster.":
+    "为加快安装和构建而保留的下载包与构建产物。",
+  "It is re-downloaded or rebuilt the next time you install or build.": "下次安装或构建时会重新下载或重建。",
+  "Nothing to restore. The next install or build refills it.": "无需恢复，下次安装或构建会自动补上。",
+  "Not merged": "未合并",
+  "A checked-out copy of a repository that an agent worked in.": "智能体工作时检出的仓库副本。",
+  "T3 Stardust worktree": "T3 Stardust 工作树",
+  "Its branch is merged and nothing in it is uncommitted, so every change already lives in git.":
+    "它的分支已合并，里面也没有未提交的内容，所有改动都已保存在 git 里。",
+  "It has no uncommitted changes, but its branch is not merged yet or it was used in the last 3 days. Commits stay in git; only this folder goes to Trash.":
+    "里面没有未提交的改动，但分支还没合并，或最近 3 天用过。提交都留在 git 里，只有这个文件夹进废纸篓。",
+  "It holds {count} uncommitted files that a removal would lose, so it is never touched.":
+    "里面有 {count} 个未提交的文件，删除会丢失，所以绝不会动它。",
+  "Create a worktree for the branch again with git; the files come back from the commit.":
+    "用 git 为这个分支重新建一个 worktree，文件会从提交里还原。",
+  "Undo from the summary while it is in Trash, or create the worktree again from the branch.":
+    "在废纸篓期间可从清理结果里撤销，也可以用分支重新建 worktree。",
+  "{tool} session transcripts": "{tool} 会话记录",
+  "{sessions} sessions · not opened for {days}+ days": "{sessions} 个会话 · 最久 {days} 天未打开",
+  "Compress and archive": "压缩归档",
+  "Transcripts of past agent conversations, stored as one file per session.":
+    "过往智能体对话的记录，每个会话一个文件。",
+  "Old transcripts only matter if you want to reread them, and they compress to a fraction of their size.":
+    "旧会话记录只有想回看时才用得上，压缩后体积会小很多。",
+  "A compressed copy goes to the rescue folder first, and the originals can be put back while they are in Trash.":
+    "先把压缩副本存进抢救目录，原文件在废纸篓期间也能放回。",
+  "T3 chat database and attachments": "T3 聊天数据库与附件",
+  "Managed by T3 itself": "由 T3 自己管理",
+  "The database and attachments behind your T3 conversations.": "你的 T3 对话背后的数据库和附件。",
+  "Removing these would delete conversations, so this page never touches them. Use Maintenance settings to compact or archive.":
+    "删除它们会丢失对话，所以本页绝不会动。需要压缩或归档，请到「维护」设置。",
+  "Agent temporary folders in /tmp": "/tmp 里的智能体临时目录",
+  "{count} folders untouched for a day or more": "{count} 个目录超过一天没动过",
+  "Scratch folders that agents and test browsers leave in /tmp.": "智能体和测试浏览器留在 /tmp 里的临时目录。",
+  "Codex, Claude Code, T3 and test browsers": "Codex、Claude Code、T3 和测试浏览器",
+  "Nothing has written to them for 24 hours, and /tmp is scratch space by design.":
+    "24 小时内没有任何写入，而且 /tmp 本来就是临时空间。",
+  "Nothing to restore. The tool recreates its scratch folder the next time it runs.":
+    "无需恢复，工具下次运行时会重新建临时目录。",
+  "{name} old copies": "{name} 的旧备份",
+  "{count} copies · newest {kept} kept": "{count} 个 · 每个来源保留最新 {kept} 份",
+  "Rollback copies": "回滚备份",
+  "Whole-app backups made before an app was replaced or rolled back.": "应用被替换或回滚之前留下的整包备份。",
+  "Newer backups of the same app are kept; these are older than that.": "同一应用更新的备份已保留，这些比它们更旧。",
+  "Undo while they are in Trash, or reinstall the app from its update channel.":
+    "在废纸篓期间可撤销，也可以从更新渠道重新安装应用。",
+  ".bak-pre-* and .orig files": ".bak-pre-* / .orig 文件",
+  "{count} files · newest {kept} per source kept": "{count} 个 · 每个来源保留最新 {kept} 份",
+  "Backup copies of single files that a patch or a merge left next to the original.":
+    "补丁或合并留在原文件旁边的单文件备份。",
+  "Patch and merge tools": "补丁与合并工具",
+  "The newest copies of each file are kept; these are older.": "每个文件最新的几份已保留，这些更旧。",
+  "Undo while they are in Trash.": "在废纸篓期间可撤销。",
+  "Older builds in my build folder ({name})": "我的构建目录里的历史构建（{name}）",
+  "{count} builds · newest {kept} kept": "{count} 个 · 保留最新 {kept} 个",
+  "Folders from earlier build generations kept for rollbacks.": "为了回滚而保留的早期构建目录。",
+  "Your build folder": "你的构建目录",
+  "Newer generations of the same build are kept; these are older.": "同一构建更新的几代已保留，这些更旧。",
+  "Undo while they are in Trash; after that, rebuild from source.": "在废纸篓期间可撤销，之后可从源码重新构建。",
+  "Caches inside repositories with uncommitted changes": "含未提交改动的仓库里的缓存",
+  "{count} locations": "{count} 处",
+  "Cache folders that sit inside a git repository whose files are not committed.":
+    "位于有文件未提交的 git 仓库里的缓存目录。",
+  "A cache rule matched them, but uncommitted work must never be deleted automatically.":
+    "缓存规则匹配到了它们，但未提交的内容绝不能自动删除。",
+  "{count} uncommitted files": "{count} 个文件未提交",
+  "Uncommitted work": "含未提交改动",
+  "A build folder that is also a git repository with uncommitted changes.":
+    "同时是 git 仓库、且含未提交改动的构建目录。",
+  "It is older than your newest builds. Its uncommitted changes are saved to the rescue folder before it moves to Trash.":
+    "它比最新的构建更旧。移到废纸篓之前，会先把未提交的改动存进抢救目录。",
+  "Rescued changes stay in the archive folder; undo while the folder is in Trash.":
+    "抢救出来的改动会留在归档目录；文件夹在废纸篓期间可撤销。",
+  "{count} uncommitted files, so it is left untouched": "有 {count} 个文件未提交，所以不动它",
+  "Git could not report its state, so it is left untouched": "git 无法报告它的状态，所以不动它",
+  "Protected: it holds your conversations": "受保护：里面是你的对话",
+  "Its folder is a link (for example to an external disk), so it is left untouched":
+    "它的文件夹是个链接（例如指向外置盘），所以不动它",
+  "It could not be checked completely, so it is left untouched": "无法完整检查，所以不动它",
+  "Some paths were skipped: ": "部分路径已跳过：",
+  "Not part of the last scan": "不在上次扫描结果里",
+  "Used a moment ago, so it was skipped": "刚刚还在使用，已跳过",
+  "Changed after the scan, so it was skipped": "扫描之后有改动，已跳过",
+  "Has uncommitted work and rescue is off, so it was kept": "含未提交改动，而「先抢救」已关闭，已保留",
+  "Has uncommitted files, so it was kept": "含未提交文件，已保留",
+  "This disk has no Trash folder, so the original was kept": "这块盘没有可用的废纸篓，已保留原件",
+  "The archive could not be verified, so the originals were kept": "归档未能通过校验，已保留原文件",
+  "Failed a safety check, so it was kept": "未通过安全检查，已保留",
+  "Put back": "已放回",
+  "It could not be removed": "未能删除",
+  "Disk free {size}. Open Storage and cleanup": "磁盘剩余 {size}。打开「存储与清理」",
+  "Disk free {size}": "磁盘剩余 {size}",
+  "rescue first build folder keep newest rollback copies bak orig": "先抢救 构建目录 保留 回滚备份 bak orig",
+  "Used {percent}%": "已用 {percent}%",
+  "{count} items selected": "已选 {count} 项",
+  "Other used space": "其他已用",
+  "Sizes below were measured by the scan just now. Nothing has been changed yet.":
+    "下面的大小是刚刚扫描量出来的，还没有改动任何东西。",
+  "Before worktrees and backup folders are removed, copy their screenshots, previews, components and uncommitted changes to {path}.":
+    "删除 worktree 与备份目录前，先把截图、预览、组件和未提交的改动复制到 {path}。",
+  "disk space free scan clean up cleanup caches mole worktrees session transcripts tmp rollback backups builds trash safe review":
+    "存储 磁盘 空间 清理 扫描 缓存 Mole worktree 会话记录 备份 构建 废纸篓 放心清 看一眼 抢救",
+  "There is not enough free space to save a rescue copy first, so it was kept":
+    "剩余空间太少，无法先存抢救副本，已保留原件",
 };

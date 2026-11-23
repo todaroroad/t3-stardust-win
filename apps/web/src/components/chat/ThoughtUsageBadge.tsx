@@ -55,9 +55,7 @@ export function ThoughtUsageBadge({
     : Date.parse(workEntry.createdAt);
   const endMs = item?.completedAt
     ? DateTime.toEpochMillis(item.completedAt)
-    : workEntry.toolLifecycleStatus !== "inProgress" && item?.updatedAt
-      ? DateTime.toEpochMillis(item.updatedAt)
-      : null;
+    : null;
   const durationMs =
     endMs !== null && Number.isFinite(startMs) && endMs > startMs ? endMs - startMs : null;
   const durationText =

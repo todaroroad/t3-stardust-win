@@ -9,6 +9,7 @@ import * as Schema from "effect/Schema";
 import { previousUsageWindow } from "./usagePreviousWindow";
 import { useUsageDateFormat } from "./useUsageDateFormat";
 import { useUiText } from "~/i18n/useUiText";
+import { useNavigate } from "@tanstack/react-router";
 import { UsageMotion } from "./UsageMotion";
 import { usageReplayKey } from "./usageReplay";
 import { usageTableHeaders } from "./usageMetricPresentation";
@@ -81,7 +82,7 @@ import {
 } from "../WorkspaceBreadcrumb";
 import { WorkspacePageContainer } from "../WorkspacePageContainer";
 import { AppRouteModal, AppRouteModalClose } from "../AppRouteModal";
-import { DiskSpaceSection } from "./DiskSpaceSection";
+import { UsageDiskChip } from "./UsageDiskChip";
 import { UsageLimitsSection } from "./UsageLimits";
 import { UsagePriceOverrides } from "./UsagePriceOverrides";
 import { UsageProviderChart } from "./UsageProviderChart";
@@ -200,20 +201,12 @@ export function UsagePage() {
       preferences.windowDays === 1 ? "hour" : "day",
     ),
   }));
-  const metric = preferences.metric;
+  // Disk moved to Settings → Storage & cleanup; an old saved "disk" tab opens Cost.
+  const metric = preferences.metric === "disk" ? "cost" : preferences.metric;
   const showingLimits = metric === "limits";
-  const showingDisk = metric === "disk";
+  const navigate = useNavigate();
   const [motionTick, setMotionTick] = useState(0);
-  const [diskRefreshTick, setDiskRefreshTick] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const diskPending = useRef(new Set<EnvironmentId>());
-  const diskSettled = (id: EnvironmentId) => {
-    diskPending.current.delete(id);
-    if (!diskPending.current.size) {
-      refreshingRef.current = false;
-      setIsRefreshing(false);
-    }
-  };
   const [limitsNow, setLimitsNow] = useState(() => Date.now());
   const refreshingRef = useRef(false);
   const [priceDialog, setPriceDialog] = useState<{
@@ -236,6 +229,7 @@ export function UsagePage() {
   const shownWindow = shown?.window ?? window;
   const shownHourly = shownWindow.resolution === "hour";
   const refreshingUsage = isRefreshing && !showingLimits;
+  const diskEnvironmentId = selectedEnvironments.find((environment) => environment.canReadDiagnostics)?.environmentId;
   const showingKept = shown !== null && shown.window !== window;
   const presentations = useAtomValue(environmentPresentations.presentationsAtom);
   const presentationsWithProviders = useAtomValue(
@@ -297,6 +291,12 @@ export function UsagePage() {
     const command = resolveUsageShortcut(event, keybindings);
     const metricOption = METRIC_OPTIONS.find((option) => option.command === command);
     const periodOption = WINDOW_OPTIONS.find((option) => option.command === command);
+    if (command === "usage.disk") {
+      event.preventDefault();
+      event.stopPropagation();
+      void navigate({ to: "/settings/storage" });
+      return;
+    }
     if (!metricOption && !periodOption) return;
     event.preventDefault();
     event.stopPropagation();
@@ -311,13 +311,6 @@ export function UsagePage() {
   }, []);
   const refreshWindow = () => {
     if (refreshingRef.current) return;
-    if (showingDisk) {
-      refreshingRef.current = true;
-      setIsRefreshing(true);
-      diskPending.current = new Set(selectedEnvironments.map((e) => e.environmentId));
-      setDiskRefreshTick((tick) => tick + 1);
-      return;
-    }
     setMotionTick((t) => t + 1);
     if (showingLimits) {
       refreshingRef.current = true;
@@ -393,7 +386,7 @@ export function UsagePage() {
             selectedEnvironments={selectedEnvironments}
             selectedEnvironmentIds={selectedEnvironmentIds}
             onSelectionChange={setSelectedEnvironmentIds}
-            showUsageStatus={!showingLimits && !showingDisk}
+            showUsageStatus={!showingLimits}
             refreshing={refreshingUsage}
             isPartial={isPartial}
             duplicateSources={merged.duplicateSources}
@@ -409,15 +402,16 @@ export function UsagePage() {
           />
         </WorkspaceBreadcrumbItem>
       </WorkspaceBreadcrumb>
-      {!showingLimits && !showingDisk ? (
+      {!showingLimits ? (
         <span className="hidden min-w-0 truncate text-xs text-muted-foreground @7xl/usage-header:block">
           {windowLabel}
         </span>
       ) : null}
       <div className="ms-auto hidden shrink-0 items-center justify-end gap-2 @4xl/usage-header:flex">
+        {diskEnvironmentId ? <UsageDiskChip environmentId={diskEnvironmentId} /> : null}
         {/* Limits are always current, so they have no period. The period sits before the metric
             tabs so dropping it never moves them. */}
-        {showingLimits || showingDisk || theme === "apple" ? null : (
+        {showingLimits || theme === "apple" ? null : (
           <ToggleGroup
             aria-label={uiText("Usage period")}
             variant="segmented"
@@ -481,7 +475,8 @@ export function UsagePage() {
         )}
       </div>
       <div className="ms-auto flex shrink-0 items-center justify-end gap-1 @4xl/usage-header:hidden">
-        {showingLimits || showingDisk ? null : (
+        {diskEnvironmentId ? <UsageDiskChip environmentId={diskEnvironmentId} /> : null}
+        {showingLimits ? null : (
           <Select value={String(windowDays)} onValueChange={(value) => selectWindow(Number(value))}>
             <SelectTrigger
               aria-label={uiText("Usage period")}
@@ -595,12 +590,6 @@ export function UsagePage() {
                   hiddenProviders={hiddenProviders}
                   now={limitsNow}
                 />
-              ) : showingDisk ? (
-                <DiskSpaceSection
-                  environments={selectedEnvironments}
-                  refreshTick={diskRefreshTick}
-                  onSettled={diskSettled}
-                />
               ) : shown === null ? (
                 <UsageSkeleton />
               ) : !canReadDiagnostics ? (
@@ -641,7 +630,7 @@ export function UsagePage() {
           </WorkspacePageContainer>
         </ScrollArea>
       </div>
-      {showingLimits || showingDisk || theme === "apple" ? null : (
+      {showingLimits || theme === "apple" ? null : (
         <UsageModelDialogHost
           models={merged.models}
           environments={selectedEnvironments}

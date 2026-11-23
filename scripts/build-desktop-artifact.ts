@@ -63,7 +63,7 @@ import { Command, Flag } from "effect/cli";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
 const LINUX_ICON_SIZES = [16, 22, 24, 32, 48, 64, 128, 256, 512] as const;
-const DESKTOP_APP_ID = "com.t3tools.t3code";
+const DESKTOP_APP_ID = "com.todaroroad.t3stardust";
 const APPLE_TEAM_ID_PATTERN = /^[A-Z0-9]{10}$/u;
 
 const BuildPlatform = Schema.Literals(["mac", "linux", "win"]);
@@ -2851,8 +2851,14 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
     ],
   };
   const updateChannel = resolveDesktopUpdateChannel(version);
-  // Keep custom Stardust Windows builds independent of upstream electron-updater feeds.
-  buildConfig.publish = null;
+  buildConfig.publish = [
+    {
+      provider: "github",
+      owner: "todaroroad",
+      repo: "t3-stardust-win",
+      releaseType: "release",
+    },
+  ];
 
   if (platform === "mac") {
     const path = yield* Path.Path;
@@ -3000,6 +3006,7 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
       signExts: [".node", ".dll"],
       // Resource editing sets product icons even when code signing is disabled.
       signAndEditExecutable: true,
+      verifyUpdateCodeSignature: false,
     };
     if (signed && (yield* HostProcess.Platform) === "win32") {
       winConfig.azureSignOptions = yield* AzureTrustedSigningOptionsConfig;
@@ -3959,7 +3966,7 @@ const buildDesktopArtifactUnlocked = Effect.fn("buildDesktopArtifactUnlocked")(f
     description:
       "T3 Code is an open-source desktop app for coding agents. Work with your existing agent subscriptions, review code changes, and run commands in your projects. Connect from desktop, web, or mobile to continue working remotely.",
     license: "MIT",
-    homepage: "https://github.com/zds-xiaoxin/xiaoxin-t3code",
+    homepage: "https://github.com/todaroroad/t3-stardust-win",
     author: "T3 Tools",
     main: "apps/desktop/dist-electron/boot.cjs",
     build: yield* createBuildConfig(

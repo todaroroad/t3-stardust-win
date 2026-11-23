@@ -10,6 +10,12 @@ import {
   StorageOperation,
   StorageManagementError,
 } from "./storageManagement.ts";
+import {
+  StorageTidyActionInput,
+  StorageTidyError,
+  StorageTidyState,
+  StorageTidyStateInput,
+} from "./storageTidy.ts";
 import { DiskSpaceInput, DiskSpaceReport } from "./diskSpace.ts";
 import { UserMemoryMutation } from "./memory.ts";
 import {
@@ -593,6 +599,8 @@ export const WS_METHODS = {
   serverGetDiskSpace: "server.getDiskSpace",
   serverInspectStorage: "server.inspectStorage",
   serverManageStorage: "server.manageStorage",
+  serverStorageTidyState: "server.storageTidyState",
+  serverStorageTidyAct: "server.storageTidyAct",
   serverReclaimDatabaseSpace: "server.reclaimDatabaseSpace",
   peerLinksList: "peerLinks.list",
   peerLinksNames: "peerLinks.names",
@@ -1012,6 +1020,17 @@ const WsServerManageStorageRpc = Rpc.make(WS_METHODS.serverManageStorage, {
   payload: StorageActionInput,
   success: StorageOperation,
   error: Schema.Union([StorageManagementError, EnvironmentAuthorizationError]),
+});
+
+const WsServerStorageTidyStateRpc = Rpc.make(WS_METHODS.serverStorageTidyState, {
+  payload: StorageTidyStateInput,
+  success: StorageTidyState,
+  error: Schema.Union([StorageTidyError, EnvironmentAuthorizationError]),
+});
+const WsServerStorageTidyActRpc = Rpc.make(WS_METHODS.serverStorageTidyAct, {
+  payload: StorageTidyActionInput,
+  success: StorageTidyState,
+  error: Schema.Union([StorageTidyError, EnvironmentAuthorizationError]),
 });
 
 const WsServerGetDiskSpaceRpc = Rpc.make(WS_METHODS.serverGetDiskSpace, {
@@ -2459,6 +2478,8 @@ export const WsRpcGroup = RpcGroup.make(
   WsServerGetDiskSpaceRpc,
   WsServerInspectStorageRpc,
   WsServerManageStorageRpc,
+  WsServerStorageTidyStateRpc,
+  WsServerStorageTidyActRpc,
   WsServerGetSettingsRpc,
   WsServerReclaimDatabaseSpaceRpc,
   WsServerUpdateSettingsRpc,

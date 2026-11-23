@@ -89,6 +89,7 @@ const layerDesktopUpdates = ({ checkResult }: MenuServices) =>
     download: Effect.die("unexpected download"),
     install: Effect.die("unexpected install"),
     installPrepared: () => Effect.die("unexpected installPrepared"),
+    setAutoInstall: () => Effect.die("unexpected setAutoInstall"),
   } satisfies DesktopUpdates.DesktopUpdates["Service"]);
 
 const layerDesktopWindow = (selectedAction: Deferred.Deferred<string>) =>

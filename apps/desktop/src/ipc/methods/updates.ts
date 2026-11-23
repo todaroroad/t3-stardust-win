@@ -66,3 +66,13 @@ export const checkForUpdate = DesktopIpc.makeIpcMethod({
     return yield* updates.check("web-ui");
   }),
 });
+
+export const setUpdateAutoInstall = DesktopIpc.makeIpcMethod({
+  channel: IpcChannels.UPDATE_SET_AUTO_INSTALL_CHANNEL,
+  payload: Schema.Boolean,
+  result: DesktopUpdateStateSchema,
+  handler: Effect.fn("desktop.ipc.updates.setAutoInstall")(function* (enabled) {
+    const updates = yield* DesktopUpdates.DesktopUpdates;
+    return yield* updates.setAutoInstall(enabled);
+  }),
+});

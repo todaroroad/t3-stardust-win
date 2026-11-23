@@ -3,6 +3,7 @@ import type { KeybindingCommand, ResolvedKeybindingsConfig } from "@t3tools/cont
 import type { UsageChartMetric } from "./UsageProviderChart";
 import { resolveShortcutCommand, type ShortcutEventLike } from "../../keybindings";
 
+/** "disk" survives only so an old saved choice still reads; the tab itself moved to Settings → Storage & cleanup. */
 export type UsageMetric = UsageChartMetric | "limits" | "disk";
 export const METRIC_OPTIONS = [
   {
@@ -25,13 +26,6 @@ export const METRIC_OPTIONS = [
       return uiText("Limits");
     },
     command: "usage.limits",
-  },
-  {
-    value: "disk",
-    get label() {
-      return uiText("Cleanup & organization");
-    },
-    command: "usage.disk",
   },
 ] as const satisfies readonly { value: UsageMetric; label: string; command: KeybindingCommand }[];
 

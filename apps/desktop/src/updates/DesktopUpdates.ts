@@ -45,6 +45,7 @@ import {
 } from "./releaseNotes.ts";
 import { desktopUpdateChannelOf } from "@t3tools/shared/cliRelease";
 import { compareSemverVersions } from "@t3tools/shared/semver";
+import { stardustUpdateUserMessage } from "./stardustUpdate.ts";
 import {
   createInitialDesktopUpdateState,
   reduceDesktopUpdateStateOnCheckFailure,
@@ -221,6 +222,8 @@ export class DesktopUpdates extends Context.Service<
     readonly installPrepared: (
       expectedVersion: string,
     ) => Effect.Effect<DesktopPreparedUpdateInstallResult>;
+    /** Downloads offered updates in the background and installs a finished one on quit. */
+    readonly setAutoInstall: (enabled: boolean) => Effect.Effect<DesktopUpdateState>;
   }
 >()("@t3tools/desktop/updates/DesktopUpdates") {}
 
@@ -318,10 +321,11 @@ function createBaseUpdateState(
   channel: DesktopUpdateChannel,
   disabledReason: Option.Option<string>,
   environment: DesktopEnvironment.DesktopEnvironment["Service"],
+  currentVersion: string,
 ): DesktopUpdateState {
   const enabled = Option.isNone(disabledReason);
   return {
-    ...createInitialDesktopUpdateState(environment.appVersion, environment.runtimeInfo, channel),
+    ...createInitialDesktopUpdateState(currentVersion, environment.runtimeInfo, channel),
     enabled,
     status: enabled ? "idle" : "disabled",
     message: Option.getOrNull(disabledReason),
@@ -407,6 +411,13 @@ export const make = Effect.gen(function* () {
   const policy = yield* DesktopUpdatePolicy.DesktopUpdatePolicy;
   // Any user can set the mock flag, so it never replaces an administrator's update source.
   const mockUpdates = config.mockUpdates && policy.message === null;
+  // T3 Stardust's macOS updater reads the fork's releases and compares community versions
+  // (1.2.1), not the Electron build version; it only ever offers the stable track.
+  const stardustFeed = electronUpdater.stardustFeed;
+  const runningVersion = stardustFeed?.runningVersion ?? environment.appVersion;
+  const effectiveChannel = (channel: DesktopUpdateChannel): DesktopUpdateChannel =>
+    stardustFeed === undefined ? channel : "latest";
+  const autoInstallRef = yield* Ref.make(false);
 
   const appUpdateYmlConfigRef = yield* Ref.make<Option.Option<AppUpdateYmlConfig>>(Option.none());
   const activeUpdateActionRef = yield* Ref.make<Option.Option<UpdateAction>>(Option.none());
@@ -428,14 +439,14 @@ export const make = Effect.gen(function* () {
           desktopUpdateChannelOf(version) === state.channel &&
           (Option.isSome(floor)
             ? compareSemverVersions(version, floor.value) >= 0
-            : desktopUpdateChannelOf(environment.appVersion) === state.channel),
+            : desktopUpdateChannelOf(runningVersion) === state.channel),
       ),
     );
   const updateStateRef = yield* Ref.make<DesktopUpdateState>(
     createInitialDesktopUpdateState(
-      environment.appVersion,
+      runningVersion,
       environment.runtimeInfo,
-      environment.defaultDesktopSettings.updateChannel,
+      effectiveChannel(environment.defaultDesktopSettings.updateChannel),
     ),
   );
 
@@ -488,7 +499,10 @@ export const make = Effect.gen(function* () {
   const hasUpdateFeedConfig = Ref.get(appUpdateYmlConfigRef).pipe(
     Effect.map(
       (appUpdateYmlConfig) =>
-        Option.isSome(appUpdateYmlConfig) || mockUpdates || policy.feedUrl !== undefined,
+        Option.isSome(appUpdateYmlConfig) ||
+        mockUpdates ||
+        policy.feedUrl !== undefined ||
+        stardustFeed !== undefined,
     ),
   );
 
@@ -496,10 +510,12 @@ export const make = Effect.gen(function* () {
     const customBuild = yield* fileSystem
       .exists(environment.path.join(environment.resourcesPath, "stardust-build.json"))
       .pipe(Effect.orElseSucceed(() => false));
-    if (customBuild)
+    // Stardust builds without their own updater (non-macOS) keep official updates off.
+    if (customBuild && stardustFeed === undefined)
       return Option.some("T3 星尘版通过迁移感知安装器手动更新；官方自动更新已禁用。");
     const bakedFeed = Option.getOrUndefined(yield* Ref.get(appUpdateYmlConfigRef));
     if (
+      stardustFeed === undefined &&
       bakedFeed !== undefined &&
       !mockUpdates &&
       policy.feedUrl === undefined &&
@@ -536,7 +552,7 @@ export const make = Effect.gen(function* () {
   // A track the policy blocks is never named as the one to switch to.
   const noOfferState = (state: DesktopUpdateState, checkedAt: string) =>
     Effect.map(Ref.get(releaseFloorRef), (floor) => {
-      const buildChannel = desktopUpdateChannelOf(environment.appVersion);
+      const buildChannel = desktopUpdateChannelOf(runningVersion);
       if (Option.isSome(floor) || buildChannel === state.channel) {
         return reduceDesktopUpdateStateOnNoUpdate(state, checkedAt);
       }
@@ -661,7 +677,11 @@ export const make = Effect.gen(function* () {
           )(function* (error) {
             const failedAt = yield* currentIsoTimestamp;
             yield* updateState((current) =>
-              reduceDesktopUpdateStateOnCheckFailure(current, error.message, failedAt),
+              reduceDesktopUpdateStateOnCheckFailure(
+                current,
+                stardustUpdateUserMessage(error.cause) ?? error.message,
+                failedAt,
+              ),
             );
             yield* logUpdaterError(error.message, {
               errorTag: error._tag,
@@ -715,9 +735,7 @@ export const make = Effect.gen(function* () {
       if (refresh) {
         // electron-updater downloads what its last check found, which can be hours old.
         yield* logUpdaterInfo("checking for updates", { reason: "download" });
-        yield* runUpdaterCheck(
-          offered.channel !== desktopUpdateChannelOf(environment.appVersion),
-        ).pipe(
+        yield* runUpdaterCheck(offered.channel !== desktopUpdateChannelOf(runningVersion)).pipe(
           // A failed check keeps electron-updater's earlier result, so the known offer still downloads.
           Effect.catchTags({
             ElectronUpdaterCheckForUpdatesError: (error) =>
@@ -745,7 +763,10 @@ export const make = Effect.gen(function* () {
           function* (error) {
             const cause = describeUpdateErrorCause(error.cause);
             yield* updateState((current) =>
-              reduceDesktopUpdateStateOnDownloadFailure(current, `${error.message} ${cause}`),
+              reduceDesktopUpdateStateOnDownloadFailure(
+                current,
+                stardustUpdateUserMessage(error.cause) ?? `${error.message} ${cause}`,
+              ),
             );
             yield* logUpdaterError(error.message, {
               errorTag: error._tag,
@@ -834,7 +855,7 @@ export const make = Effect.gen(function* () {
     DESKTOP_UPDATE_INSTALL_RECORD_FILE,
   );
   const writeInstallRecord = (targetVersion: string) =>
-    encodeInstallRecord({ fromVersion: environment.appVersion, targetVersion }).pipe(
+    encodeInstallRecord({ fromVersion: runningVersion, targetVersion }).pipe(
       Effect.flatMap((text) => fileSystem.writeFileString(installRecordPath, text)),
       Effect.catch((error) =>
         logUpdaterWarning("Could not record the update install.", { errorTag: error._tag }),
@@ -849,7 +870,7 @@ export const make = Effect.gen(function* () {
     Effect.option,
     Effect.map((record) =>
       Option.flatMap(record, (value) =>
-        Option.fromNullishOr(resolveNotAppliedInstallVersion(value, environment.appVersion)),
+        Option.fromNullishOr(resolveNotAppliedInstallVersion(value, runningVersion)),
       ),
     ),
     Effect.tap((notAppliedVersion) =>
@@ -860,7 +881,7 @@ export const make = Effect.gen(function* () {
   const baseUpdateState = (channel: DesktopUpdateChannel, disabledReason: Option.Option<string>) =>
     Ref.get(notAppliedVersionRef).pipe(
       Effect.map((notAppliedVersion) => ({
-        ...createBaseUpdateState(channel, disabledReason, environment),
+        ...createBaseUpdateState(channel, disabledReason, environment, runningVersion),
         // Callers fall back to the channel's reason only when nothing else turns updates off.
         ...(Option.isSome(disabledReason) &&
         disabledReason.value === Option.getOrUndefined(channelBlockedReason(channel))
@@ -992,7 +1013,9 @@ export const make = Effect.gen(function* () {
           Effect.catchTags({
             ElectronUpdaterQuitAndInstallError: Effect.fn("desktop.updates.handleInstallFailure")(
               function* (error) {
-                yield* recoverFailedInstall(error.message);
+                yield* recoverFailedInstall(
+                  stardustUpdateUserMessage(error.cause) ?? error.message,
+                );
                 yield* logUpdaterError(error.message, {
                   errorTag: error._tag,
                   cause: describeUpdateErrorCause(error.cause),
@@ -1044,7 +1067,7 @@ export const make = Effect.gen(function* () {
       (yield* checkForUpdates(
         "install",
         "acquire",
-        retained.channel !== desktopUpdateChannelOf(environment.appVersion),
+        retained.channel !== desktopUpdateChannelOf(runningVersion),
       )) &&
       (yield* Ref.get(updateStateRef)).status === "available"
     ) {
@@ -1079,9 +1102,18 @@ export const make = Effect.gen(function* () {
     };
   });
 
+  // With auto-install on, an offered update downloads quietly and installs when the app quits.
+  const downloadInBackgroundIfEnabled = Effect.gen(function* () {
+    if (!(yield* Ref.get(autoInstallRef))) return;
+    if ((yield* Ref.get(updateStateRef)).status !== "available") return;
+    yield* logUpdaterInfo("downloading update in the background");
+    yield* downloadAvailableUpdate(false);
+  }).pipe(Effect.asVoid, Effect.withSpan("desktop.updates.downloadInBackground"));
+
   const startUpdatePollers: Effect.Effect<void, never, Scope.Scope> = Effect.gen(function* () {
     yield* Effect.sleep(AUTO_UPDATE_STARTUP_DELAY).pipe(
       Effect.andThen(checkForUpdates("startup")),
+      Effect.andThen(downloadInBackgroundIfEnabled),
       Effect.catchCause((cause) => {
         if (Cause.hasInterruptsOnly(cause)) {
           return Effect.void;
@@ -1097,6 +1129,7 @@ export const make = Effect.gen(function* () {
     );
     yield* Effect.sleep(AUTO_UPDATE_POLL_INTERVAL).pipe(
       Effect.andThen(checkForUpdates("poll")),
+      Effect.andThen(downloadInBackgroundIfEnabled),
       Effect.forever,
       Effect.catchCause((cause) => {
         if (Cause.hasInterruptsOnly(cause)) {
@@ -1323,7 +1356,7 @@ export const make = Effect.gen(function* () {
       yield* Ref.set(notAppliedVersionRef, notAppliedVersion);
       if (Option.isSome(notAppliedVersion)) {
         yield* logUpdaterWarning("the last update install did not apply", {
-          version: environment.appVersion,
+          version: runningVersion,
           targetVersion: notAppliedVersion.value,
         });
       }
@@ -1342,13 +1375,14 @@ export const make = Effect.gen(function* () {
       }
 
       const settings = yield* desktopSettings.get;
+      const updateChannel = effectiveChannel(settings.updateChannel);
       const disabledReason = yield* resolveDisabledReason;
       // A blocked nightly channel still lets the user switch back to stable, so it stays updatable.
       yield* Ref.set(desktopState.canInstallUpdates, Option.isNone(disabledReason));
       yield* setState(
         yield* baseUpdateState(
-          settings.updateChannel,
-          Option.orElse(disabledReason, () => channelBlockedReason(settings.updateChannel)),
+          updateChannel,
+          Option.orElse(disabledReason, () => channelBlockedReason(updateChannel)),
         ),
       );
       if (Option.isSome(disabledReason)) {
@@ -1357,8 +1391,8 @@ export const make = Effect.gen(function* () {
       yield* Ref.set(updaterConfiguredRef, true);
 
       yield* electronUpdater.setAutoDownload(false);
-      yield* electronUpdater.setAutoInstallOnAppQuit(false);
-      yield* applyAutoUpdaterChannel(settings.updateChannel);
+      yield* electronUpdater.setAutoInstallOnAppQuit(yield* Ref.get(autoInstallRef));
+      yield* applyAutoUpdaterChannel(updateChannel);
       yield* electronUpdater.setDisableDifferentialDownload(
         isArm64HostRunningIntelBuild(environment.runtimeInfo),
       );
@@ -1399,6 +1433,12 @@ export const make = Effect.gen(function* () {
       options?: { readonly minimumVersion?: string | undefined },
     ) {
       yield* Effect.annotateCurrentSpan({ channel: nextChannel });
+      if (stardustFeed !== undefined && nextChannel !== "latest") {
+        return yield* new DesktopUpdateChannelManagedError({
+          channel: nextChannel,
+          policyMessage: "T3 Stardust only offers stable releases.",
+        });
+      }
       if (Option.isSome(channelBlockedReason(nextChannel))) {
         return yield* new DesktopUpdateChannelManagedError({
           channel: nextChannel,
@@ -1431,7 +1471,7 @@ export const make = Effect.gen(function* () {
         // So does a retained offer below the new floor, which must not install.
         if (
           nextChannel === state.channel &&
-          nextChannel === desktopUpdateChannelOf(environment.appVersion) &&
+          nextChannel === desktopUpdateChannelOf(runningVersion) &&
           (retained === null || (yield* offerable(retained, state)))
         ) {
           return state;
@@ -1456,7 +1496,7 @@ export const make = Effect.gen(function* () {
         yield* checkForUpdates(
           "channel-change",
           "held",
-          nextChannel !== desktopUpdateChannelOf(environment.appVersion),
+          nextChannel !== desktopUpdateChannelOf(runningVersion),
         );
         return yield* Ref.get(updateStateRef);
       }).pipe(Effect.ensuring(finishUpdateAction("channel")));
@@ -1473,6 +1513,7 @@ export const make = Effect.gen(function* () {
         };
       }
       const checked = yield* checkForUpdates(reason, "acquire", options?.allowDowngrade === true);
+      if (checked) yield* Effect.forkDetach(downloadInBackgroundIfEnabled);
       return {
         checked,
         state: yield* Ref.get(updateStateRef),
@@ -1491,6 +1532,15 @@ export const make = Effect.gen(function* () {
     ),
     installPrepared: Effect.fn("DesktopUpdates.installPrepared")(function (expectedVersion) {
       return installWithExpectedVersion(expectedVersion);
+    }),
+    setAutoInstall: Effect.fn("desktop.updates.setAutoInstall")(function* (enabled: boolean) {
+      yield* Effect.annotateCurrentSpan({ enabled });
+      yield* Ref.set(autoInstallRef, enabled);
+      if (yield* Ref.get(updaterConfiguredRef)) {
+        yield* electronUpdater.setAutoInstallOnAppQuit(enabled);
+        if (enabled) yield* Effect.forkDetach(downloadInBackgroundIfEnabled);
+      }
+      return yield* Ref.get(updateStateRef);
     }),
   });
 });
