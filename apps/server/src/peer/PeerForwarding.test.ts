@@ -1,4 +1,3 @@
-import * as UsageLimitSources from "../usage/UsageLimitSources.ts";
 import * as DocumentText from "../provider/DocumentText.ts";
 import { NodeHttpServer } from "@effect/platform-node";
 import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
@@ -240,14 +239,7 @@ const serveBox = (seen: Ref.Ref<Seen>, linkSession: Ref.Ref<string>) =>
   servePeer(
     box,
     Layer.mergeAll(
-      McpHttpServer.layerOrchestratorToolkit.pipe(
-        Layer.provide(
-          Layer.mock(UsageLimitSources.UsageLimitSources)({
-            current: Effect.succeed([]),
-            refresh: Effect.void,
-          }),
-        ),
-      ),
+      McpHttpServer.layerOrchestratorToolkit,
       McpHttpServer.layerProjectRegistration,
       McpHttpServer.layerThreadToolkit,
     ).pipe(
@@ -302,14 +294,7 @@ const mcpClient = McpSchema.McpServerClient.of({
 const makeLaptop = Effect.gen(function* () {
   const linking = yield* layerLinkingEnvironment(laptop).pipe(Layer.build);
   const layerHere = Layer.mergeAll(
-    McpHttpServer.layerOrchestratorToolkit.pipe(
-      Layer.provide(
-        Layer.mock(UsageLimitSources.UsageLimitSources)({
-          current: Effect.succeed([]),
-          refresh: Effect.void,
-        }),
-      ),
-    ),
+    McpHttpServer.layerOrchestratorToolkit,
     McpHttpServer.layerProjectRegistration,
     McpHttpServer.layerThreadToolkit,
   ).pipe(

@@ -43,6 +43,7 @@ import { changeRequestTermKind } from "./changeRequestTerm";
 export function GhostBar({ className }: { className?: string | undefined }) {
   return <span aria-hidden className={cn("block h-3 rounded bg-muted-foreground/15", className)} />;
 }
+
 const TITLE_WIDTHS = ["w-3/5", "w-2/5", "w-1/2", "w-2/3", "w-2/5", "w-3/5", "w-1/2"];
 const META_WIDTHS = ["w-2/5", "w-1/3", "w-2/5", "w-1/4", "w-1/3", "w-2/5", "w-1/3"];
 const DEFAULT_DETAIL_TABS = [
@@ -50,6 +51,7 @@ const DEFAULT_DETAIL_TABS = [
   { value: "timeline", label: msg("Timeline", { $context: "pull request tab" }) },
   { value: "code", label: msg("Code", { $context: "pull request tab" }) },
 ] as const;
+
 export function PullRequestListGhost({ rows = 7, caption }: { rows?: number; caption?: string }) {
   const gt = useGT();
   return (
@@ -413,6 +415,7 @@ export function PullRequestDetailGhost({
             </div>
           </div>
         </section>
+
         <section>
           <div className="sticky top-0 z-10 flex w-full items-center bg-background pr-4">
             <div className="flex min-w-0 flex-1 items-center gap-1.5 px-4 py-3 text-left text-xs font-medium text-muted-foreground">
@@ -439,6 +442,7 @@ export function PullRequestDetailGhost({
     </div>
   );
 }
+
 export function PullRequestPeopleGhost({ rows = 4 }: { rows?: number }) {
   const gt = useGT();
   return (
@@ -456,6 +460,7 @@ export function PullRequestPeopleGhost({ rows = 4 }: { rows?: number }) {
     </div>
   );
 }
+
 export function PullRequestTimelineGhost({ rows = 6 }: { rows?: number }) {
   const gt = useGT();
   return (

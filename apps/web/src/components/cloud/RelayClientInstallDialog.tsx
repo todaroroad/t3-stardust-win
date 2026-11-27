@@ -1,7 +1,5 @@
-
-import { uiText } from "~/i18n";
 import { DownloadIcon } from "lucide-react";
-import { T, useGT, useMessages, Var } from "gt-react";
+import { msg, T, useGT, useMessages, Var } from "gt-react";
 import { useSyncExternalStore } from "react";
 import type { RelayClientInstallProgressStage } from "@t3tools/contracts";
 
@@ -26,48 +24,13 @@ const installSteps: ReadonlyArray<{
   readonly stage: RelayClientInstallProgressStage;
   readonly label: string;
 }> = [
-  {
-    stage: "checking",
-    get label() {
-      return uiText("Checking current installation");
-    },
-  },
-  {
-    stage: "waiting_for_lock",
-    get label() {
-      return uiText("Waiting for installer");
-    },
-  },
-  {
-    stage: "downloading",
-    get label() {
-      return uiText("Downloading relay client");
-    },
-  },
-  {
-    stage: "verifying",
-    get label() {
-      return uiText("Verifying download");
-    },
-  },
-  {
-    stage: "installing",
-    get label() {
-      return uiText("Installing relay client");
-    },
-  },
-  {
-    stage: "validating",
-    get label() {
-      return uiText("Validating executable");
-    },
-  },
-  {
-    stage: "activating",
-    get label() {
-      return uiText("Activating installation");
-    },
-  },
+  { stage: "checking", label: msg("Checking current installation") },
+  { stage: "waiting_for_lock", label: msg("Waiting for installer") },
+  { stage: "downloading", label: msg("Downloading relay client") },
+  { stage: "verifying", label: msg("Verifying download") },
+  { stage: "installing", label: msg("Installing relay client") },
+  { stage: "validating", label: msg("Validating executable") },
+  { stage: "activating", label: msg("Activating installation") },
 ];
 
 export function RelayClientInstallDialog() {

@@ -3,8 +3,14 @@ import { useLocale } from "gt-react";
 import { use } from "react";
 import { useQuietThreadProjection } from "../../state/entities";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
-import { formatTokenCount } from "./sessionStats";
 import { TimelineRowCtx, type TimelineWorkEntry } from "./timelineRowContext";
+
+function formatTokenCount(count: number): string {
+  if (!Number.isFinite(count) || count < 0) return "0";
+  if (count >= 1_000_000) return `${(count / 1_000_000).toFixed(2).replace(/\.?0+$/, "")}M`;
+  if (count >= 1_000) return `${(count / 1_000).toFixed(1).replace(/\.0$/, "")}k`;
+  return String(Math.round(count));
+}
 
 function estimateThoughtTokens(text: string): number {
   const trimmed = text.trim();

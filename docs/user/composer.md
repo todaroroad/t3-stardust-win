@@ -30,14 +30,6 @@ Files upload to the environment's machine as soon as you attach them, and all up
 
 See [images and videos](#images-and-videos-in-messages) for previewing and saving media.
 
-## Task plan above the composer
-
-When the agent reports a plan, a one-line capsule floats above the composer with the current stage and
-how many stages are done. Long plans are merged into at most six stages. Select the capsule to open the
-plan, and select a stage to see its operations and retries. A stage that needs your confirmation or has a
-problem is flagged on the capsule. `Esc` or a click elsewhere closes the plan. When the plan finishes, the
-capsule fades and leaves a one-line summary in the conversation. Nothing shows when the agent reports no plan.
-
 ## Send while the agent is working
 
 Choose your default follow-up behavior in **Settings → Chat → Follow-up behavior** (per client):

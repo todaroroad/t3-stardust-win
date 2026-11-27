@@ -205,7 +205,6 @@ it.each(["[Docs](https://example.com/docs)", "[Readme](docs/readme.md)"])(
     using _setup = setup();
     await using screen = await renderMarkdown(text);
     screen.anchor().focus();
-    expect(document.activeElement, "focused markdown anchor").toBe(screen.anchor());
     await userEvent.keyboard("{Shift>}{F10}{/Shift}");
     await vi.waitFor(() => expect(state.choose.mock.lastCall?.[2]).toBe("keyboard"));
     await userEvent.click(screen.anchor(), { button: "right" });

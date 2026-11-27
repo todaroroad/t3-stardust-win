@@ -2,7 +2,6 @@ import {
   USAGE_CONTRACT_VERSION,
   USAGE_MERGE_COMPATIBLE_SINCE,
   type EnvironmentId,
-  type ProjectId,
   type UsageBucket,
   type UsageDay,
   type UsageProviderKind,
@@ -135,82 +134,6 @@ describe("mergeUsage", () => {
     expect(merged.contributingEnvironments).toEqual(["env-a"]);
   });
 
-  it("totals projects per environment from owned sources only", () => {
-    const shared = { provider: "claude" as const, hostId: "mac", homePath: "/claude" };
-    const codex = { provider: "codex" as const, hostId: "mac", homePath: "/codex" };
-    const projectRow = (
-      provider: UsageProviderKind,
-      sourcePath: string,
-      costUsd: number,
-      projectId?: string,
-    ) => ({
-      ...(projectId === undefined ? {} : { projectId: projectId as ProjectId }),
-      provider,
-      sourcePath,
-      totals: bucket().totals,
-      costUsd,
-      records: 1,
-      unpricedRecords: 0,
-      sessions: 1,
-    });
-    const withProjects = (
-      usageSummary: UsageSummary,
-      projectTotals: UsageSummary["projectTotals"],
-    ): UsageSummary => ({
-      ...usageSummary,
-      projectTotals,
-      projects: [{ projectId: "p1" as ProjectId, title: "App" }],
-    });
-    const merged = mergeUsage(
-      [
-        environment(
-          "env-a",
-          withProjects(summary([bucket({ sourcePath: "/claude", costUsd: 10 })], [shared]), [
-            projectRow("claude", "/claude", 6, "p1"),
-            projectRow("claude", "/claude", 4),
-          ]),
-        ),
-        // Its shared Claude copy is env-a's; only its own Codex usage counts here.
-        environment(
-          "env-b",
-          withProjects(
-            summary(
-              [
-                bucket({ sourcePath: "/claude", costUsd: 10 }),
-                bucket({ provider: "codex", sourcePath: "/codex", costUsd: 3 }),
-              ],
-              [shared, codex],
-            ),
-            [projectRow("claude", "/claude", 10, "p1"), projectRow("codex", "/codex", 3, "p1")],
-          ),
-        ),
-        environment(
-          "env-old",
-          summary(
-            [bucket({ provider: "grok", sourcePath: "/grok", costUsd: 1 })],
-            [{ provider: "grok", hostId: "old", homePath: "/grok" }],
-          ),
-        ),
-      ],
-      USAGE_CONTRACT_VERSION,
-    );
-
-    expect(merged.costUsd).toBe(14);
-    expect(
-      merged.projects.map((project) => [
-        project.kind,
-        project.kind === "project" ? `${project.environmentId}:${project.title}` : null,
-        project.costUsd,
-        project.costShare,
-      ]),
-    ).toEqual([
-      ["project", "env-a:App", 6, 6 / 14],
-      ["unlinked", null, 4, 4 / 14],
-      ["project", "env-b:App", 3, 3 / 14],
-      ["unreported", null, 1, 1 / 14],
-    ]);
-  });
-
   it("drops only the duplicated provider, keeping the environment's other one", () => {
     const sharedClaude = {
       provider: "claude" as const,
@@ -333,19 +256,6 @@ describe("mergeUsage", () => {
       ...partialSummary,
       readAt: "2026-08-08T01:00:00.000Z",
       sources: partialSummary.sources.map((entry) => ({ ...entry, status: "partial" as const })),
-      projectTotals: [
-        {
-          projectId: "p1" as ProjectId,
-          provider: "claude",
-          sourcePath: source.homePath,
-          totals: bucket().totals,
-          costUsd: 7,
-          records: 3,
-          unpricedRecords: 0,
-          sessions: 2,
-        },
-      ],
-      projects: [{ projectId: "p1" as ProjectId, title: "App" }],
     });
 
     for (const ordered of [
@@ -356,10 +266,6 @@ describe("mergeUsage", () => {
       expect(merged.costUsd).toBe(13);
       expect(merged.records).toBe(6);
       expect(merged.sessions).toBe(2);
-      expect(merged.projects.reduce((total, project) => total + project.costUsd, 0)).toBe(
-        merged.costUsd,
-      );
-      expect(merged.projects.every((project) => project.kind === "unreported")).toBe(true);
       expect(merged.daily.map(({ day, costUsd }) => [day, costUsd])).toEqual([
         ["2026-08-07", 10],
         ["2026-08-08", 3],
@@ -799,89 +705,5 @@ describe("mergeUsage", () => {
 
     expect(merged.sessions).toBe(1);
     expect(merged.providers[0]?.sessions).toBe(1);
-  });
-
-  it("accumulates throughput outputTokens and modelMs across environments before dividing", () => {
-    const envA: UsageSummary = {
-      ...summary(
-        [bucket({ provider: "codex", model: "gpt-5.4", sourcePath: "/a/codex" })],
-        [{ provider: "codex", hostId: "host-a", homePath: "/a/codex" }],
-      ),
-      readAt: "2026-08-07T01:00:00.000Z",
-      pricing: {
-        status: "fresh",
-        source: "litellm",
-        fetchedAt: null,
-        knownModels: 2,
-        modelUnitPrices: { "gpt-5.4": 0.000015, "gpt-5.4-mini": 0.000002 },
-      },
-      throughput: [
-        // 100 tok/s over 1s (1 turn)
-        { provider: "codex", model: "gpt-5.4", outputTokens: 100, modelMs: 1_000, turns: 1 },
-      ],
-    };
-    const envB: UsageSummary = {
-      ...summary(
-        [bucket({ provider: "codex", model: "gpt-5.4", sourcePath: "/b/codex" })],
-        [{ provider: "codex", hostId: "host-b", homePath: "/b/codex" }],
-      ),
-      readAt: "2026-08-07T02:00:00.000Z",
-      pricing: {
-        status: "fresh",
-        source: "litellm",
-        fetchedAt: null,
-        knownModels: 2,
-        modelUnitPrices: { "gpt-5.4": 0.000014 },
-      },
-      throughput: [
-        // ~47.37 tok/s over 19s (4 turns)
-        { provider: "codex", model: "gpt-5.4", outputTokens: 900, modelMs: 19_000, turns: 4 },
-        { provider: "claude", model: "claude-opus-4-6", outputTokens: 500, modelMs: 10_000, turns: 2 },
-      ],
-    };
-
-    const merged = mergeUsage(
-      [environment("env-a", envA), environment("env-b", envB)],
-      USAGE_CONTRACT_VERSION,
-    );
-
-    // Weighted total: (100 + 900 + 500) / ((1000 + 19000 + 10000) / 1000) = 1500 / 30 = 50 tok/s
-    expect(merged.throughput.total).toEqual({
-      outputTokens: 1500,
-      modelMs: 30_000,
-      turns: 7,
-      tokensPerSecond: 50,
-    });
-    // Weighted codex rate: 1000 / 20s = 50 tok/s (NOT mean of 100 and 47.37)
-    expect(merged.throughput.byModel.find((entry) => entry.model === "gpt-5.4")).toEqual({
-      provider: "codex",
-      model: "gpt-5.4",
-      outputTokens: 1000,
-      modelMs: 20_000,
-      turns: 5,
-      tokensPerSecond: 50,
-    });
-    expect(merged.throughput.byProvider).toHaveLength(2);
-    // Newer readAt (env-b) overrides shared pricing key while keeping env-a-only keys.
-    expect(merged.modelUnitPrices).toEqual({
-      "gpt-5.4": 0.000014,
-      "gpt-5.4-mini": 0.000002,
-    });
-  });
-
-  it("handles older servers that omit throughput and modelUnitPrices cleanly", () => {
-    const decoded = decodeSummary(
-      summary([bucket()], [{ provider: "claude", hostId: "mac", homePath: "/a/.claude" }]),
-    );
-    expect(decoded.throughput).toBeUndefined();
-    expect(decoded.pricing.modelUnitPrices).toBeUndefined();
-
-    const merged = mergeUsage([environment("legacy", decoded)], USAGE_CONTRACT_VERSION);
-    expect(merged.throughput).toEqual({
-      total: { outputTokens: 0, modelMs: 0, turns: 0, tokensPerSecond: null },
-      byProvider: [],
-      byModel: [],
-    });
-    expect(merged.modelUnitPrices).toEqual({});
   });
 });

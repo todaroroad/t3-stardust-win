@@ -269,7 +269,6 @@ export const makeManagedServerProvider = Effect.fn("makeManagedServerProvider")(
               previous: state.snapshot.usageLimits,
               update,
               checkedAt: update.checkedAt,
-              ...(update.verified ? { verified: true } : {}),
             });
         const { auth } = state.snapshot;
         const label = update.windows.length > 0 ? update.authLabel : undefined;

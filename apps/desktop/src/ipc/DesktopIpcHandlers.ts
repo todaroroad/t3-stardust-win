@@ -37,14 +37,12 @@ import {
   downloadUpdate,
   getUpdateState,
   installUpdate,
-  setUpdateAutoInstall,
   setUpdateChannel,
 } from "./methods/updates.ts";
 import {
   getAppBranding,
   getDatabaseMigrationProgress,
   getLocalEnvironmentBootstraps,
-  installLocalBootstrapForwarding,
   getLocalEnvironmentBearerToken,
   installRelayTelemetryEnabled,
   getSystemLocale,
@@ -115,7 +113,6 @@ export const installDesktopIpcHandlers = Effect.fn("desktop.ipc.installHandlers"
   yield* ipc.handleSync(getPrimaryPasteEnabled);
   yield* ipc.handleSync(getWindowFullscreenState);
   yield* ipc.handleSync(getLocalEnvironmentBootstraps);
-  yield* installLocalBootstrapForwarding();
   yield* ipc.handleSync(getLocalEnvironmentEnabled);
   yield* ipc.handle(setLocalEnvironmentEnabled);
   yield* ipc.handle(getHostEnvironmentId);
@@ -183,7 +180,6 @@ export const installDesktopIpcHandlers = Effect.fn("desktop.ipc.installHandlers"
   yield* ipc.handle(downloadUpdate);
   yield* ipc.handle(installUpdate);
   yield* ipc.handle(checkForUpdate);
-  yield* ipc.handle(setUpdateAutoInstall);
   yield* ipc.handle(getCliCommandState);
   yield* ipc.handle(installCliCommand);
   yield* ipc.handle(uninstallCliCommand);

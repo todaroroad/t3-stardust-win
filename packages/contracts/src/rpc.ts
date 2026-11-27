@@ -1,24 +1,4 @@
 import {
-  SidebarCategorySuggestionInput,
-  SidebarCategorySuggestionOutput,
-  SidebarCategorySuggestionError,
-} from "./sidebarCategories.ts";
-import {
-  StorageActionInput,
-  StorageInspection,
-  StorageInspectInput,
-  StorageOperation,
-  StorageManagementError,
-} from "./storageManagement.ts";
-import {
-  StorageTidyActionInput,
-  StorageTidyError,
-  StorageTidyState,
-  StorageTidyStateInput,
-} from "./storageTidy.ts";
-import { DiskSpaceInput, DiskSpaceReport } from "./diskSpace.ts";
-import { UserMemoryMutation } from "./memory.ts";
-import {
   OrchestrationV2SearchThreadError,
   OrchestrationV2SearchThreadInput,
   OrchestrationV2SearchThreadResult,
@@ -623,11 +603,6 @@ export const WS_METHODS = {
   serverRunStorageCleanup: "server.runStorageCleanup",
   serverGetStorageCleanupReport: "server.getStorageCleanupReport",
   serverGetDatabaseStorage: "server.getDatabaseStorage",
-  serverGetDiskSpace: "server.getDiskSpace",
-  serverInspectStorage: "server.inspectStorage",
-  serverManageStorage: "server.manageStorage",
-  serverStorageTidyState: "server.storageTidyState",
-  serverStorageTidyAct: "server.storageTidyAct",
   serverReclaimDatabaseSpace: "server.reclaimDatabaseSpace",
   peerLinksList: "peerLinks.list",
   peerLinksNames: "peerLinks.names",
@@ -661,7 +636,6 @@ export const WS_METHODS = {
   serverGetResourceTelemetryHistory: "server.getResourceTelemetryHistory",
   serverRetryResourceTelemetry: "server.retryResourceTelemetry",
   serverCheckOtlpEndpoint: "server.checkOtlpEndpoint",
-  serverSuggestSidebarCategories: "server.suggestSidebarCategories",
   serverListTextGeneratorModels: "server.listTextGeneratorModels",
   serverPrepareTriage: "server.prepareTriage",
   serverSignalProcess: "server.signalProcess",
@@ -1061,34 +1035,6 @@ const WsPeerLinksAnswerRequestRpc = Rpc.make(WS_METHODS.peerLinksAnswerRequest, 
 });
 
 // No in-tree caller; installed Swift TestFlight builds still request it.
-const WsServerInspectStorageRpc = Rpc.make(WS_METHODS.serverInspectStorage, {
-  payload: StorageInspectInput,
-  success: StorageInspection,
-  error: Schema.Union([StorageManagementError, EnvironmentAuthorizationError]),
-});
-const WsServerManageStorageRpc = Rpc.make(WS_METHODS.serverManageStorage, {
-  payload: StorageActionInput,
-  success: StorageOperation,
-  error: Schema.Union([StorageManagementError, EnvironmentAuthorizationError]),
-});
-
-const WsServerStorageTidyStateRpc = Rpc.make(WS_METHODS.serverStorageTidyState, {
-  payload: StorageTidyStateInput,
-  success: StorageTidyState,
-  error: Schema.Union([StorageTidyError, EnvironmentAuthorizationError]),
-});
-const WsServerStorageTidyActRpc = Rpc.make(WS_METHODS.serverStorageTidyAct, {
-  payload: StorageTidyActionInput,
-  success: StorageTidyState,
-  error: Schema.Union([StorageTidyError, EnvironmentAuthorizationError]),
-});
-
-const WsServerGetDiskSpaceRpc = Rpc.make(WS_METHODS.serverGetDiskSpace, {
-  payload: DiskSpaceInput,
-  success: DiskSpaceReport,
-  error: EnvironmentAuthorizationError,
-});
-
 const WsServerGetSettingsRpc = Rpc.make(WS_METHODS.serverGetSettings, {
   payload: Schema.Struct({}),
   success: ServerSettings,
@@ -1099,7 +1045,6 @@ const WsServerUpdateSettingsRpc = Rpc.make(WS_METHODS.serverUpdateSettings, {
   payload: Schema.Struct({
     patch: ClientServerSettingsPatch,
     providerInstanceMutation: Schema.optionalKey(ProviderInstanceMutation),
-    memoryMutation: Schema.optionalKey(UserMemoryMutation),
   }),
   success: ServerSettings,
   error: Schema.Union([ServerSettingsError, EnvironmentAuthorizationError]),
@@ -1232,12 +1177,6 @@ const WsServerCheckOtlpEndpointRpc = Rpc.make(WS_METHODS.serverCheckOtlpEndpoint
   payload: OtlpEndpointCheckInput,
   success: OtlpEndpointCheckResult,
   error: EnvironmentAuthorizationError,
-});
-
-const WsServerSuggestSidebarCategoriesRpc = Rpc.make(WS_METHODS.serverSuggestSidebarCategories, {
-  payload: SidebarCategorySuggestionInput,
-  success: SidebarCategorySuggestionOutput,
-  error: Schema.Union([SidebarCategorySuggestionError, EnvironmentAuthorizationError]),
 });
 
 const WsServerListTextGeneratorModelsRpc = Rpc.make(WS_METHODS.serverListTextGeneratorModels, {
@@ -2601,11 +2540,6 @@ export const WsRpcGroup = RpcGroup.make(
   WsServerRunStorageCleanupRpc,
   WsServerGetStorageCleanupReportRpc,
   WsServerGetDatabaseStorageRpc,
-  WsServerGetDiskSpaceRpc,
-  WsServerInspectStorageRpc,
-  WsServerManageStorageRpc,
-  WsServerStorageTidyStateRpc,
-  WsServerStorageTidyActRpc,
   WsServerGetSettingsRpc,
   WsServerReclaimDatabaseSpaceRpc,
   WsServerUpdateSettingsRpc,
@@ -2640,7 +2574,6 @@ export const WsRpcGroup = RpcGroup.make(
   WsServerGetResourceTelemetryHistoryRpc,
   WsServerRetryResourceTelemetryRpc,
   WsServerCheckOtlpEndpointRpc,
-  WsServerSuggestSidebarCategoriesRpc,
   WsServerListTextGeneratorModelsRpc,
   WsServerPrepareTriageRpc,
   WsServerGetUsageSummaryRpc,

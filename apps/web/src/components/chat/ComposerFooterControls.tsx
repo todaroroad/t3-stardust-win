@@ -13,7 +13,6 @@ import { resolveModelPickerSelectedModel } from "./ModelPickerContent";
 import { ProviderModelPicker } from "./ProviderModelPicker";
 import { resolveRuntimeModeOption, runtimeModeConfig } from "./runtimeModeConfig";
 import { useComposerMenuState } from "./useComposerMenuState";
-import "./composerV9.css";
 import {
   RuntimeModeLimitsTargetContext,
   useProviderRuntimeModeLimits,
@@ -66,7 +65,6 @@ export const ComposerFooterModeControls = memo(function ComposerFooterModeContro
                 <ComposerControl
                   ref={permissionsChipRef}
                   data-composer-shortcut="composer.mode"
-                  data-composer-perm-mode={props.runtimeMode}
                   size={size}
                   // Mirrors the model trigger's trailing pe-1 so the gaps on both sides of the chip match.
                   className="ps-1.5"

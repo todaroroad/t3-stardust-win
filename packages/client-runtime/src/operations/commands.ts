@@ -1,4 +1,3 @@
-import { threadCreated } from "../state/threadSubscriptionWakeups.ts";
 import { msg } from "gt-i18n";
 import { translatableMessage } from "../errors/translatable.ts";
 import { remapComposerContextAttachments } from "@t3tools/shared/composerContextReferences";
@@ -110,9 +109,7 @@ export interface DeleteThreadInput extends ThreadCommandInput {
   /** The server deletes only a thread with no runs and no messages. */
   readonly onlyIfUnused?: boolean;
 }
-export interface ArchiveThreadInput extends ThreadCommandInput {
-  readonly requireIdle?: true;
-}
+export type ArchiveThreadInput = ThreadCommandInput;
 export type UnarchiveThreadInput = ThreadCommandInput;
 export type SettleThreadInput = ThreadCommandInput;
 
@@ -504,7 +501,7 @@ export const deleteProject = Effect.fn("EnvironmentCommands.deleteProject")(func
 export const createThread = Effect.fn("EnvironmentCommands.createThread")(function* (
   input: CreateThreadInput,
 ) {
-  const result = yield* dispatch({
+  return yield* dispatch({
     type: "thread.create",
     commandId: yield* allocateCommandId(input),
     createdBy: "user",
@@ -518,9 +515,6 @@ export const createThread = Effect.fn("EnvironmentCommands.createThread")(functi
     branch: input.branch,
     worktreePath: input.worktreePath,
   });
-  const supervisor = yield* EnvironmentSupervisor.EnvironmentSupervisor;
-  yield* threadCreated(supervisor.target.environmentId, input.threadId);
-  return result;
 });
 
 function simpleThreadCommand(
@@ -591,12 +585,7 @@ export const resolveGuestMessage = Effect.fn("EnvironmentCommands.resolveGuestMe
 export const archiveThread = Effect.fn("EnvironmentCommands.archiveThread")(function* (
   input: ArchiveThreadInput,
 ) {
-  return yield* dispatch({
-    type: "thread.archive",
-    commandId: yield* allocateCommandId(input),
-    threadId: input.threadId,
-    ...(input.requireIdle === undefined ? {} : { requireIdle: input.requireIdle }),
-  });
+  return yield* simpleThreadCommand("thread.archive", input);
 });
 
 export const unarchiveThread = Effect.fn("EnvironmentCommands.unarchiveThread")(function* (
@@ -855,10 +844,7 @@ export const startThreadTurn = Effect.fn("EnvironmentCommands.startThreadTurn")(
         attachments,
       },
     });
-    const result = yield* resend ? resendAfterSocketLoss(launch) : launch;
-    const supervisor = yield* EnvironmentSupervisor.EnvironmentSupervisor;
-    yield* threadCreated(supervisor.target.environmentId, input.threadId);
-    return result;
+    return yield* resend ? resendAfterSocketLoss(launch) : launch;
   }
 
   const requestedMode = input.dispatchMode ?? "auto";

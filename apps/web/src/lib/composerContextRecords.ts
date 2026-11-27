@@ -449,18 +449,6 @@ export function previewAnnotationContextRecord(
       "preview-annotation",
     ),
     annotationId: annotation.id,
-    ...(annotation.pins
-      ? {
-          pins: annotation.pins.map(({ number, text, tag, selectorChain, relative, pageKey }) => ({
-            number,
-            text,
-            tag,
-            selectorChain,
-            relative,
-            pageKey,
-          })),
-        }
-      : {}),
     pageUrl: annotation.pageUrl,
     pageTitle: annotation.pageTitle,
     comment: clampContextText(

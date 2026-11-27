@@ -42,10 +42,6 @@ const clientSettings: ClientSettings = {
   favorites: [],
   fontFamilyCode: "",
   fontFamilyComposer: "",
-  fontFamilySidebar: "Menlo",
-  fontSizeSidebar: 18,
-  sidebarTextColorLight: "high-contrast",
-  sidebarTextColorDark: "high-contrast",
   fontFamilySans: "",
   fontFamilyTerminal: "",
   fontSizeCode: 13,
@@ -118,35 +114,6 @@ const withClientSettings = <A, E, R>(
   }).pipe(Effect.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer)));
 
 describe("DesktopClientSettings", () => {
-  it.effect(
-    "migrates a private category seed while preserving the rest of the existing profile",
-    () =>
-      withClientSettings(
-        Effect.gen(function* () {
-          const environment = yield* DesktopEnvironment.DesktopEnvironment;
-          const fileSystem = yield* FileSystem.FileSystem;
-          const settings = yield* DesktopClientSettings.DesktopClientSettings;
-          yield* fileSystem.makeDirectory(environment.stateDir, { recursive: true });
-          yield* fileSystem.writeFileString(
-            environment.clientSettingsPath,
-            '{"timestampFormat":"24-hour"}',
-          );
-          yield* fileSystem.writeFileString(
-            `${environment.stateDir}/sidebar-categories-migration.json`,
-            '{"preset":"general","automatic":true,"suggestions":true,"suggestionModel":null,"editedCategories":{"general":[{"id":"local","label":"My work","keywords":["local work"]}]}}',
-          );
-          const migrated = Option.getOrThrow(yield* settings.get);
-          assert.equal(migrated.timestampFormat, "24-hour");
-          assert.equal(migrated.sidebarCategories.editedCategories.general?.[0]?.id, "local");
-          yield* settings.set({
-            ...migrated,
-            sidebarCategories: { ...migrated.sidebarCategories, preset: "developer" },
-          });
-          const saved = Option.getOrThrow(yield* settings.get);
-          assert.equal(saved.sidebarCategories.preset, "developer");
-        }),
-      ),
-  );
   it.effect("saves through a symlinked client settings file without replacing the link", () =>
     withClientSettings(
       Effect.gen(function* () {

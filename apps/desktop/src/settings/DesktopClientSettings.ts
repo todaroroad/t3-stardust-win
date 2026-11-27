@@ -1,4 +1,3 @@
-import { migrateLegacyClientSettings } from "@t3tools/shared/clientSettingsMigration";
 import { ClientSettingsSchema, type ClientSettings } from "@t3tools/contracts";
 import { fromLenientJson } from "@t3tools/shared/schemaJson";
 import { resolveSymlinkTarget } from "@t3tools/shared/symlink";
@@ -19,31 +18,12 @@ const decodeClientSettingsDocument = Schema.decodeEffect(
   fromLenientJson(Schema.Record(Schema.String, Schema.Unknown)),
 );
 const decodeClientSettingsValue = Schema.decodeUnknownEffect(ClientSettingsSchema);
-const decodeClientSettingsJson = Effect.fnUntraced(function* (
-  raw: string,
-  loadCategorySeed: Effect.Effect<string | null>,
-) {
+const decodeClientSettingsJson = Effect.fnUntraced(function* (raw: string) {
   const document = yield* decodeClientSettingsDocument(raw);
   // Select the shape before validation so invalid legacy settings cannot become defaults.
-  const source = migrateLegacyClientSettings(
+  return yield* decodeClientSettingsValue(
     Object.hasOwn(document, "settings") ? document.settings : document,
   );
-  const settings = yield* decodeClientSettingsValue(source);
-  if (typeof source !== "object" || source === null || Object.hasOwn(source, "sidebarCategories"))
-    return settings;
-  const seed = yield* loadCategorySeed;
-  if (seed === null) return settings;
-  const seeded = yield* decodeClientSettingsDocument(seed).pipe(
-    Effect.flatMap((sidebarCategories) =>
-      decodeClientSettingsValue({ ...settings, sidebarCategories }),
-    ),
-    Effect.catch(() =>
-      Effect.logWarning("Could not read sidebar category migration data.").pipe(
-        Effect.as(settings),
-      ),
-    ),
-  );
-  return seeded;
 });
 const encodeClientSettingsJson = Schema.encodeEffect(ClientSettingsJson);
 
@@ -95,7 +75,6 @@ export class DesktopClientSettings extends Context.Service<
 const readClientSettings = (
   fileSystem: FileSystem.FileSystem,
   settingsPath: string,
-  migrationPath: string,
 ): Effect.Effect<Option.Option<ClientSettings>, DesktopClientSettingsReadError> =>
   fileSystem.readFileString(settingsPath).pipe(
     Effect.asSome,
@@ -120,10 +99,7 @@ const readClientSettings = (
       Option.match({
         onNone: () => Effect.succeed(Option.none<ClientSettings>()),
         onSome: (raw) =>
-          decodeClientSettingsJson(
-            raw,
-            fileSystem.readFileString(migrationPath).pipe(Effect.orElseSucceed(() => null)),
-          ).pipe(
+          decodeClientSettingsJson(raw).pipe(
             Effect.asSome,
             Effect.catchTags({
               SchemaError: (cause) =>
@@ -217,11 +193,9 @@ export const make = Effect.gen(function* () {
   const random = yield* SecureRandom.SecureRandom;
 
   return DesktopClientSettings.of({
-    get: readClientSettings(
-      fileSystem,
-      environment.clientSettingsPath,
-      path.join(path.dirname(environment.clientSettingsPath), "sidebar-categories-migration.json"),
-    ).pipe(Effect.withSpan("desktop.clientSettings.get")),
+    get: readClientSettings(fileSystem, environment.clientSettingsPath).pipe(
+      Effect.withSpan("desktop.clientSettings.get"),
+    ),
     set: Effect.fn("desktop.clientSettings.set")(function (settings) {
       return random.uuidV4().pipe(
         Effect.map((uuid) => uuid.replace(/-/g, "")),

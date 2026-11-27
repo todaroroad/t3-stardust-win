@@ -413,13 +413,12 @@ describe.skipIf(HostProcess.Platform.defaultValue() === "win32")("POSIX setup co
   );
 
   it.live.each([
-    { name: "an explicit exit", command: "exit 7", exitCodes: [7] },
-    // macOS bash 3.2 returns 1 for an eval syntax error; newer bash returns 2.
-    { name: "a syntax error", command: "if then", exitCodes: [1, 2] },
-  ])("reports a nonzero completion for $name", ({ command, exitCodes }) =>
+    { name: "an explicit exit", command: "exit 7", exitCode: 7 },
+    { name: "a syntax error", command: "if then", exitCode: 2 },
+  ])("reports a nonzero completion for $name", ({ command, exitCode }) =>
     Effect.gen(function* () {
       const result = yield* runObservedSetup(command);
-      assert.include(exitCodes, result.exitCode);
+      assert.equal(result.exitCode, exitCode);
     }),
   );
 });

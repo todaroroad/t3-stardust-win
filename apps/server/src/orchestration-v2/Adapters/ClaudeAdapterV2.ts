@@ -1,8 +1,3 @@
-import * as PtyAdapter from "@t3tools/shared/PtyAdapter";
-import {
-  makeClaudeTerminalQueryFactory,
-  type ClaudeTerminalQueryRuntime,
-} from "./ClaudeTerminalQuery.ts";
 import * as DocumentText from "../../provider/DocumentText.ts";
 import {
   compactDynamicToolOutput,
@@ -11,7 +6,6 @@ import {
 } from "@t3tools/shared/toolOutput";
 import { makeProviderTextDeltaCoalescer } from "./ProviderTextDeltaCoalescer.ts";
 import { claudeTaskOutputRoot, tailClaudeTaskOutput } from "./ClaudeTaskOutputTail.ts";
-import { withClaudeTaskTools } from "./ClaudeTaskTools.ts";
 import {
   dynamicToolTitle,
   formatReadToolLabel,
@@ -799,9 +793,6 @@ export type ClaudeAgentSdkQueryOptions = Omit<
   ClaudeQueryOptions,
   "maxTurns" | "model" | "permissionMode" | "resume" | "sessionId" | "tools"
 > & {
-  readonly interactiveCli?: boolean;
-  readonly terminalSubagentContext?: string;
-  readonly terminalOnStop?: HookCallback;
   readonly model: string;
   readonly tools: NonNullable<ClaudeQueryOptions["tools"]>;
   readonly permissionMode: NonNullable<ClaudeQueryOptions["permissionMode"]>;
@@ -1063,8 +1054,7 @@ function claudeProcessExitFailure(
   return exit === undefined ? undefined : { message: `${exit.status}.`, code: exit.code };
 }
 
-type ClaudeQueryRuntime = ClaudeQuery | ClaudeTerminalQueryRuntime;
-function closeClaudeQuery(queryRuntime: ClaudeQueryRuntime) {
+function closeClaudeQuery(queryRuntime: ClaudeQuery) {
   return Effect.try({
     try: () => queryRuntime.close(),
     catch: (cause) => queryRunnerError(cause, "close"),
@@ -1073,7 +1063,7 @@ function closeClaudeQuery(queryRuntime: ClaudeQueryRuntime) {
 
 // SDK 0.3.316 types `mcp_call` and `list_permission_rules` but has no Query method for them; its own readMcpResource sends control requests this way.
 async function sendClaudeControlRequest(
-  queryRuntime: ClaudeQueryRuntime,
+  queryRuntime: ClaudeQuery,
   request: {
     readonly subtype:
       | "mcp_call"
@@ -1242,9 +1232,7 @@ function claudeMcpCallToolResult(
 }
 
 // Iterate Query itself: the raw generator's return() queues behind a pending CLI read and deadlocks interruption.
-export function claudeQueryMessages(
-  queryRuntime: ClaudeQueryRuntime,
-): AsyncIterable<SDKMessage, void> {
+export function claudeQueryMessages(queryRuntime: ClaudeQuery): AsyncIterable<SDKMessage, void> {
   return { [Symbol.asyncIterator]: () => queryRuntime };
 }
 
@@ -1752,20 +1740,6 @@ export const layerQueryRunner: Layer.Layer<
 
     // The open span below is the tracing boundary for both attempts.
     const openQuery = Effect.fnUntraced(function* (input: ClaudeAgentSdkQueryOpenInput) {
-      const interactiveCli = input.options.interactiveCli === true;
-      const terminalFactory = interactiveCli
-        ? yield* Effect.gen(function* () {
-            const pty = yield* Effect.serviceOption(PtyAdapter.PtyAdapter);
-            if (Option.isNone(pty))
-              return yield* queryRunnerError(
-                new Error("Claude TUI requires a PTY adapter. No SDK fallback was started."),
-                "query",
-              );
-            return yield* makeClaudeTerminalQueryFactory.pipe(
-              Effect.provideService(PtyAdapter.PtyAdapter, pty.value),
-            );
-          })
-        : undefined;
       const protocolLogger = makeClaudeAgentSdkProtocolLogger({
         nativeEventLogger,
         threadId: input.threadId,
@@ -1782,17 +1756,11 @@ export const layerQueryRunner: Layer.Layer<
         Stream.toAsyncIterable,
       );
       // Send MCP credentials over stdin to keep them out of SDK argv and inherited command environments.
-      const {
-        mcpServers,
-        interactiveCli: _interactiveCli,
-        terminalSubagentContext,
-        terminalOnStop,
-        ...sdkOptions
-      } = input.options;
+      const { mcpServers, ...sdkOptions } = input.options;
       // Jobs the agent starts inherit the thread, so port discovery can attribute their servers.
       let resumeSessionAt = sdkOptions.resumeSessionAt;
       let endsOnFailedRequest = false;
-      if (input.resume && !interactiveCli && sdkOptions.resume !== undefined) {
+      if (input.resume && sdkOptions.resume !== undefined) {
         const messages = yield* runClaudeWorker({
           method: "getSessionMessages",
           sessionId: sdkOptions.resume,
@@ -1830,9 +1798,7 @@ export const layerQueryRunner: Layer.Layer<
       // The SDK can prepend a scope wrapper to native binaries; script entries run through node.
       const binaryPath = queryOptions.pathToClaudeCodeExecutable;
       const launch =
-        interactiveCli ||
-        binaryPath === undefined ||
-        CLAUDE_SCRIPT_EXTENSIONS.some((ext) => binaryPath.endsWith(ext))
+        binaryPath === undefined || CLAUDE_SCRIPT_EXTENSIONS.some((ext) => binaryPath.endsWith(ext))
           ? undefined
           : yield* agentScope.wrap({
               command: binaryPath,
@@ -1917,26 +1883,12 @@ export const layerQueryRunner: Layer.Layer<
       const queryRuntime = yield* Effect.uninterruptibleMask((restore) =>
         Effect.try({
           try: () =>
-            terminalFactory !== undefined
-              ? terminalFactory({
-                  prompt,
-                  trackAgent: () => portDiscovery.trackAgent(),
-                  options: {
-                    ...queryOptions,
-                    ...(terminalSubagentContext === undefined ? {} : { terminalSubagentContext }),
-                    ...(terminalOnStop === undefined ? {} : { terminalOnStop }),
-                    ...(mcpServers === undefined ? {} : { mcpServers }),
-                  },
-                  ...(hostEnvironment.T3_CLAUDE_TUI_SANDBOX === undefined
-                    ? {}
-                    : { sandbox: hostEnvironment.T3_CLAUDE_TUI_SANDBOX }),
-                })
-              : withoutClaudeCanUseToolShadowedWarning(() =>
-                  query({
-                    prompt,
-                    options: { ...options, spawnClaudeCodeProcess },
-                  }),
-                ),
+            withoutClaudeCanUseToolShadowedWarning(() =>
+              query({
+                prompt,
+                options: { ...options, spawnClaudeCodeProcess },
+              }),
+            ),
           catch: (cause) => queryRunnerError(cause, "query"),
         }).pipe(
           Effect.tap((queryRuntime) =>
@@ -1958,9 +1910,7 @@ export const layerQueryRunner: Layer.Layer<
                   // The SDK leaves query() boot unbounded, and it takes about a minute on a host
                   // with CPUs 12x oversubscribed, so it gets its own, longer deadline.
                   yield* Effect.promise(() =>
-                    "initializationResult" in queryRuntime
-                      ? queryRuntime.initializationResult().catch(() => undefined)
-                      : Promise.resolve(undefined),
+                    queryRuntime.initializationResult().catch(() => undefined),
                   ).pipe(
                     Effect.timeoutOrElse({
                       duration: CLAUDE_BOOT_TIMEOUT,
@@ -2219,22 +2169,12 @@ export const layerQueryRunner: Layer.Layer<
             ),
           ),
         mcpServerStatus: Effect.tryPromise({
-          try: () =>
-            "mcpServerStatus" in queryRuntime
-              ? queryRuntime.mcpServerStatus()
-              : Promise.reject(
-                  new Error("Claude TUI does not expose MCP status control requests."),
-                ),
+          try: () => queryRuntime.mcpServerStatus(),
           catch: (cause) => queryRunnerError(cause, "mcpServerStatus"),
         }),
         readMcpResource: ({ server, uri }) =>
           Effect.tryPromise({
-            try: () =>
-              "readMcpResource" in queryRuntime
-                ? queryRuntime.readMcpResource(server, uri)
-                : Promise.reject(
-                    new Error("Claude TUI does not expose MCP resource control requests."),
-                  ),
+            try: () => queryRuntime.readMcpResource(server, uri),
             catch: (cause) => queryRunnerError(cause, "readMcpResource"),
           }),
         mcpAuthenticate: (server) =>
@@ -2266,12 +2206,7 @@ export const layerQueryRunner: Layer.Layer<
           }).pipe(Effect.asVoid),
         reconnectMcpServer: (server) =>
           Effect.tryPromise({
-            try: () =>
-              "reconnectMcpServer" in queryRuntime
-                ? queryRuntime.reconnectMcpServer(server)
-                : Promise.reject(
-                    new Error("Claude TUI does not expose MCP reconnect control requests."),
-                  ),
+            try: () => queryRuntime.reconnectMcpServer(server),
             catch: (cause) => queryRunnerError(cause, "reconnectMcpServer"),
           }),
         callMcpTool: (call) =>
@@ -2299,9 +2234,7 @@ export const layerQueryRunner: Layer.Layer<
           Effect.mapError((cause) => queryRunnerError(cause, "listPermissionRules")),
         ),
         interrupt: Effect.tryPromise({
-          try: async () => {
-            await queryRuntime.interrupt();
-          },
+          try: () => queryRuntime.interrupt(),
           catch: (cause) => queryRunnerError(cause, "interrupt"),
         }).pipe(
           Effect.tap(() =>
@@ -2768,7 +2701,6 @@ export function makeClaudeQueryOptions(input: {
   const deviceInstructions = input.mcpServers !== undefined && input.deviceToolsAvailable === true;
   const agentFeedback = input.mcpServers === undefined ? "off" : (input.agentFeedback ?? "off");
   const options: ClaudeAgentSdkQueryOptions = {
-    ...(input.settings?.interactiveCli === true ? { interactiveCli: true } : {}),
     model: compiledSelection.apiModelId,
     // T3 names threads; a supplied title skips Claude's redundant naming request.
     ...(input.title === undefined ? {} : { title: input.title }),
@@ -2815,7 +2747,7 @@ export function makeClaudeQueryOptions(input: {
     ...(input.settings?.binaryPath
       ? { pathToClaudeCodeExecutable: input.settings.binaryPath }
       : {}),
-    ...(input.environment === undefined ? {} : { env: withClaudeTaskTools(input.environment) }),
+    ...(input.environment === undefined ? {} : { env: input.environment }),
     ...(input.mcpServers === undefined ? {} : { mcpServers: input.mcpServers }),
     systemPrompt: {
       type: "preset" as const,
@@ -2837,23 +2769,16 @@ export function makeClaudeQueryOptions(input: {
         ...launchAppendSystemPrompt,
       ].join("\n\n"),
     },
-    ...(input.settings?.interactiveCli === true
+    ...(deviceInstructions || input.onStop !== undefined
       ? {
-          ...(deviceInstructions
-            ? { terminalSubagentContext: T3_CODE_DEVICE_TOOL_INSTRUCTIONS_WITH_TOOL_SEARCH }
-            : {}),
-          ...(input.onStop === undefined ? {} : { terminalOnStop: input.onStop }),
+          hooks: {
+            ...(deviceInstructions
+              ? { SubagentStart: [{ hooks: [subagentDeviceInstructions] }] }
+              : {}),
+            ...(input.onStop === undefined ? {} : { Stop: [{ hooks: [input.onStop] }] }),
+          },
         }
-      : deviceInstructions || input.onStop !== undefined
-        ? {
-            hooks: {
-              ...(deviceInstructions
-                ? { SubagentStart: [{ hooks: [subagentDeviceInstructions] }] }
-                : {}),
-              ...(input.onStop === undefined ? {} : { Stop: [{ hooks: [input.onStop] }] }),
-            },
-          }
-        : {}),
+      : {}),
     ...(pluginDirectories.length === 0
       ? {}
       : { plugins: pluginDirectories.map((path) => ({ type: "local" as const, path })) }),
@@ -2973,9 +2898,6 @@ export const CLAUDE_READ_ONLY_T3_MCP_ALLOWED_TOOLS: ReadonlyArray<string> = [
   "mcp__t3-code__html_render",
   "mcp__t3-code__send_to_user",
   "mcp__t3-code__t3_submit_output",
-  "mcp__t3-code__memory_list",
-  "mcp__t3-code__artifact_list",
-  "mcp__t3-code__usage_limits",
 ];
 
 // The name this adapter registers T3's MCP server under, and so the one Claude gives for it.

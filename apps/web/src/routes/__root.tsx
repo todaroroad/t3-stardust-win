@@ -14,7 +14,7 @@ import { msg, T, useGT, Var } from "gt-react";
 import { CheckIcon, CopyIcon } from "lucide-react";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 
-import { appDisplayName, APP_VERSION } from "../branding";
+import { APP_DISPLAY_NAME, APP_VERSION } from "../branding";
 import { AppSidebarLayout } from "../components/AppSidebarLayout";
 import { CommandPalette } from "../components/CommandPalette";
 import { CustomSnoozeDialogHost } from "../components/CustomSnoozeDialog";
@@ -113,7 +113,7 @@ export const Route = createRootRoute({
   errorComponent: RootRouteErrorView,
   notFoundComponent: RootRouteNotFoundView,
   head: () => ({
-    meta: [{ name: "title", content: appDisplayName() }],
+    meta: [{ name: "title", content: APP_DISPLAY_NAME }],
   }),
 });
 
@@ -126,7 +126,7 @@ function RootRouteNotFoundView() {
         </h1>
         <p className="text-sm text-muted-foreground">
           <T>
-            This link doesn't point to a page in <Var>{appDisplayName()}</Var>. Go home to choose a
+            This link doesn't point to a page in <Var>{APP_DISPLAY_NAME}</Var>. Go home to choose a
             project or start a thread.
           </T>
         </p>
@@ -341,7 +341,7 @@ const MAX_ERROR_CAUSE_DEPTH = 5;
 // Use only pathname to keep query tokens off the clipboard.
 function errorReport(error: unknown, pathname: string): string {
   const lines = [
-    `${appDisplayName()} ${APP_VERSION}`,
+    `${APP_DISPLAY_NAME} ${APP_VERSION}`,
     `Path: ${pathname}`,
     `Time: ${new Date().toISOString()}`,
     "",

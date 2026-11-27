@@ -29,7 +29,6 @@ import * as DesktopCliShim from "../app/DesktopCliShim.ts";
 import * as DesktopEnvironment from "../app/DesktopEnvironment.ts";
 import * as DesktopState from "../app/DesktopState.ts";
 import * as DesktopServerExposure from "./DesktopServerExposure.ts";
-import * as DesktopSystemProxy from "./DesktopSystemProxy.ts";
 import * as DesktopShellEnvironment from "../shell/DesktopShellEnvironment.ts";
 import * as DesktopAppSettings from "../settings/DesktopAppSettings.ts";
 import * as DesktopWslEnvironment from "../wsl/DesktopWslEnvironment.ts";
@@ -532,7 +531,6 @@ const resolvePrimaryStartConfig = Effect.fn("desktop.backendConfiguration.resolv
       readonly cliPath: Option.Option<string>;
       readonly shellEnvironmentPrepared: boolean;
       readonly desktopAppUpdate: boolean;
-      readonly proxyEnv?: Readonly<Record<string, string>>;
     },
   ): Effect.fn.Return<
     DesktopBackendManager.DesktopBackendStartConfig,
@@ -579,7 +577,6 @@ const resolvePrimaryStartConfig = Effect.fn("desktop.backendConfiguration.resolv
       cwd: environment.backendCwd,
       env: {
         ...backendChildEnvPatch(),
-        ...input.proxyEnv,
         ELECTRON_RUN_AS_NODE: "1",
         T3CODE_DESKTOP_SHELL_DISCOVERY_PENDING: "1",
         T3CODE_CLI_PATH: Option.getOrUndefined(input.cliPath),
@@ -790,7 +787,6 @@ export const make = Effect.gen(function* () {
   const wslServerTree = yield* DesktopWslServerTree.DesktopWslServerTree;
   const settings = yield* DesktopAppSettings.DesktopAppSettings;
   const desktopState = yield* DesktopState.DesktopState;
-  const systemProxy = yield* Effect.serviceOption(DesktopSystemProxy.DesktopSystemProxy);
   const mac = yield* Mac.Mac;
   const random = yield* SecureRandom.SecureRandom;
   // Random generation yields; serialize it so concurrent backends cannot capture distinct bootstrap secrets.
@@ -877,16 +873,12 @@ export const make = Effect.gen(function* () {
       Effect.provideService(FileSystem.FileSystem, fileSystem),
       Effect.provideService(DesktopEnvironment.DesktopEnvironment, environment),
     );
-    // Providers with instance overrides capture their environment when the backend starts.
-    const shellEnvironmentPrepared = yield* shellEnvironment.awaitDiscovery;
-    // Re-read on each restart so a proxy switched on after launch reaches the next backend.
-    const proxyEnv = Option.isSome(systemProxy) ? yield* systemProxy.value.backendEnvPatch : {};
+    const shellEnvironmentPrepared = yield* shellEnvironment.installIntoProcess;
     return yield* resolvePrimaryStartConfig({
       ...shared,
       resourceMonitorPath,
       cliPath,
       shellEnvironmentPrepared,
-      proxyEnv,
       desktopAppUpdate: yield* Ref.get(desktopState.canInstallUpdates),
     }).pipe(
       Effect.provideService(DesktopEnvironment.DesktopEnvironment, environment),

@@ -1,5 +1,3 @@
-
-
 import type { ProjectId, ScopedThreadRef, ThreadPullRequestLink } from "@t3tools/contracts";
 import {
   sourceControlClients,
@@ -74,6 +72,7 @@ const SOURCE_LABELS: Record<ThreadPullRequestLink["source"], string> = {
   stack: msg("Found in the stack"),
   "stack-dismissed": msg("Dismissed", { $context: "pull request link source" }),
 };
+
 function ChecksGlyph({
   state,
 }: {
@@ -402,8 +401,10 @@ function latestSyncedAt(links: ReadonlyArray<ThreadPullRequestLink>): string | n
   }
   return latest;
 }
+
 const lineKey = (line: PullRequestListLine) =>
   `${line.link.host}/${line.link.repository}#${line.link.number}`;
+
 export function ThreadPullRequestsPanel({ threadRef }: { threadRef: ScopedThreadRef }) {
   const gt = useGT();
   const configs = useServerConfigs();
@@ -417,6 +418,7 @@ export function ThreadPullRequestsPanel({ threadRef }: { threadRef: ScopedThread
   }
   return <EnabledThreadPullRequestsPanel threadRef={threadRef} />;
 }
+
 function EnabledThreadPullRequestsPanel({ threadRef }: { threadRef: ScopedThreadRef }) {
   const gt = useGT();
   const thread = useThreadShell(threadRef);
@@ -498,6 +500,7 @@ function EnabledThreadPullRequestsPanel({ threadRef }: { threadRef: ScopedThread
       },
     });
   };
+
   // Legend rows update only for data/extraData changes; include all external inputs.
   const rowInputs = {
     speedMode,
@@ -529,6 +532,7 @@ function EnabledThreadPullRequestsPanel({ threadRef }: { threadRef: ScopedThread
       </div>
     );
   }
+
   return (
     <PullRequestSpeedModeContext value={speedMode}>
       <div className="flex h-full min-h-0 flex-col">

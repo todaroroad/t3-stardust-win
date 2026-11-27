@@ -25,7 +25,6 @@ import * as Path from "effect/Path";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
-import * as Schedule from "effect/Schedule";
 import * as Ref from "effect/Ref";
 import * as DesktopState from "../../app/DesktopState.ts";
 
@@ -619,24 +618,6 @@ export const checkSystemPermission = DesktopIpc.makeIpcMethod({
     const check = yield* safariPermissionCheck;
     return yield* Effect.promise(check);
   }),
-});
-/** Until backend topology has an event stream, poll off the renderer's critical path. */
-const encodeLocalBootstraps = Schema.encodeUnknownEffect(
-  Schema.fromJsonString(Schema.Array(DesktopEnvironmentBootstrapSchema)),
-);
-export const installLocalBootstrapForwarding = Effect.fn(
-  "desktop.ipc.installLocalBootstrapForwarding",
-)(function* () {
-  const window = yield* ElectronWindow.ElectronWindow;
-  let previous: string | undefined;
-  const publish = Effect.gen(function* () {
-    const entries = yield* getLocalEnvironmentBootstraps.handler();
-    const signature = yield* encodeLocalBootstraps(entries);
-    if (signature === previous) return;
-    yield* window.sendAll(IpcChannels.LOCAL_ENVIRONMENT_BOOTSTRAPS_CHANGED_CHANNEL, entries);
-    previous = signature;
-  }).pipe(Effect.ignoreCause);
-  yield* Effect.forkScoped(publish.pipe(Effect.repeat(Schedule.spaced("2 seconds"))));
 });
 
 export const restartAudioService = DesktopIpc.makeIpcMethod({

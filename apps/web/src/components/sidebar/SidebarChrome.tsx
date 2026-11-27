@@ -1,21 +1,11 @@
-import "./stardustWordmark.css";
-import { useUiText } from "~/i18n/useUiText";
-import { useMemoryProposalNotification } from "../settings/useMemoryProposalNotification";
-
-import {
-  ArrowLeftIcon,
-  ChartNoAxesColumnIcon,
-  SettingsIcon,
-  EllipsisIcon,
-  ArrowRightIcon,
-} from "lucide-react";
+import { ArrowLeftIcon, ArrowRightIcon, ChartNoAxesColumnIcon, SettingsIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { T, useGT } from "gt-react";
-import { memo, useState } from "react";
+import { memo } from "react";
 import { Link, useLocation, useNavigate } from "@tanstack/react-router";
-import { useEnvironmentIdentificationMode, useLegacySidebarEnabled } from "../../hooks/useSettings";
 
 import { useAtomValue } from "@effect/atom-react";
+import { useEnvironmentIdentificationMode } from "../../hooks/useSettings";
 import { shortcutLabelForCommand } from "../../keybindings";
 import {
   navigateHistory,
@@ -25,7 +15,7 @@ import {
 import { primaryServerKeybindingsAtom } from "../../state/server";
 import { cn } from "../../lib/utils";
 import { useIssuesSupported, usePullRequestsSupported } from "../../state/environments";
-
+import { T3Wordmark } from "../T3Wordmark";
 import {
   resolveEnvironmentIdentificationPillLabel,
   resolveSidebarStageBackdropVariant,
@@ -42,9 +32,6 @@ import {
   SidebarTrigger,
   useSidebar,
 } from "../ui/sidebar";
-import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
-import { Popover, PopoverPopup, PopoverTitle, PopoverTrigger } from "../ui/popover";
-import { openRecentWork } from "../../workbenchNavigation";
 import { readPullRequestListPreferences } from "../pullRequest/pullRequestListPreferences";
 import { readIssueListPreferences } from "../issue/issueListPreferences";
 import { IssueGlyph } from "../issue/issuePresentation";
@@ -72,6 +59,7 @@ export const SidebarChromeHeader = memo(function SidebarChromeHeader({
     environmentIdentificationMode === "pill"
       ? resolveEnvironmentIdentificationPillLabel(stageLabel)
       : null;
+
   return (
     <div
       className={cn(
@@ -87,13 +75,11 @@ export const SidebarChromeHeader = memo(function SidebarChromeHeader({
           aria-label={gt("Toggle main sidebar")}
         />
       </div>
-      <div className="relative top-[calc(-1*var(--liquid-sidebar-inset,0px))] z-10 flex h-8 min-w-0 flex-1 flex-wrap content-start items-center gap-x-2 overflow-hidden py-0.5">
+      <div className="relative z-10 flex h-8 min-w-0 flex-1 flex-wrap content-start items-center gap-x-2 overflow-hidden py-0.5">
         <div className="flex shrink-0 items-center gap-1">
           <SidebarBrand onBackdrop={backdropVariant !== null} />
           {isElectron ? (
-            // Back/forward stay out of sight until the pointer is in the sidebar (or a key focuses
-            // them), so the titlebar row reads as traffic lights, toggle and brand only.
-            <div className="hidden items-center opacity-0 transition-opacity duration-150 focus-within:opacity-100 md:flex [[data-app-sidebar]:hover_&]:opacity-100">
+            <div className="hidden items-center md:flex">
               <HistoryNavigationButton direction="back" onBackdrop={backdropVariant !== null} />
               <HistoryNavigationButton direction="forward" onBackdrop={backdropVariant !== null} />
             </div>
@@ -110,6 +96,7 @@ export const SidebarChromeHeader = memo(function SidebarChromeHeader({
     </div>
   );
 });
+
 export function SidebarBrandWidthProbe({
   isElectron,
   onWidthChange,
@@ -122,13 +109,14 @@ export function SidebarBrandWidthProbe({
       if (entry) onWidthChange(entry.borderBoxSize[0]?.inlineSize ?? probe.offsetWidth);
     });
   };
+
   return (
     <div
       aria-hidden="true"
       className="pointer-events-none invisible fixed top-0 left-0 flex w-max border-r border-transparent pr-3"
       ref={observeWidth}
     >
-      <div className="ml-[calc(var(--workspace-titlebar-content-left)-var(--liquid-sidebar-inset,0px)+1px)] flex gap-1">
+      <div className="ml-[var(--workspace-titlebar-content-left)] flex gap-1">
         <SidebarBrandMark onBackdrop={false} />
         {isElectron ? <div className="w-[calc(2*var(--workspace-titlebar-control-size))]" /> : null}
       </div>
@@ -186,7 +174,7 @@ function SidebarBrand({ onBackdrop }: { onBackdrop: boolean }) {
     <Link
       aria-label={gt("T3 Code home")}
       className={cn(
-        "relative z-10 ml-[calc(var(--workspace-titlebar-content-left)-var(--liquid-sidebar-inset,0px)+1px)] hidden h-7 w-fit min-w-0 shrink-0 items-center overflow-hidden rounded-md outline-hidden ring-ring focus-visible:ring-2 focus-visible:ring-inset md:flex",
+        "relative z-10 ml-[var(--workspace-titlebar-content-left)] hidden h-7 w-fit min-w-0 shrink-0 items-center overflow-hidden rounded-md outline-hidden ring-ring focus-visible:ring-2 focus-visible:ring-inset md:flex",
         onBackdrop ? "text-white" : "text-foreground",
       )}
       to="/"
@@ -195,33 +183,24 @@ function SidebarBrand({ onBackdrop }: { onBackdrop: boolean }) {
     </Link>
   );
 }
-/**
- * A quiet brand mark: "T3" in the secondary label colour plus the app icon's sparkle, the only
- * brand colour. It is a name, not copy, so it is never translated. Static: no animation.
- */
+
 function SidebarBrandMark({ onBackdrop }: { onBackdrop: boolean }) {
   return (
-    <span
-      data-stardust-wordmark
-      data-on-backdrop={onBackdrop || undefined}
-      className="inline-flex items-center gap-0.75 text-sm font-semibold tracking-tight [text-box:trim-both_cap_alphabetic] supports-[text-box:trim-both_cap_alphabetic]:py-1"
-    >
-      T3
-      <svg
-        aria-hidden="true"
-        data-stardust-star=""
-        viewBox="0 0 16 16"
-        className="size-[11px] shrink-0"
+    <span className="inline-flex min-w-0 items-baseline gap-1 text-sm font-medium tracking-tight">
+      <T3Wordmark aria-label="T3" className="h-[1cap] w-auto shrink-0" />
+      <span
+        className={cn(
+          "truncate [text-box:trim-both_cap_alphabetic] supports-[text-box:trim-both_cap_alphabetic]:py-1",
+          onBackdrop ? "text-white/70" : "text-muted-foreground",
+        )}
       >
-        <path
-          d="M8 0c.4 3.9 2.1 5.6 6 6-3.9.4-5.6 2.1-6 6-.4-3.9-2.1-5.6-6-6 3.9-.4 5.6-2.1 6-6z"
-          fill="currentColor"
-        />
-      </svg>
-      <span className="ml-0.5 text-[12px] font-medium tracking-normal opacity-90">星辰版</span>
+        {/* oxlint-disable-next-line t3code/no-untranslated-copy -- product wordmark */}
+        {"星辰版"}
+      </span>
     </span>
   );
 }
+
 function SidebarUtilityItem({
   icon,
   label,
@@ -244,12 +223,8 @@ function SidebarUtilityItem({
     </SidebarMenuItem>
   );
 }
-const SidebarUtilityMenu = memo(function SidebarUtilityMenu({
-  archiveSlot,
-}: {
-  archiveSlot?: ReactNode;
-}) {
-  const uiText = useUiText();
+
+const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
   const navigate = useNavigate();
   const navigateToMainApp = useNavigateToMainApp();
   const gt = useGT();
@@ -258,9 +233,6 @@ const SidebarUtilityMenu = memo(function SidebarUtilityMenu({
     select: (location) => isSidebarUtilityPage(location.pathname),
   });
   const pullRequestsSupported = usePullRequestsSupported();
-  const legacySidebarEnabled = useLegacySidebarEnabled();
-  const [moreOpen, setMoreOpen] = useState(false);
-  useMemoryProposalNotification();
   const issuesSupported = useIssuesSupported();
   const closeMobileSidebar = () => {
     if (isMobile) {
@@ -282,16 +254,19 @@ const SidebarUtilityMenu = memo(function SidebarUtilityMenu({
     closeMobileSidebar();
     void navigate({ to: "/settings" });
   };
+
   const handleUsageClick = () => {
     if (isMobile) {
       setOpenMobile(false);
     }
     void navigate({ to: "/usage" });
   };
+
   const handleBackClick = () => {
     closeMobileSidebar();
     void navigateToMainApp();
   };
+
   return (
     <SidebarMenu className="flex-row items-center">
       {isOnUtilityPage ? (
@@ -310,7 +285,7 @@ const SidebarUtilityMenu = memo(function SidebarUtilityMenu({
             label={gt("Settings")}
             onClick={handleSettingsClick}
           />
-          {!legacySidebarEnabled && pullRequestsSupported ? (
+          {pullRequestsSupported ? (
             <SidebarUtilityItem
               icon={<PullRequestGlyph.pullRequest />}
               label={gt("Pull requests")}
@@ -329,63 +304,20 @@ const SidebarUtilityMenu = memo(function SidebarUtilityMenu({
             label={gt("Usage")}
             onClick={handleUsageClick}
           />
-          {archiveSlot}
         </>
       )}
       <SidebarThreadUndoNotice />
-      {legacySidebarEnabled ? (
-        <SidebarMenuItem className="shrink-0">
-          <Popover open={moreOpen} onOpenChange={setMoreOpen}>
-            <PopoverTrigger
-              render={<SidebarMenuButton aria-label={uiText("More actions")} size="icon" />}
-            >
-              <EllipsisIcon />
-            </PopoverTrigger>
-            <PopoverPopup side="top" align="start" width="sm" padding="compact">
-              <PopoverTitle>{uiText("More actions")}</PopoverTitle>
-              <div className="mt-2 flex flex-col items-start gap-1">
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => {
-                    setMoreOpen(false);
-                    openRecentWork();
-                  }}
-                >
-                  {uiText("Recent and saved for later")}
-                </Button>
-                {pullRequestsSupported ? (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => {
-                      setMoreOpen(false);
-                      handlePullRequestsClick();
-                    }}
-                  >
-                    {uiText("Pull Requests")}
-                  </Button>
-                ) : null}
-              </div>
-            </PopoverPopup>
-          </Popover>
-        </SidebarMenuItem>
-      ) : null}
       <SidebarUpdatePill />
     </SidebarMenu>
   );
 });
 
-export const SidebarChromeFooter = memo(function SidebarChromeFooter({
-  archiveSlot,
-}: {
-  archiveSlot?: ReactNode;
-}) {
+export const SidebarChromeFooter = memo(function SidebarChromeFooter() {
   return (
     <SidebarFooter>
       <SidebarProviderUpdatePill />
       <SidebarUpdateArchitectureWarning />
-      <SidebarUtilityMenu archiveSlot={archiveSlot} />
+      <SidebarUtilityMenu />
     </SidebarFooter>
   );
 });

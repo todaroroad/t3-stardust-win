@@ -77,7 +77,3 @@ export function useMediaQuery(query: BreakpointQuery | MediaQueryInput | (string
 
   return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 }
-
-export function useIsMobile() {
-  return useMediaQuery("(max-width: 767px)");
-}

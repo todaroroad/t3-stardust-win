@@ -1,5 +1,3 @@
-
-
 import { Spinner } from "~/components/ui/spinner";
 import type {
   EnvironmentId,
@@ -151,6 +149,7 @@ export function PullRequestSearchInput({
     </InputGroup>
   );
 }
+
 const ALL_PROJECTS_VALUE = "all";
 const ALL_HOSTS_VALUE = "";
 const ALL_SERVERS_VALUE = "";
@@ -160,6 +159,7 @@ export const pullRequestProjectKey = (project: {
   readonly id: ProjectId;
   readonly environmentId: EnvironmentId;
 }) => JSON.stringify([project.environmentId, project.id]);
+
 const DRAFT_OPTIONS = [
   {
     value: UNFILTERED_VALUE,
@@ -169,6 +169,7 @@ const DRAFT_OPTIONS = [
   { value: "only", label: msg("Drafts only"), Icon: PullRequestGlyph.draft },
   { value: "hide", label: msg("Hide drafts"), Icon: EyeOffIcon },
 ] as const satisfies ReadonlyArray<PullRequestFilterOption<string>>;
+
 const REVIEW_OPTIONS = [
   {
     value: UNFILTERED_VALUE,
@@ -184,6 +185,7 @@ const REVIEW_OPTIONS = [
   { value: "review-required", label: msg("Review required"), Icon: CircleDashedIcon },
   { value: "none", label: msg("No reviews"), Icon: CircleSlashIcon },
 ] as const satisfies ReadonlyArray<PullRequestFilterOption<string>>;
+
 const CHECKS_OPTIONS = [
   {
     value: UNFILTERED_VALUE,
@@ -193,6 +195,7 @@ const CHECKS_OPTIONS = [
   { value: "passing", label: msg("Passing", { $context: "checks filter" }), Icon: CircleCheckIcon },
   { value: "failing", label: msg("Failing", { $context: "checks filter" }), Icon: CircleXIcon },
 ] as const satisfies ReadonlyArray<PullRequestFilterOption<string>>;
+
 function PullRequestFilterRadioGroup<Value extends string>({
   label,
   value,
@@ -364,6 +367,7 @@ function PullRequestAuthorChoices({
     </>
   );
 }
+
 function PullRequestAuthorFilter({
   value,
   options,

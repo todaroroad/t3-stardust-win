@@ -1,4 +1,3 @@
-import { uiText } from "~/i18n";
 import type { UsageProviderKind } from "@t3tools/contracts";
 
 import { ProviderDriverKind } from "@t3tools/contracts";
@@ -14,56 +13,43 @@ type UsageProviderPresentation = {
 export const PROVIDER_PRESENTATION = {
   codex: {
     label: "Codex",
-    color: "var(--usage-codex)",
+    color: "var(--contrast-foreground)",
     driverKind: ProviderDriverKind.make("codex"),
   },
   claude: {
     label: "Claude Code",
-    color: "var(--usage-claude)",
+    color: "#d97757",
     driverKind: ProviderDriverKind.make("claudeAgent"),
   },
   grok: {
     label: "Grok Build",
-    color: "var(--usage-grok)",
+    color: "color-mix(in oklab, var(--contrast-foreground) 72%, var(--background))",
     driverKind: ProviderDriverKind.make("grok"),
   },
-  cursor: {
-    label: "Cursor",
-    color: "var(--usage-other)",
-    driverKind: ProviderDriverKind.make("cursor"),
-  },
+  cursor: { label: "Cursor", color: "#8b8b8b", driverKind: ProviderDriverKind.make("cursor") },
   opencode: {
     label: "OpenCode",
-    color: "var(--usage-other)",
+    color: "#5b9bbd",
     driverKind: ProviderDriverKind.make("opencode"),
   },
   antigravity: {
     label: "Antigravity",
-    color: "var(--usage-antigravity)",
+    color: "#8c7bd1",
     driverKind: ProviderDriverKind.make("antigravity"),
   },
   pi: {
     label: "Pi",
-    color: "var(--usage-other)",
+    color: "#4d9f8a",
     driverKind: ProviderDriverKind.make("pi"),
   },
   muse: {
     label: "Muse Code",
-    color: "var(--usage-other)",
+    color: "#0866ff",
     driverKind: ProviderDriverKind.make("muse"),
   },
 } satisfies Record<UsageProviderKind, UsageProviderPresentation>;
 
-export const PROVIDER_ORDER = [
-  "codex",
-  "claude",
-  "grok",
-  "antigravity",
-  "cursor",
-  "opencode",
-  "pi",
-  "muse",
-] as UsageProviderKind[];
+export const PROVIDER_ORDER = Object.keys(PROVIDER_PRESENTATION) as UsageProviderKind[];
 
 export function providersWithUsage(
   totals: readonly {
@@ -78,20 +64,6 @@ export function providersWithUsage(
       .map((entry) => entry.provider),
   );
   return PROVIDER_ORDER.filter((provider) => active.has(provider));
-}
-
-export function usageSeries(provider: UsageProviderKind): UsageProviderKind {
-  return ["codex", "claude", "grok", "antigravity"].includes(provider) ? provider : "cursor";
-}
-export const USAGE_SERIES_ORDER: readonly UsageProviderKind[] = [
-  "codex",
-  "claude",
-  "grok",
-  "antigravity",
-  "cursor",
-];
-export function usageSeriesLabel(provider: UsageProviderKind) {
-  return provider === "cursor" ? uiText("Other providers") : PROVIDER_PRESENTATION[provider].label;
 }
 
 export function rankProvidersByMetric(

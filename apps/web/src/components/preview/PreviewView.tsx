@@ -1,4 +1,3 @@
-import { PreviewPinsControl } from "./PreviewPinsControl";
 import { thrownErrorMessage } from "@t3tools/client-runtime/errors";
 import { m } from "~/i18n/messages";
 import { useAtomValue } from "@effect/atom-react";
@@ -123,7 +122,7 @@ interface Props {
   onSendAnnotation?: (
     annotation: PreviewAnnotationPayload,
     image: ComposerImageAttachment | null,
-  ) => void | boolean | Promise<void | boolean>;
+  ) => void;
 }
 
 function previewProfileName(
@@ -1072,30 +1071,14 @@ export function PreviewView({
             : undefined
         }
         leadingActions={
-          <>
-            {visible &&
-              previewBridge?.pinAction &&
-              runtimeTabId &&
-              !isServerTab &&
-              !isUnreachable && (
-                <PreviewPinsControl
-                  key={runtimeTabId}
-                  tabId={runtimeTabId}
-                  url={url}
-                  loading={loading}
-                  enabled={canSendAnnotation}
-                  onSend={onSendAnnotation}
-                />
-              )}
-            {activeProfileId !== browserDefaults.profileId ? (
-              <SharedTooltipTrigger
-                render={<Badge variant="outline" className="max-w-28 shrink-0" />}
-                label={activeProfileName}
-              >
-                <span className="truncate">{activeProfileName}</span>
-              </SharedTooltipTrigger>
-            ) : null}
-          </>
+          activeProfileId !== browserDefaults.profileId ? (
+            <SharedTooltipTrigger
+              render={<Badge variant="outline" className="max-w-28 shrink-0" />}
+              label={activeProfileName}
+            >
+              <span className="truncate">{activeProfileName}</span>
+            </SharedTooltipTrigger>
+          ) : null
         }
         trailingActions={
           moreMenuActions ? (

@@ -22,10 +22,12 @@ import { mFallback, msg } from "gt-i18n";
 import type { MFunctionType } from "gt-i18n/types";
 
 import { formatSubagentDisplayTitle } from "./subagentDisplay.ts";
+
 export interface EnvironmentProject extends OrchestrationProjectShell {
   readonly environmentId: EnvironmentId;
   readonly isScratch?: true;
 }
+
 /**
  * The projection stays nested so the server projection and all structurally
  * shared collections retain their identities.
@@ -34,40 +36,26 @@ export interface EnvironmentThread {
   readonly environmentId: EnvironmentId;
   readonly projection: OrchestrationV2ThreadProjection;
 }
+
 type ProjectionTurnItem = OrchestrationV2ThreadProjection["turnItems"][number];
 type StreamedProjectionTurnItem = Extract<
   ProjectionTurnItem,
-  {
-    readonly type: "assistant_message" | "reasoning";
-  }
+  { readonly type: "assistant_message" | "reasoning" }
 >;
+
 /** A turn item without the fields that move while it streams. */
 export type ThreadStructureTurnItem =
   | Exclude<ProjectionTurnItem, StreamedProjectionTurnItem>
-  | Omit<
-      Extract<
-        ProjectionTurnItem,
-        {
-          readonly type: "assistant_message";
-        }
-      >,
-      "text" | "updatedAt"
-    >
-  | Omit<
-      Extract<
-        ProjectionTurnItem,
-        {
-          readonly type: "reasoning";
-        }
-      >,
-      "text" | "updatedAt"
-    >;
+  | Omit<Extract<ProjectionTurnItem, { readonly type: "assistant_message" }>, "text" | "updatedAt">
+  | Omit<Extract<ProjectionTurnItem, { readonly type: "reasoning" }>, "text" | "updatedAt">;
+
 export type ThreadStructureVisibleTurnItem = Omit<
   OrchestrationV2ThreadProjection["visibleTurnItems"][number],
   "item"
 > & {
   readonly item: ThreadStructureTurnItem;
 };
+
 /**
  * A thread projection without the fields that move while a reply streams, so a
  * reader of the quiet thread cannot depend on them and go stale. A full
@@ -77,6 +65,7 @@ export type ThreadStructureThread = Omit<
   OrchestrationV2ThreadProjection["thread"],
   "updatedAt" | "lastVisitedAt"
 >;
+
 export type ThreadStructure = Omit<
   OrchestrationV2ThreadProjection,
   "thread" | "turnItems" | "visibleTurnItems" | "updatedAt"
@@ -85,10 +74,12 @@ export type ThreadStructure = Omit<
   readonly turnItems: ReadonlyArray<ThreadStructureTurnItem>;
   readonly visibleTurnItems: ReadonlyArray<ThreadStructureVisibleTurnItem>;
 };
+
 export interface EnvironmentThreadStructure {
   readonly environmentId: EnvironmentId;
   readonly projection: ThreadStructure;
 }
+
 export interface ThreadRunSummary {
   readonly runId: RunId;
   readonly status: OrchestrationV2RunStatus;
@@ -119,6 +110,7 @@ export interface ThreadRunSummary {
     readonly planId: PlanId;
   };
 }
+
 export interface ThreadRuntimeSummary {
   readonly status: OrchestrationV2RunStatus | "idle";
   readonly activeRunId: RunId | null;
@@ -133,11 +125,14 @@ export interface ThreadRuntimeSummary {
   readonly usageLimitResetAt?: string | null;
   readonly updatedAt: string;
 }
+
 /** The runtime summary a thread's structure determines; see ThreadStructure. */
 export type ThreadStructureRuntime = Omit<ThreadRuntimeSummary, "updatedAt">;
+
 export function threadRuntimeIsActive(runtime: ThreadStructureRuntime | null | undefined): boolean {
   return runtime !== null && runtime !== undefined && threadRunStatusIsActive(runtime.status);
 }
+
 export function threadRuntimeCanArchive(runtime: ThreadRuntimeSummary | null | undefined): boolean {
   if (runtime?.status === "queued") return runtime.activeRunId === null;
   return (
@@ -146,6 +141,7 @@ export function threadRuntimeCanArchive(runtime: ThreadRuntimeSummary | null | u
     runtime?.status !== "running"
   );
 }
+
 function threadRunStatusIsActive(status: ThreadRuntimeSummary["status"]): boolean {
   return (
     status === "preparing" ||
@@ -155,6 +151,7 @@ function threadRunStatusIsActive(status: ThreadRuntimeSummary["status"]): boolea
     status === "waiting"
   );
 }
+
 export interface EnvironmentThreadShell {
   readonly environmentId: EnvironmentId;
   readonly id: ThreadId;
@@ -167,11 +164,6 @@ export interface EnvironmentThreadShell {
   readonly branch: string | null;
   readonly worktreePath: string | null;
   readonly lineage: OrchestrationV2ThreadShell["lineage"];
-  /**
-   * Thread this one continues after a context handoff (local customization). Only
-   * top-level, non-forked threads count; subagents and forks never continue anything.
-   */
-  readonly continuedFromThreadId?: ThreadId | null;
   readonly forkedFrom: OrchestrationV2ThreadShell["forkedFrom"];
   readonly linkOrigin: OrchestrationV2ThreadShell["linkOrigin"] | null;
   /** The thread in a linked environment that delegated this one, if one did. */
@@ -184,7 +176,6 @@ export interface EnvironmentThreadShell {
   readonly blockedOnThreadWait?: boolean;
   readonly latestUserMessageAt: string | null;
   readonly latestUserAuthoredMessageAt?: string | null;
-  readonly pendingRequestCreatedAt?: string | null;
   readonly hasPendingApprovals: boolean;
   readonly hasPendingUserInput: boolean;
   readonly pendingUserInputAt?: string | null;
@@ -225,19 +216,19 @@ export interface EnvironmentThreadShell {
   readonly lastVisitedAt?: string | null;
   /** Server-tracked open history for search ranking. */
   readonly opens?: import("@t3tools/contracts").OrchestrationV2ThreadOpens | null;
-  readonly titleRegeneration?: {
-    readonly requestId: string;
-    readonly startedAt: string;
-  } | null;
+  readonly titleRegeneration?: { readonly requestId: string; readonly startedAt: string } | null;
   readonly deletedAt: string | null;
   readonly source: OrchestrationV2ThreadShell;
 }
+
 function iso(value: DateTime.Utc): string {
   return DateTime.formatIso(value);
 }
+
 function nullableIso(value: DateTime.Utc | null): string | null {
   return value === null ? null : iso(value);
 }
+
 function terminalRunStatus(status: OrchestrationV2RunStatus): boolean {
   return (
     status === "completed" ||
@@ -276,13 +267,16 @@ function shellRuntime(thread: OrchestrationV2ThreadShell): ThreadRuntimeSummary 
     updatedAt: iso(thread.updatedAt),
   };
 }
+
 export function scopeProject(
   environmentId: EnvironmentId,
   project: OrchestrationProjectShell,
 ): EnvironmentProject {
   return { ...project, environmentId };
 }
+
 export type PendingSubagentRequest = "approval" | "user_input";
+
 export function presentThreadShell(
   environmentId: EnvironmentId,
   thread: OrchestrationV2ThreadShell,
@@ -325,10 +319,6 @@ export function presentThreadShell(
     branchPullRequest: thread.branchPullRequest ?? null,
     issues: thread.issues ?? [],
     lineage: thread.lineage,
-    continuedFromThreadId:
-      thread.lineage.relationshipToParent === null && thread.forkedFrom === null
-        ? (thread.continuedFromThreadId ?? null)
-        : null,
     forkedFrom: thread.forkedFrom,
     linkOrigin: thread.linkOrigin ?? null,
     delegatedFrom: thread.delegatedFrom ?? null,
@@ -341,7 +331,6 @@ export function presentThreadShell(
     ...(thread.latestUserAuthoredMessageAt === undefined
       ? {}
       : { latestUserAuthoredMessageAt: nullableIso(thread.latestUserAuthoredMessageAt) }),
-    pendingRequestCreatedAt: nullableIso(thread.pendingRuntimeRequest?.createdAt ?? null),
     hasPendingApprovals:
       thread.pendingRuntimeRequest !== null &&
       thread.pendingRuntimeRequest.kind !== "user_input" &&
@@ -388,13 +377,16 @@ export function presentThreadShell(
     source: thread,
   };
 }
+
 export function scopeThreadShell(
   environmentId: EnvironmentId,
   thread: OrchestrationV2ThreadShell,
 ): EnvironmentThreadShell {
   return presentThreadShell(environmentId, thread);
 }
+
 const THREAD_PROVIDER_STACK_LIMIT = 3;
+
 export function resolveThreadProviderStack(
   thread: Pick<EnvironmentThreadShell, "providerInstanceHistory" | "modelSelection" | "runtime">,
 ): ReadonlyArray<ProviderInstanceId> {
@@ -402,6 +394,7 @@ export function resolveThreadProviderStack(
   const previous = thread.providerInstanceHistory.filter((instanceId) => instanceId !== current);
   return [...previous.slice(-(THREAD_PROVIDER_STACK_LIMIT - 1)), current];
 }
+
 /**
  * Both shell and detail timers count from the activity-owning run's work
  * start, never last activity. A wake keeps the start of the work it continues.

@@ -1,10 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import {
-  claudeRateLimitEventToUpdate,
-  claudeUnifiedWindowsToUpdate,
-  claudeUsageResponseToLimits,
-} from "./claudeUsageLimits.ts";
+import { claudeRateLimitEventToUpdate, claudeUsageResponseToLimits } from "./claudeUsageLimits.ts";
 
 const checkedAt = "2026-07-18T10:00:00.000Z";
 const noNames = { overageIncluded: undefined } as const;
@@ -287,34 +283,5 @@ describe("claudeRateLimitEventToUpdate", () => {
         },
       ],
     });
-  });
-});
-
-describe("claudeUnifiedWindowsToUpdate", () => {
-  it("applies every header window of one response as percentages", () => {
-    const info = {
-      status: "allowed",
-      rateLimitType: "five_hour",
-      utilization: 0.32,
-      unifiedWindows: {
-        five_hour: { utilization: 0.32, resetsAt: 1_795_256_400, status: "allowed" },
-        seven_day: { utilization: 0.7, resetsAt: 1_795_356_000, status: "allowed" },
-      },
-    } as unknown as Parameters<typeof claudeUnifiedWindowsToUpdate>[0];
-    const update = claudeUnifiedWindowsToUpdate(info);
-    expect(update?.windows.map((w) => [w.id, w.usedPercent])).toEqual([
-      ["five_hour", 32],
-      ["seven_day", 70],
-    ]);
-    expect(update?.windows[1]?.resetsAt).toBe("2026-11-22T14:00:00.000Z");
-  });
-
-  it("ignores SDK events without header windows", () => {
-    const info = {
-      status: "allowed",
-      rateLimitType: "five_hour",
-      utilization: 0.4,
-    } as unknown as Parameters<typeof claudeUnifiedWindowsToUpdate>[0];
-    expect(claudeUnifiedWindowsToUpdate(info)).toBeUndefined();
   });
 });

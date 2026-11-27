@@ -1,4 +1,3 @@
-import { uiText } from "~/i18n";
 import { thrownErrorMessage } from "@t3tools/client-runtime/errors";
 import {
   AuthOrchestrationOperateScope,
@@ -21,7 +20,7 @@ import {
   PlayIcon,
   WrenchIcon,
 } from "lucide-react";
-import { T, useGT, useMessages } from "gt-react";
+import { msg, T, useGT, useMessages, Var } from "gt-react";
 import React, { type FormEvent, type KeyboardEvent, useEffect, useRef, useState } from "react";
 
 import {
@@ -58,42 +57,12 @@ import { Switch } from "./ui/switch";
 import { Textarea } from "./ui/textarea";
 
 const SCRIPT_ICONS: Array<{ id: ProjectScriptIcon; label: string }> = [
-  {
-    id: "play",
-    get label() {
-      return uiText("Play");
-    },
-  },
-  {
-    id: "test",
-    get label() {
-      return uiText("Test");
-    },
-  },
-  {
-    id: "lint",
-    get label() {
-      return uiText("Lint");
-    },
-  },
-  {
-    id: "configure",
-    get label() {
-      return uiText("Configure");
-    },
-  },
-  {
-    id: "build",
-    get label() {
-      return uiText("Build");
-    },
-  },
-  {
-    id: "debug",
-    get label() {
-      return uiText("Debug");
-    },
-  },
+  { id: "play", label: msg("Play") },
+  { id: "test", label: msg("Test") },
+  { id: "lint", label: msg("Lint") },
+  { id: "configure", label: msg("Configure") },
+  { id: "build", label: msg("Build") },
+  { id: "debug", label: msg("Debug") },
 ];
 
 export function ScriptIcon({
@@ -251,11 +220,12 @@ export function ProjectScriptEditorDialog({
         <AlertDialogPopup>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {uiText('Delete action "')}
-              {deleteName}"?
+              <T>
+                Delete action "<Var>{deleteName}</Var>"?
+              </T>
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {uiText("This action cannot be undone.")}
+              <T>This action cannot be undone.</T>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

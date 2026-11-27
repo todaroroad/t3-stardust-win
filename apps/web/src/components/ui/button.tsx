@@ -14,7 +14,6 @@ const buttonVariants = cva(
     },
     variants: {
       size: {
-        "annotation-pill": "h-8 rounded-full px-3 before:rounded-full",
         compact:
           "h-7 gap-1.5 rounded-md px-[calc(--spacing(2)-1px)] text-xs before:rounded-[calc(var(--radius-md)-1px)] [&_svg:not([class*='size-'])]:size-3.5",
         default: "h-9 px-[calc(--spacing(3)-1px)] sm:h-8",
@@ -42,10 +41,6 @@ const buttonVariants = cva(
         xs: "h-7 gap-1.5 px-[calc(--spacing(2)-1px)] text-sm sm:h-6 sm:text-xs [&_svg:not([class*='size-'])]:size-4 sm:[&_svg:not([class*='size-'])]:size-3.5",
       },
       variant: {
-        annotation:
-          "border-transparent bg-annotation text-white [:hover,[data-pressed]]:bg-annotation/90",
-        "annotation-send":
-          "border-transparent bg-foreground text-background transition-[width] duration-400 ease-drawer motion-reduce:transition-none",
         default:
           "not-disabled:inset-shadow-[0_1px_--theme(--color-white/16%)] border-primary bg-primary text-primary-foreground shadow-primary/24 shadow-xs [:active,[data-pressed]]:inset-shadow-[0_1px_--theme(--color-black/8%)] [:disabled,:active,[data-pressed]]:shadow-none [:hover,[data-pressed]]:bg-primary/90",
         destructive:

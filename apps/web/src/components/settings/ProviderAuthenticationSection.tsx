@@ -193,18 +193,18 @@ export function ProviderAuthenticationSection({
             </T>
           </span>
         ) : (
-          <span role={"status"}>{accountDescription}</span>
+          <span role="status">{accountDescription}</span>
         )
       }
       status={
         statusMessage ? (
-          <p role={"status"} className={"[overflow-wrap:anywhere]"}>
+          <p role="status" className="[overflow-wrap:anywhere]">
             {statusMessage}
           </p>
         ) : undefined
       }
       control={
-        <div className={"flex min-w-0 flex-wrap items-center gap-1.5"}>
+        <div className="flex min-w-0 flex-wrap items-center gap-1.5">
           {!active && (auth?.methods?.length ?? 0) > 1 ? (
             <Select
               value={auth?.methods?.some((method) => method.id === methodId) ? methodId : ""}
@@ -232,8 +232,8 @@ export function ProviderAuthenticationSection({
           {url ? (
             <>
               <Button
-                size={"sm"}
-                variant={"outline"}
+                size="sm"
+                variant="outline"
                 disabled={disabled}
                 onClick={() => void openBrowser()}
               >
@@ -279,10 +279,10 @@ export function ProviderAuthenticationSection({
           <>
             {needsExternalSetup && provider.setup?.documentationUrl ? (
               <Button
-                size={"sm"}
-                variant={"outline"}
+                size="sm"
+                variant="outline"
                 render={
-                  <a href={provider.setup.documentationUrl} target={"_blank"} rel={"noreferrer"} />
+                  <a href={provider.setup.documentationUrl} target="_blank" rel="noreferrer" />
                 }
               >
                 <T>Open docs</T>
@@ -303,8 +303,8 @@ export function ProviderAuthenticationSection({
               </Button>
             ) : !active && !needsExternalSetup && provider.setup?.canAuthenticate !== false ? (
               <Button
-                size={"sm"}
-                variant={"outline"}
+                size="sm"
+                variant="outline"
                 disabled={disabled || !provider.enabled || !provider.installed || !auth}
                 onClick={() =>
                   void run(() =>
@@ -333,8 +333,8 @@ export function ProviderAuthenticationSection({
             ) : null}
             {!active && signedIn && (provider.auth.canLogout ?? provider.setup?.canAuthenticate) ? (
               <Button
-                size={"sm"}
-                variant={"ghost"}
+                size="sm"
+                variant="ghost"
                 disabled={disabled || !auth}
                 onClick={() => {
                   void ensureLocalApi()
@@ -378,7 +378,7 @@ export function ProviderAuthenticationSection({
             </p>
           ) : null}
           {interaction?.type === "terminal" ? (
-            <div className={"py-2"}>
+            <div className="py-2">
               <Suspense
                 fallback={
                   <p className="text-xs text-muted-foreground">

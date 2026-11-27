@@ -202,7 +202,6 @@ jobs:
             }
 
             const off = parseVer(process.env.OFFICIAL_TAG_VAL || "v0.1.13") || [0, 1, 13];
-            // Map official 0.1.13 -> 1.13.0, official 0.2.0 -> 1.200.0 / 2.0.0 so always > 1.2.6
             const mappedMajor = off[0] >= 1 ? off[0] + 1 : 1;
             const mappedMinor = off[0] === 0 && off[1] === 1 ? off[2] : off[1] * 100 + off[2];
             const base = [mappedMajor, mappedMinor, 0];
@@ -233,7 +232,7 @@ jobs:
           echo "should_build=true" >> "$GITHUB_OUTPUT"
           echo "release_version=${RELEASE_VERSION}" >> "$GITHUB_OUTPUT"
 
-      - name: Apply & verify T3星辰版 branding and privacy guards
+      - name: Apply & verify T3星辰版 pure-official overlay
         if: steps.sync.outputs.should_build == 'true'
         run: node stardust-win/apply-overlay.mjs
 
@@ -271,7 +270,7 @@ jobs:
             vp install --filter=t3... --filter=@t3tools/web... --filter=@t3tools/desktop... --filter=@t3tools/scripts...
           fi
 
-      - name: Align package versions & Build JS bundle (pre-push verification)
+      - name: Align package versions, Build JS bundle & Inject Stardust Quota + Web Enhancer Suite
         id: build_verify
         if: steps.sync.outputs.should_build == 'true'
         continue-on-error: true
@@ -281,11 +280,12 @@ jobs:
           set -euo pipefail
           node scripts/update-release-package-versions.ts "${RELEASE_VERSION}"
           vp run build:desktop
+          node stardust-win/patch-dist-bundle.mjs apps/server/dist
           if grep -rn "xiaoxin666\|api/stardust" apps/server/dist apps/desktop/dist-electron; then
             echo "ERROR: Unexpected third-party endpoint found in compiled bundle!"
             exit 1
           fi
-          echo "Build & privacy verification passed!"
+          echo "Build, bundle enhancement & syntax verification passed!"
 
       - name: Handle build failure on automated merge without breaking main
         if: steps.sync.outputs.should_build == 'true' && steps.build_verify.outcome == 'failure'
@@ -489,22 +489,22 @@ jobs:
         run: |
           set -euo pipefail
           tag="v${RELEASE_VERSION}"
-          notes="T3星辰版 v${RELEASE_VERSION} Windows x64 构建（直接基于 T3 官方正式版 pingdotgg/t3code@${OFFICIAL_TAG} / ${OFFICIAL_SHA:0:7}）：
-          - 品牌与侧边栏增强：统一升级为「T3星辰版」，新增置顶（已置顶）与活跃会话区原生折叠抽屉
-          - 独立安装共存（com.todaroroad.t3stardust）：与官方 T3 Code (Beta) 并排共存、互不覆盖，共用本地聊天记录与登录态
-          - 原生应用内热更新（electron-updater）：支持在「设置 → 关于」中自动检测更新、差分下载（.blockmap）并一键重启升级
-          - 定制增强与隐私净空：保留星辰侧边栏/星舰推理滑块/用量看板 + 三芒星渐变思考图标与 Token 耗时徽章，零第三方上报"
+          notes="T3星辰版 v${RELEASE_VERSION} Windows x64 纯净增强版（100% 基于 T3 官方正式版 pingdotgg/t3code@${OFFICIAL_TAG} / ${OFFICIAL_SHA:0:7}，移除旧第三方分支冗余代码）：
+          - 左侧 Telegram 式竖排项目导航栏（68px，置顶分割线 + 彩色图标 + 双色实时会话角标 + 管理/添加快捷入口）
+          - 任务完成 / 待确认多端提醒直达（Windows 桌面通知 + 顶部毛玻璃灵动浮窗 + 柔和提示音 + 任务栏角标 + 历史收件箱，点击毫秒级直达会话，桌面端与 Web/PWA 通用）
+          - 全链路用量与配额美化：星舰曲速推理滑块、顶栏多账号常驻额度胶囊、模型选择器剩 XX% 徽章、耗时行模型与 Token 胶囊、三芒星思考徽章、双列限额燃尽预测与 ¥/$ 实时换算
+          - 独立安装共存（com.todaroroad.t3stardust）：与官方 T3 Code (Beta) 并排共存互不覆盖，支持应用内 electron-updater 差分热更新"
 
           if ! gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release create "$tag" release-publish/* \
               --repo "$GITHUB_REPOSITORY" \
-              --title "T3星辰版 v${RELEASE_VERSION} for Windows (x64) [基于官方 ${OFFICIAL_TAG}]" \
+              --title "T3星辰版 v${RELEASE_VERSION} for Windows (x64) [纯净官方 ${OFFICIAL_TAG} 增强版]" \
               --notes "$notes" \
               --latest
           else
             gh release upload "$tag" release-publish/* --repo "$GITHUB_REPOSITORY" --clobber
             gh release edit "$tag" --repo "$GITHUB_REPOSITORY" \
-              --title "T3星辰版 v${RELEASE_VERSION} for Windows (x64) [基于官方 ${OFFICIAL_TAG}]" \
+              --title "T3星辰版 v${RELEASE_VERSION} for Windows (x64) [纯净官方 ${OFFICIAL_TAG} 增强版]" \
               --notes "$notes" \
               --latest
           fi

@@ -48,23 +48,7 @@ export const deliverContextHandoffs = Effect.fn("orchestrationV2.deliverContextH
     if (pending.length === 0 || (input.deferInline && input.inject === undefined))
       return { context: "", delivered: Effect.void, unsent: Effect.void, inlineHandoffs: [] };
     const budget = typeof input.budget === "number" ? input.budget : yield* input.budget;
-    // Overlapping retries retain separate delivery receipts, but need only one coverage index.
-    const coverageHandoffs = pending.filter(
-      (handoff, index) =>
-        !pending.some(
-          (other, otherIndex) =>
-            other.history !== undefined &&
-            handoff.history !== undefined &&
-            other.threadId === handoff.threadId &&
-            other.strategy === handoff.strategy &&
-            other.coveredRunOrdinals.from <= handoff.coveredRunOrdinals.from &&
-            other.coveredRunOrdinals.to >= handoff.coveredRunOrdinals.to &&
-            (other.coveredRunOrdinals.from < handoff.coveredRunOrdinals.from ||
-              other.coveredRunOrdinals.to > handoff.coveredRunOrdinals.to ||
-              otherIndex > index),
-        ),
-    );
-    let coverage = coverageHandoffs
+    let coverage = pending
       .map(
         (handoff) =>
           `Context handoff (${handoff.strategy === "fork_delta_summary" ? "merge_back / fork_delta_summary" : handoff.strategy}):\n${

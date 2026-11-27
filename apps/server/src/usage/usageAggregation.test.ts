@@ -1,4 +1,3 @@
-import { ProjectId } from "@t3tools/contracts";
 import { describe, expect, it } from "@effect/vitest";
 
 import { resolveModelAliases, UsageAggregator } from "./usageAggregation.ts";
@@ -132,24 +131,11 @@ describe("UsageAggregator", () => {
         sinceDay: "2026-08-01",
         untilDay: "2026-08-31",
         rates,
-        attributeProject: (_record, transcriptPath) => ProjectId.make(transcriptPath ?? "unbound"),
       });
-      copies.forEach((copy, index) => aggregator.add(copy, `${index}.jsonl`, `project-${index}`));
+      copies.forEach((copy, index) => aggregator.add(copy, `${index}.jsonl`));
       const result = aggregator.finish();
       const expected = aggregate([{ ...copies[0]!, ...merged }]).buckets[0];
 
-      expect(result.projectTotals).toEqual([
-        {
-          projectId: "project-0",
-          provider: expected!.provider,
-          sourcePath: "0.jsonl",
-          totals: expected!.totals,
-          costUsd: expect.closeTo(expected!.costUsd, 8),
-          records: expected!.records,
-          unpricedRecords: expected!.unpricedRecords,
-          sessions: expected!.sessions,
-        },
-      ]);
       expect(result.duplicatesDropped).toBe(3);
       expect(result.buckets).toEqual([{ ...expected, sourcePath: "0.jsonl" }]);
     }

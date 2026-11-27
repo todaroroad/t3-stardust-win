@@ -126,24 +126,24 @@ export function ProjectActionsSettings() {
         )}
         onResetOverride={() => void persist(() => null)}
         control={
-          <div className={"flex flex-wrap items-center gap-1.5"}>
+          <div className="flex flex-wrap items-center gap-1.5">
             {importableScripts.length > 0 ? (
               <Menu>
                 <MenuTrigger
                   render={
                     <Button
-                      id={"import-scripts"}
-                      size={"xs"}
-                      variant={"ghost"}
+                      id="import-scripts"
+                      size="xs"
+                      variant="ghost"
                       disabled={saving || !canWriteSettings}
-                      type={"button"}
+                      type="button"
                     />
                   }
                 >
                   <T>Import scripts</T>
                   <ChevronDownIcon className="size-3.5" />
                 </MenuTrigger>
-                <MenuPopup align={"end"}>
+                <MenuPopup align="end">
                   <MenuGroup>
                     <MenuGroupLabel>
                       <T>Import from t3.json</T>

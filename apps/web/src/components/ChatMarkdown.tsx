@@ -2133,23 +2133,6 @@ function ChatMarkdown({
         componentState.isStreaming && (!remounted || text !== textAtMount) ? "" : undefined
       }
       onCopy={handleCopy}
-      onKeyDown={(event) => {
-        if (event.key !== "ContextMenu" && !(event.shiftKey && event.key === "F10")) return;
-        const link = event.target instanceof Element ? event.target.closest("a") : null;
-        if (!link || !event.currentTarget.contains(link)) return;
-        // macOS needs an explicit keyboard gesture; MouseEvent normalizes button -1 to 0.
-        event.preventDefault();
-        const bounds = link.getBoundingClientRect();
-        link.dispatchEvent(
-          new MouseEvent("contextmenu", {
-            bubbles: true,
-            cancelable: true,
-            button: -1,
-            clientX: bounds.left,
-            clientY: bounds.bottom,
-          }),
-        );
-      }}
     >
       <ChatMarkdownRendererContext value={componentState}>
         {blocks.map((source, index) => (

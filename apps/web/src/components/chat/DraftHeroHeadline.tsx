@@ -1,14 +1,9 @@
-import { useUiText } from "~/i18n/useUiText";
-
-import { useTaskBoard } from "~/taskBoard";
-import { useVisibleThreadShells } from "~/state/entities";
-import { recentProjectThreads, startThreadStatus } from "./stardustStartModel";
 import type { DraftId } from "~/composerDraftStore";
 import { useComposerDraftStore } from "~/composerDraftStore";
 import { resolveEnvironmentMachineKind, type ScopedProjectRef } from "@t3tools/contracts";
 import { scopedProjectKey, scopeProjectRef } from "@t3tools/client-runtime/environment";
 import { isScratchProject } from "@t3tools/client-runtime/state/projects";
-import { T, useGT } from "gt-react";
+import { T, useGT, Var } from "gt-react";
 import { FolderPlusIcon } from "lucide-react";
 import { useAtomValue } from "@effect/atom-react";
 import { useRef, useState } from "react";
@@ -47,7 +42,7 @@ import { Tooltip, TooltipPopup, TooltipScrollDismissArea, TooltipTrigger } from 
 import { SharedTooltipTrigger } from "../ui/shared-tooltip";
 import { InlineButton } from "../ui/button";
 import { DraftProjectName } from "./DraftProjectName";
-
+import { DraftHeroProjectHeading } from "./DraftHeroProjectHeading";
 import { TriageDraftHero } from "./TriageDraftHero";
 
 const ADD_PROJECT_VALUE = "add-project";
@@ -69,16 +64,6 @@ export function DraftHeroHeadline({
   activeProjectTitle,
 }: DraftHeroHeadlineProps) {
   const gt = useGT();
-  const uiText = useUiText();
-  const [greeting] = useState(() => {
-    const hour = new Date().getHours();
-    return hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
-  });
-  const threads = useVisibleThreadShells();
-  const boards = useTaskBoard((state) => state.data?.tasks);
-  const hasContinuation = recentProjectThreads(threads, activeProjectRef).some(
-    (thread) => startThreadStatus(thread, boards ?? []) !== null,
-  );
   const projects = useProjects();
   const { environments } = useEnvironments();
   const primaryEnvironmentId = usePrimaryEnvironmentId();
@@ -363,31 +348,29 @@ export function DraftHeroHeadline({
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col items-center" data-stardust-heading>
-      <img src="/stardust-icon.png" alt={uiText("T3 Stardust")} className="mb-3 size-14" />
-      <h1 className="text-center text-2xl font-semibold tracking-tight">
-        {hasResolvedProject && !isScratchDraft ? (
-          <>
-            {uiText("{greeting}, what would you like to do in", { greeting: uiText(greeting) })}{" "}
-            <span className="stardust-project-name">{projectSelector}</span> {uiText("today?")}
-          </>
-        ) : (
-          uiText("{greeting}, what would you like to do today?", { greeting: uiText(greeting) })
-        )}
-      </h1>
-      {hasContinuation ? (
-        <p className="mt-2 text-sm text-muted-foreground">
-          {uiText("Start something new, or continue below")}
-        </p>
-      ) : null}
-      {!hasResolvedProject && !isScratchDraft ? (
-        <div className="mt-2">{projectSelector}</div>
-      ) : null}
-      {!hasContinuation && scratchWorkspaceRoot !== null ? (
+    <div className="mx-auto flex w-full max-w-5xl flex-col items-center">
+      {hasResolvedProject && !isScratchDraft ? (
+        <DraftHeroProjectHeading projectName={activeProjectTitle ?? gt("Choose a project")}>
+          {projectSelector}
+        </DraftHeroProjectHeading>
+      ) : (
+        <h1 className="w-full text-center font-normal text-2xl text-foreground tracking-tight sm:text-3xl">
+          {isScratchDraft ? (
+            <T>What should we work on?</T>
+          ) : canChooseProject ? (
+            <T>
+              <Var>{projectSelector}</Var> to start
+            </T>
+          ) : (
+            <T>Add a project to start</T>
+          )}
+        </h1>
+      )}
+      {scratchWorkspaceRoot === null ? null : (
         <p className="mt-2 flex h-6 w-full items-center justify-center text-sm">
           {isScratchDraft ? projectSelector : orStartWithoutProject}
         </p>
-      ) : null}
+      )}
     </div>
   );
 }

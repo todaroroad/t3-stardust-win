@@ -15,8 +15,6 @@ import {
   type OrchestrationV2ThreadLaunchWorkspaceStrategy,
   type OrchestrationV2TurnItem,
   OrchestratorMcpFailure,
-  type OrchestratorMcpUsageLimitsInput,
-  type OrchestratorMcpUsageLimitsResult,
   type OrchestratorMcpCapabilitiesInput,
   type OrchestratorMcpCapabilitiesResult,
   type OrchestratorMcpModelOption,
@@ -122,8 +120,6 @@ import { isSnoozed } from "../orchestration-v2/ThreadSettlementService.ts";
 import { userFacingDispatchErrorMessage } from "../orchestration-v2/UserFacingErrors.ts";
 import * as ProjectService from "../project/ProjectService.ts";
 import * as ProviderRegistry from "../provider/ProviderRegistry.ts";
-import * as UsageLimitSources from "../usage/UsageLimitSources.ts";
-import { quotaAccounts, quotaReadingStale } from "@t3tools/shared/usageLimits";
 import * as ScheduledTaskService from "../scheduledTasks/ScheduledTaskService.ts";
 import * as ServerSettings from "../serverSettings.ts";
 import {
@@ -182,14 +178,6 @@ type TerminalTaskStatus = Extract<
 >;
 
 export interface OrchestratorMcpServiceShape {
-  readonly usageLimits: (
-    scope: McpInvocationScope,
-    input: OrchestratorMcpUsageLimitsInput,
-  ) => Effect.Effect<
-    OrchestratorMcpUsageLimitsResult,
-    OrchestratorMcpFailure,
-    UsageLimitSources.UsageLimitSources
-  >;
   readonly capabilities: (
     scope: McpInvocationScope,
     input?: OrchestratorMcpCapabilitiesInput,
@@ -2831,80 +2819,6 @@ const make = Effect.gen(function* () {
         );
       }
       return { status, secretRef: secretRef.value };
-    }),
-
-    usageLimits: Effect.fn("OrchestratorMcpService.usageLimits")(function* (scope, input) {
-      yield* loadCaller(scope, []);
-      const sources = yield* UsageLimitSources.UsageLimitSources;
-      let refreshFailed = false;
-      if (input.refresh === true) {
-        // Same probes as the popover's empty refreshProviders request. No secret reload,
-        // model-cache invalidation, settings writes, or reset-credit redemption.
-        const refreshed = yield* Effect.all([sources.refresh, providerRegistry.refresh()], {
-          concurrency: "unbounded",
-        }).pipe(Effect.timeout("20 seconds"), Effect.result);
-        refreshFailed = refreshed._tag === "Failure";
-      }
-      const providers = yield* providerRegistry.getProviders;
-      const usageLimitSources = yield* sources.current;
-      const now = DateTime.toEpochMillis(yield* DateTime.now);
-      const accounts = quotaAccounts(
-        new Map([
-          [
-            scope.environmentId,
-            {
-              entry: { target: { label: "This environment" } },
-              connection: { phase: "connected" },
-              serverConfig: { providers, usageLimitSources },
-            },
-          ],
-        ]),
-      ).map((account) => {
-        const unavailable =
-          account.limits?.unavailable ?? (account.failed ? { reason: "probeFailed" } : undefined);
-        const windows =
-          unavailable?.reason === "unsupported"
-            ? []
-            : (account.limits?.windows ?? []).map((window) => ({
-                label: window.label,
-                kind: window.kind,
-                ...(window.windowDurationMins === undefined
-                  ? {}
-                  : { windowDurationMins: window.windowDurationMins }),
-                remainingPercent: 100 - window.usedPercent,
-                resetsAt: window.resetsAt ?? null,
-              }));
-        return {
-          id: account.id,
-          provider: account.driver,
-          label: account.label,
-          alias: account.alias,
-          connected: account.connected,
-          stale: quotaReadingStale(
-            account.limits,
-            now,
-            account.connected,
-            account.failed || refreshFailed,
-          ),
-          remainingPercent: windows.length
-            ? Math.min(...windows.map((window) => window.remainingPercent))
-            : null,
-          windows,
-          ...(unavailable ? { unavailable: { reason: unavailable.reason } } : {}),
-        };
-      });
-      const timestamps = [
-        ...providers.map((provider) => provider.usageLimits?.checkedAt),
-        ...usageLimitSources.flatMap((source) => [
-          source.checkedAt,
-          ...source.accounts.map((account) => account.usageLimits.checkedAt),
-        ]),
-      ].filter((at): at is string => at !== undefined);
-      const checkedAt = timestamps.reduce<string | null>(
-        (latest, at) => (latest === null || Date.parse(at) > Date.parse(latest) ? at : latest),
-        null,
-      );
-      return { checkedAt, accounts };
     }),
 
     capabilities: Effect.fn("OrchestratorMcpService.capabilities")(function* (scope, input = {}) {

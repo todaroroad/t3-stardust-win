@@ -1,4 +1,3 @@
-import * as Schema from "effect/Schema";
 import { createMemoryHistory } from "@tanstack/react-router";
 import { scopeProjectRef, scopeThreadRef } from "@t3tools/client-runtime/environment";
 import {
@@ -6,7 +5,6 @@ import {
   IssueTrackerKind,
   ORCHESTRATION_V2_WS_METHODS,
   RunId,
-  TurnItemId,
   ThreadId,
   WS_METHODS,
   type IssueDetail,
@@ -19,6 +17,7 @@ import {
   mergeWithDefaultKeybindings,
 } from "@t3tools/shared/keybindings";
 import type * as Context from "effect/Context";
+import * as Schema from "effect/Schema";
 import * as Effect from "effect/Effect";
 import { expect, it, vi } from "vite-plus/test";
 import { cdp, page, userEvent } from "vite-plus/test/browser";
@@ -36,7 +35,6 @@ import { startWorkspaceFocus } from "~/lib/workspaceFocus";
 import { usePromptStashStore } from "~/promptStashStore";
 import { useRightPanelStore } from "~/rightPanelStore";
 import { getRouter } from "~/router";
-import { serverEnvironment } from "~/state/server";
 import { appAtomRegistry } from "~/rpc/atomRegistry";
 import { environmentThreadDetails } from "~/state/threads";
 import {
@@ -50,7 +48,6 @@ import {
   hasPendingAssetUrl,
   installFakeEnvironment,
   rejectPendingCommand,
-  runningRun,
   threadWithHistory,
   threadWithQuestion,
   type FakeDriver,
@@ -438,68 +435,6 @@ it("a new draft does not load its reserved thread before the server lists it", a
   expect(threadRequests).toEqual([]);
 });
 
-class FixtureSendError extends Schema.TaggedError<FixtureSendError>()("FixtureSendError", {
-  message: Schema.String,
-}) {}
-
-it("shows an idle draft send and attachment within 100ms and retries its failed RPC exactly", async () => {
-  using _environment = installFakeEnvironment([]);
-  __setClientSettingsForTests({
-    ...DEFAULT_CLIENT_SETTINGS,
-    onboardingCompletedAt: "2026-01-01T00:00:00.000Z",
-  });
-  const draftId = DraftId.make("draft-c81-instant");
-  useComposerDraftStore
-    .getState()
-    .setProjectDraftThreadId(scopeProjectRef(ENVIRONMENT_ID, PROJECT_ID), draftId, {
-      threadId: ThreadId.make("thread-c81-instant"),
-    });
-  using launch = holdRpc(
-    ORCHESTRATION_V2_WS_METHODS.launchThread,
-    Effect.fail(new FixtureSendError({ message: "Fixture connection failed" })),
-  );
-  const router = getRouter(createMemoryHistory({ initialEntries: [`/draft/${draftId}`] }));
-  await router.load();
-  await using _app = await render(<AppRoot router={router} />, {
-    // AppRoot provides the router.
-    router: false,
-  });
-  using _uploads = acceptAttachmentUploads();
-  const editor = page.getByTestId("composer-editor");
-  await expect.element(editor).toBeVisible();
-  await expect.element(page.getByText("render", { exact: true }).first()).toBeVisible();
-  using _timers = fakeTimers();
-  await act(() => vi.advanceTimersByTimeAsync(40000));
-  await userEvent.click(editor);
-  await userEvent.keyboard("Instant fixture message");
-  const clipboardData = new DataTransfer();
-  clipboardData.items.add(new File([PNG], "instant.png", { type: "image/png" }));
-  editor
-    .element()
-    .dispatchEvent(new ClipboardEvent("paste", { clipboardData, bubbles: true, cancelable: true }));
-  await act(() => vi.advanceTimersByTimeAsync(100));
-  await userEvent.keyboard("{Enter}");
-  await act(() => vi.advanceTimersByTimeAsync(100));
-  expect(document.querySelector("[data-send-feedback]")).not.toBeNull();
-  const optimisticRow = document.querySelector('[data-message-role="user"]');
-  expect(optimisticRow?.textContent).toContain("Instant fixture message");
-  expect(optimisticRow?.querySelector('img[alt="instant.png"]')).not.toBeNull();
-  await act(() => vi.advanceTimersByTimeAsync(900));
-  expect(launch.calls).toHaveLength(1);
-  expect(document.querySelector('[data-send-feedback="connecting"]')).not.toBeNull();
-  await act(() => vi.advanceTimersByTimeAsync(10000));
-  expect(document.body.textContent).toContain("confirm the connection");
-  launch.release();
-  await act(() => vi.advanceTimersByTimeAsync(100));
-  expect(document.querySelector('[data-send-feedback="failed"]')?.textContent).toContain(
-    "Fixture connection failed",
-  );
-  await userEvent.click(page.getByRole("button", { name: "Retry message" }));
-  await act(() => vi.advanceTimersByTimeAsync(100));
-  expect(launch.calls).toHaveLength(2);
-  expect(launch.calls[1]).toEqual(launch.calls[0]);
-});
-
 it("a failed image-only first send of a new thread keeps the new draft", async () => {
   using _environment = installFakeEnvironment([]);
   __setClientSettingsForTests({
@@ -798,70 +733,7 @@ it("a stashed prompt ending in a file chip restores with the chip", async () => 
   await expect.element(chip).toBeVisible();
 });
 
-it("replaces an optimistic row once and keeps the echoed thread stable across navigation", async () => {
-  const base = threadWithHistory("c81-echo", 1);
-  const other = threadWithHistory("c81-other", 1);
-  const items = [...base.items],
-    runs = [...base.runs];
-  const thread = { ...base, items, runs };
-  using _environment = installFakeEnvironment([thread, other], { acceptCommands: true });
-  __setClientSettingsForTests({
-    ...DEFAULT_CLIENT_SETTINGS,
-    onboardingCompletedAt: "2026-01-01T00:00:00.000Z",
-  });
-  const router = getRouter(
-    createMemoryHistory({ initialEntries: [`/${ENVIRONMENT_ID}/${thread.id}`] }),
-  );
-  await router.load();
-  await using _app = await render(<AppRoot router={router} />, {
-    // AppRoot supplies the router.
-    router: false,
-  });
-  await expect.element(page.getByText(`Answer 0 for ${thread.id}.`)).toBeVisible();
-  await userEvent.click(page.getByTestId("composer-editor"));
-  await userEvent.keyboard("Echo exactly once{Enter}");
-  await expect.element(page.getByText("Echo exactly once", { exact: true })).toBeVisible();
-  await vi.waitFor(() =>
-    expect(dispatchedCommands().some((c) => c.type === "message.dispatch")).toBe(true),
-  );
-  const command = dispatchedCommands().find((c) => c.type === "message.dispatch")!;
-  if (command.type !== "message.dispatch") throw new Error("Missing fixture dispatch");
-  const run = runningRun(thread.id, "c81-new-run", 2, command.messageId);
-  const original = items.find((item) => item.type === "user_message")!;
-  if (original.type !== "user_message") throw new Error("Missing fixture user item");
-  const echo = {
-    ...original,
-    id: TurnItemId.make("c81-echo-item"),
-    messageId: command.messageId,
-    text: command.text,
-    ordinal: 2,
-    runId: run.id,
-  };
-  runs.push(run);
-  items.push(echo);
-  await act(() => emitThreadEvent(thread.id, { type: "run.updated", payload: run }));
-  await act(() => emitThreadEvent(thread.id, { type: "turn-item.updated", payload: echo }));
-  expect(page.getByText("Echo exactly once", { exact: true }).all()).toHaveLength(1);
-  await act(() =>
-    router.navigate({
-      to: "/$environmentId/$threadId",
-      params: { environmentId: ENVIRONMENT_ID, threadId: other.id },
-    }),
-  );
-  await expect.element(page.getByText(`Answer 0 for ${other.id}.`)).toBeVisible();
-  expect(page.getByText("Echo exactly once", { exact: true }).query()).toBeNull();
-  expect(document.querySelector("[data-send-feedback]")).toBeNull();
-  await act(() =>
-    router.navigate({
-      to: "/$environmentId/$threadId",
-      params: { environmentId: ENVIRONMENT_ID, threadId: thread.id },
-    }),
-  );
-  await expect.element(page.getByText("Echo exactly once", { exact: true })).toBeVisible();
-  expect(page.getByText("Echo exactly once", { exact: true }).all()).toHaveLength(1);
-});
-
-it("a rejected send stays in place with exact retry while a new draft is preserved", async () => {
+it("a rejected send leaves the timeline when a new draft was typed meanwhile", async () => {
   const thread = threadWithHistory("rejected-send", 1);
   using _environment = installFakeEnvironment([thread], {
     acceptCommands: true,
@@ -893,32 +765,8 @@ it("a rejected send stays in place with exact retry while a new draft is preserv
   await rejectPendingCommand("Attachment 'sample.png' cannot be sent.");
 
   await expect.element(page.getByText("Attachment 'sample.png' cannot be sent.")).toBeVisible();
-  await expect.element(page.getByText("Failed prompt", { exact: true })).toBeVisible();
-  await expect.element(page.getByRole("button", { name: "Retry message" })).toBeVisible();
+  await expect.element(page.getByText("Failed prompt")).not.toBeInTheDocument();
   expect(editor.element().textContent).toContain("Next draft");
-  const command = dispatchedCommands().find((c) => c.type === "message.dispatch")!;
-  if (command.type !== "message.dispatch") throw new Error("Missing fixture dispatch");
-  const run = runningRun(thread.id, "late-confirmed-run", 2, command.messageId);
-  const original = thread.items.find((item) => item.type === "user_message")!;
-  if (original.type !== "user_message") throw new Error("Missing fixture user item");
-  await act(() => emitThreadEvent(thread.id, { type: "run.updated", payload: run }));
-  await act(() =>
-    emitThreadEvent(thread.id, {
-      type: "turn-item.updated",
-      payload: {
-        ...original,
-        id: TurnItemId.make("late-confirmed-item"),
-        messageId: command.messageId,
-        text: command.text,
-        ordinal: 2,
-        runId: run.id,
-      },
-    }),
-  );
-  await vi.waitFor(() =>
-    expect(document.querySelector('[data-send-feedback="failed"]')).toBeNull(),
-  );
-  expect(page.getByText("Failed prompt", { exact: true }).all()).toHaveLength(1);
 });
 
 it("Enter on an empty prompt resumes an interrupted thread", async () => {
@@ -1066,11 +914,6 @@ it("a shortcut conditioned on rightPanelOpen sees the thread's open right panel"
     createMemoryHistory({ initialEntries: [`/${ENVIRONMENT_ID}/${thread.id}`] }),
   );
   await router.load();
-  await act(() =>
-    appAtomRegistry.refresh(
-      serverEnvironment.configProjection({ environmentId: ENVIRONMENT_ID, input: {} }),
-    ),
-  );
   await using _app = await render(<AppRoot router={router} />, {
     // AppRoot brings its own router.
     router: false,
@@ -1078,19 +921,9 @@ it("a shortcut conditioned on rightPanelOpen sees the thread's open right panel"
   const composer = page.getByTestId("composer-editor");
   const toggle = page.getByRole("button", { name: "Toggle right panel", exact: true });
   await expect.element(toggle).toHaveAttribute("aria-pressed", "false");
-  await toggle.click({ timeout: 3000 });
-  await page.getByRole("button", { name: /^Files/ }).click({ timeout: 3000 });
-  await composer.click({ timeout: 3000 });
-  expect(
-    appAtomRegistry.get(serverEnvironment.configValueAtom(ENVIRONMENT_ID))?.keybindings,
-    "current fixture keybindings",
-  ).toContainEqual(
-    expect.objectContaining({
-      command: "rightPanel.new",
-      shortcut: expect.objectContaining({ ctrlKey: true, key: "t" }),
-      whenAst: expect.objectContaining({ type: "and" }),
-    }),
-  );
+  await toggle.click();
+  await page.getByRole("button", { name: /^Files/ }).click();
+  await composer.click();
   await userEvent.keyboard("{Control>}t{/Control}");
   await expect.element(page.getByRole("menuitem", { name: /Files/ })).toBeVisible();
   await expect.element(toggle).toHaveAttribute("aria-pressed", "true");

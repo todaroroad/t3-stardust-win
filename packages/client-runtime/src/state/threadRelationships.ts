@@ -87,18 +87,6 @@ export function deriveThreadRelationshipGraph(input: {
       ? [...threads, { ...selectedThread, activityRunStatus: null, status: null }]
       : threads;
   for (const thread of lineageThreads) {
-    if (
-      thread.continuedFromThreadId != null &&
-      thread.lineage.relationshipToParent == null &&
-      thread.forkedFrom == null
-    ) {
-      addEdge({
-        sourceThreadId: thread.continuedFromThreadId,
-        targetThreadId: thread.id,
-        kind: "transfer",
-        status: thread.activityRunStatus ?? thread.status,
-      });
-    }
     const parentThreadId =
       thread.forkedFrom?.type === "run"
         ? thread.forkedFrom.threadId
@@ -140,18 +128,6 @@ export function deriveThreadRelationshipGraph(input: {
   }
 
   return { nodes, edges: [...edgesByKey.values()] };
-}
-
-export function relatedThreadIds(
-  graph: ThreadRelationshipGraph,
-  threadId: ThreadId,
-): ReadonlyArray<ThreadId> {
-  const ids = new Set<ThreadId>();
-  for (const edge of graph.edges) {
-    if (edge.sourceThreadId === threadId) ids.add(edge.targetThreadId);
-    if (edge.targetThreadId === threadId) ids.add(edge.sourceThreadId);
-  }
-  return [...ids];
 }
 
 export function immediateThreadRelationships(

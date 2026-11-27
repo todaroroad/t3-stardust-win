@@ -187,9 +187,3 @@ describe("pull request worktree permissions", () => {
     expect(state.setupScripts).toBe(0);
   });
 });
-
-// These permission tests invoke hooks with a stubbed React runtime.
-vi.mock("~/i18n/useUiText", async () => {
-  const { uiText } = await import("~/i18n");
-  return { useUiText: () => uiText };
-});

@@ -11,11 +11,12 @@ import type {
 import { withMessageSenderNote } from "@t3tools/contracts";
 
 import * as Config from "effect/Config";
-export const DEFAULT_HANDOFF_TOKEN_CAP = 16000;
-const HANDOFF_BYTE_CAP = 64000;
+
+export const DEFAULT_HANDOFF_TOKEN_CAP = 16_000;
+const HANDOFF_BYTE_CAP = 64_000;
 export const handoffTokenCapConfig = Config.Int("T3CODE_CONTEXT_HANDOFF_TOKEN_CAP").pipe(
   Config.withDefault(DEFAULT_HANDOFF_TOKEN_CAP),
-  Config.map((value) => Math.max(1024, Math.min(HANDOFF_BYTE_CAP, value))),
+  Config.map((value) => Math.max(1_024, Math.min(HANDOFF_BYTE_CAP, value))),
 );
 
 // Only accepted roots with matching native identity count; row reuse must not revive old usage.
@@ -90,7 +91,7 @@ export function attachmentTokenAllowance(attachments: ReadonlyArray<ChatAttachme
   // https://developers.openai.com/api/docs/guides/image-cost-calculator
   // https://platform.claude.com/docs/en/build-with-claude/vision
   return attachments.reduce(
-    (sum, attachment) => sum + (attachment.type === "image" ? 8192 : 4096),
+    (sum, attachment) => sum + (attachment.type === "image" ? 8_192 : 4_096),
     0,
   );
 }
@@ -111,7 +112,7 @@ export function handoffBudget(input: {
 }): number {
   const usage = input.providerThread.contextUsage;
   const window = Math.min(
-    input.modelContextWindow ?? usage?.maxTokens ?? 128000,
+    input.modelContextWindow ?? usage?.maxTokens ?? 128_000,
     usage?.maxTokens ?? Infinity,
     usage?.autoCompactThreshold ?? Infinity,
   );
@@ -147,16 +148,6 @@ export function historicalMessage(
         `Command: ${item.input}`,
         `Exit code: ${item.exitCode ?? "unknown"}`,
         item.output ?? "",
-      ].join("\n");
-      break;
-    case "dynamic_tool":
-      // Carry the durable receipt, not arbitrary payloads (which can contain
-      // images or secrets). A cancelled call may already have changed its target.
-      text = [
-        `Tool: ${item.toolName ?? "unknown"}`,
-        `Recorded status: ${item.status}`,
-        `Read the original result with t3_thread_read({threadId:${JSON.stringify(item.threadId)},itemId:${JSON.stringify(item.id)}}).`,
-        "A tool status is not business acceptance. Check the target before retrying an external write whose outcome is uncertain.",
       ].join("\n");
       break;
     case "error":

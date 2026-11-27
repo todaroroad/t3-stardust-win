@@ -1,5 +1,3 @@
-
-
 import {
   EMPTY_PULL_REQUEST_DIFF_FOLDS,
   foldAllPullRequestDiffs,
@@ -99,7 +97,7 @@ import {
   resolveFileDiffPreviousPath,
   type RenderablePatch,
 } from "~/lib/diffRendering";
-import { appBaseName } from "~/branding";
+import { APP_BASE_NAME } from "~/branding";
 import { PREFERRED_HIGHLIGHTER } from "~/lib/syntaxHighlighting";
 import { cn } from "~/lib/utils";
 import { createPullRequestDiffFileContentsLoader } from "~/lib/diffFileContents";
@@ -375,6 +373,7 @@ function FileViewedToggle({
     </span>
   );
 }
+
 interface MutableAnnotationGroup {
   readonly side: PullRequestDiffSide;
   readonly line: number;
@@ -1196,6 +1195,7 @@ function PullRequestCodeTab({
         ) : null}
       </div>
     );
+
   const renderHeaderPrefix = (item: CodeViewItem<ReviewAnnotationGroup>) => {
     const collapsed = item.collapsed === true;
     return (
@@ -1555,7 +1555,7 @@ function PullRequestCodeTab({
               </span>
               <span className="truncate">
                 {viewedFilesStore === "environment"
-                  ? gt("viewed in {app}", { app: appBaseName() })
+                  ? gt("viewed in {app}", { app: APP_BASE_NAME })
                   : gt("viewed", { $context: "files marked as viewed" })}
               </span>
               {viewedFilesStore === "environment" ? (
@@ -1926,9 +1926,11 @@ function PullRequestCodeTab({
       />,
     );
   }
+
   if (rawSlicesView !== null) {
     return withToolbar(rawSlicesView);
   }
+
   if (items.length === 0 && nextCursor === null) {
     if (hiddenTestFilesLabel !== null && files.length === 0) {
       return withToolbar(

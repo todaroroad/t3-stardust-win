@@ -1,4 +1,3 @@
-import { uiText } from "../../i18n";
 import type {
   BackgroundActivityProfile,
   BackgroundActivitySettings,
@@ -82,10 +81,6 @@ export function hasChangedBackgroundActivitySettings(
 
 type TypographySettings = Pick<
   UnifiedSettings,
-  | "fontFamilySidebar"
-  | "fontSizeSidebar"
-  | "sidebarTextColorLight"
-  | "sidebarTextColorDark"
   | "fontFamilySans"
   | "fontFamilyComposer"
   | "fontFamilyCode"
@@ -101,12 +96,6 @@ export function getChangedTypographySettingLabels(
   resolve: MessageResolver = m,
 ): string[] {
   return [
-    ...(settings.fontFamilySidebar !== DEFAULT_UNIFIED_SETTINGS.fontFamilySidebar ||
-    settings.fontSizeSidebar !== DEFAULT_UNIFIED_SETTINGS.fontSizeSidebar ||
-    settings.sidebarTextColorLight !== DEFAULT_UNIFIED_SETTINGS.sidebarTextColorLight ||
-    settings.sidebarTextColorDark !== DEFAULT_UNIFIED_SETTINGS.sidebarTextColorDark
-      ? [uiText("Sidebar.")]
-      : []),
     ...(settings.fontFamilySans !== DEFAULT_UNIFIED_SETTINGS.fontFamilySans ||
     settings.fontSizeInterface !== DEFAULT_UNIFIED_SETTINGS.fontSizeInterface
       ? [resolve(msg("Interface font"))]

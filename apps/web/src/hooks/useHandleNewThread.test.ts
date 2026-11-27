@@ -26,7 +26,6 @@ const testState = vi.hoisted(() => {
     readonly promotedTo: null;
     readonly threadId: string;
   } | null = null;
-  let populatedDraftIds = new Set<string>();
   let openDraftRoute: { readonly kind: "draft"; readonly draftId: string } | null = null;
   const router = {
     state: {
@@ -41,10 +40,7 @@ const testState = vi.hoisted(() => {
     }),
   };
   const draftStore = {
-    getComposerDraft: vi.fn((draftId: string) => ({
-      draftId,
-      ...(populatedDraftIds.has(draftId) ? { prompt: "populated" } : {}),
-    })),
+    getComposerDraft: vi.fn((draftId: string) => ({ draftId })),
     getDraftSessionByLogicalProjectKey: vi.fn(() => storedDraft),
     getDraftSession: vi.fn(() =>
       openDraftRoute === null
@@ -93,9 +89,6 @@ const testState = vi.hoisted(() => {
     get openDraftRoute() {
       return openDraftRoute;
     },
-    giveUserText(draftId: string) {
-      populatedDraftIds.add(draftId);
-    },
     openEmptyDraft(draftId: string) {
       openDraftRoute = { kind: "draft", draftId };
     },
@@ -110,7 +103,6 @@ const testState = vi.hoisted(() => {
       },
     ) {
       storedDraft = nextStoredDraft;
-      populatedDraftIds = new Set();
       openDraftRoute = null;
       draftSession = {
         environmentId: "environment-ssh",
@@ -175,8 +167,7 @@ vi.mock("@t3tools/client-runtime/environment", () => ({
   scopeProjectRef: (environmentId: string, projectId: string) => ({ environmentId, projectId }),
   scopeThreadRef: (environmentId: string, threadId: string) => ({ environmentId, threadId }),
 }));
-vi.mock("@t3tools/contracts", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@t3tools/contracts")>()),
+vi.mock("@t3tools/contracts", () => ({
   DEFAULT_RUNTIME_MODE: "default",
   DEFAULT_SERVER_SETTINGS: {},
 }));
@@ -458,24 +449,4 @@ describe("default project selection", () => {
       ),
     ).toEqual({ environmentId: "first", projectId: "project" });
   });
-});
-
-it("opens a distinct setup draft without replacing an existing populated draft", async () => {
-  testState.reset({
-    draftId: "draft-existing",
-    environmentId: "environment-ssh",
-    promotedTo: null,
-    threadId: "thread-existing",
-  });
-  testState.giveUserText("draft-existing");
-  const opened = await useNewThreadHandler()(
-    { environmentId: "environment-ssh", projectId: "project-remote" } as never,
-    { prompt: "Connect Claude", forceNew: true, envMode: "local" },
-  );
-  expect(opened?.draftId).not.toBe("draft-existing");
-  expect(testState.draftStore.setPrompt).toHaveBeenCalledWith(opened?.draftId, "Connect Claude");
-  expect(testState.draftStore.setPrompt).not.toHaveBeenCalledWith(
-    "draft-existing",
-    expect.anything(),
-  );
 });

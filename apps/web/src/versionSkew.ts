@@ -10,15 +10,6 @@ import * as Schema from "effect/Schema";
 import { msg } from "gt-react";
 
 import { APP_VERSION } from "./branding";
-
-function mapStardustVersionToOfficial(version: string): string {
-  const match = /^1\.(\d+)\.\d+$/.exec(version.trim());
-  if (!match) return version;
-  const mappedMinor = Number(match[1]);
-  return mappedMinor < 100
-    ? `0.1.${mappedMinor}`
-    : `0.${Math.floor(mappedMinor / 100)}.${mappedMinor % 100}`;
-}
 import { getLocalStorageItem, setLocalStorageItem } from "./hooks/useLocalStorage";
 import { m, type MessageResolver } from "./i18n/messages";
 
@@ -55,12 +46,17 @@ function versionCore(version: string): string {
   return version.replace(/[-+].*$/, "");
 }
 
+function toOfficialCompatVersion(version: string): string {
+  const m = /^1\.(\d+)\.\d+(?:[-+].*)?$/.exec(version.trim());
+  return m ? `0.1.${m[1]}` : version;
+}
+
 export function resolveVersionMismatch(
   serverVersion: string | null | undefined,
-  clientVersion: string = mapStardustVersionToOfficial(APP_VERSION),
+  clientVersion: string = APP_VERSION,
   resolve: MessageResolver = m,
 ): VersionMismatch | null {
-  const normalizedClientVersion = normalizeVersion(clientVersion);
+  const normalizedClientVersion = normalizeVersion(clientVersion ? toOfficialCompatVersion(clientVersion) : clientVersion);
   const normalizedServerVersion = normalizeVersion(serverVersion);
   if (!normalizedClientVersion || !normalizedServerVersion) {
     return null;
@@ -92,17 +88,16 @@ export function resolveVersionMismatch(
 }
 
 export function resolveServerConfigVersionMismatch(
-  _serverConfig: Pick<ServerConfig, "environment"> | null | undefined,
-  _resolve: MessageResolver = m,
+  serverConfig: Pick<ServerConfig, "environment"> | null | undefined,
+  resolve: MessageResolver = m,
 ): VersionMismatch | null {
-  // T3星辰版 disables remote server version-skew prompts & updates.
-  return null;
+  return resolveVersionMismatch(serverConfig?.environment.serverVersion, APP_VERSION, resolve);
 }
 
 export function resolveServerSelfUpdateCapability(
-  serverConfig: Pick<ServerConfig, "environment"> | null | undefined,
+  _serverConfig: Pick<ServerConfig, "environment"> | null | undefined,
 ): ServerSelfUpdateCapability | null {
-  return serverConfig?.environment.capabilities.serverSelfUpdate ?? null;
+  return null;
 }
 
 export function supportsDesktopAppUpdate(

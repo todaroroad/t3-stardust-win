@@ -1,4 +1,3 @@
-import * as SpotlightSearch from "./SpotlightSearch.ts";
 import {
   IsoDateTime,
   MessageId,
@@ -418,9 +417,6 @@ const OlderSettledTitleRow = Schema.Struct({
 /** @public */
 export const make = Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient;
-  const spotlight = Option.getOrUndefined(
-    yield* Effect.serviceOption(SpotlightSearch.SpotlightSearch),
-  );
 
   const searchRows = SqlSchema.findAll({
     Request: SearchRequest,
@@ -636,11 +632,7 @@ export const make = Effect.gen(function* () {
   });
 
   const search: ThreadSearch["Service"]["search"] = (input) =>
-    input.searchMode === "spotlight" && spotlight
-      ? spotlight
-          .search(input.query, input.limit ?? 50)
-          .pipe(Effect.mapError((cause) => new ThreadSearchError({ operation: "query", cause })))
-      : searchMessages({ ...input, projectId: null });
+    searchMessages({ ...input, projectId: null });
 
   const searchThreads: ThreadSearch["Service"]["searchThreads"] = Effect.fn(
     "ThreadSearch.searchThreads",

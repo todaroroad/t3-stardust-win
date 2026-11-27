@@ -467,39 +467,3 @@ it("opening a thread or removing its environment closes only its in-app toasts, 
   app.changeSettings();
   expect(state.closeToast.mock.calls.slice(3)).toEqual([["one-other"]]);
 });
-
-it("holds completion while a delegated subagent runs, hints once in-app, and completes exactly once", async () => {
-  await using app = setup();
-  state.mode = "notifications-and-sound";
-  state.inApp = true;
-  focused = true;
-  app.start();
-  const turn = (turnId: string, completedAt: string | null) => ({
-    latestTurn: { turnId, state: completedAt ? "completed" : "running", completedAt },
-  });
-  const withTasks = (
-    overrides: Partial<typeof thread>,
-    pendingBackgroundTasks: ReadonlyArray<{ taskId: string; kind: "subagent" }>,
-  ) => ({
-    status: "live",
-    snapshot: Option.some({
-      threads: [{ ...toV2ThreadShell({ ...thread, ...overrides }), pendingBackgroundTasks }],
-    }),
-  });
-  const child = [{ taskId: "delegate", kind: "subagent" as const }];
-  const titles = () => TestNotification.sent.map(({ title }) => title);
-  const toasts = () => state.toast.mock.calls.map(([toast]) => toast.title);
-  state.shells.set("one", withTasks(turn("turn", null), []));
-  state.shells.set("one", withTasks(turn("turn", "2026-09-13T07:00:05.000Z"), child));
-  state.shells.set("one", withTasks(turn("turn", "2026-09-13T07:00:05.000Z"), child));
-  // Only the light hint: no completion toast, system notification or sound.
-  expect(toasts()).toEqual(["Waiting for background tasks"]);
-  expect(titles()).toEqual([]);
-  expect(state.sound).not.toHaveBeenCalled();
-  state.shells.set("one", withTasks(turn("turn", "2026-09-13T07:00:05.000Z"), []));
-  state.shells.set("one", withTasks(turn("turn", "2026-09-13T07:00:05.000Z"), []));
-  expect(toasts()).toEqual(["Waiting for background tasks", "Thread completed"]);
-  expect(titles()).toEqual([]);
-  expect(state.sound).toHaveBeenCalledTimes(1);
-  expect(state.closeToast).toHaveBeenCalledTimes(1);
-});

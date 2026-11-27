@@ -17,7 +17,6 @@ import { applyLanguage, m, onLocaleChange } from "../i18n/messages.ts";
 import * as DesktopClientSettings from "../settings/DesktopClientSettings.ts";
 import * as DesktopUpdates from "../updates/DesktopUpdates.ts";
 import * as DesktopWindow from "./DesktopWindow.ts";
-import { localizeApplicationMenu } from "./menuLocale.ts";
 
 export class DesktopApplicationMenuActionError extends Schema.TaggedError<DesktopApplicationMenuActionError>()(
   "DesktopApplicationMenuActionError",
@@ -30,18 +29,23 @@ export class DesktopApplicationMenuActionError extends Schema.TaggedError<Deskto
     return `Desktop menu action "${this.action}" failed.`;
   }
 }
+
 export class DesktopApplicationMenu extends Context.Service<
   DesktopApplicationMenu,
   {
     readonly configure: Effect.Effect<void>;
   }
 >()("@t3tools/desktop/window/DesktopApplicationMenu") {}
+
 type DesktopApplicationMenuRuntimeServices =
   | DesktopUpdates.DesktopUpdates
   | DesktopWindow.DesktopWindow
   | ElectronDialog.ElectronDialog;
+
 const { logInfo: logUpdaterInfo } = makeComponentLogger("desktop-updater");
+
 const { logError: logMenuError } = makeComponentLogger("desktop-menu");
+
 const dispatchMenuAction = Effect.fn("desktop.menu.dispatchMenuAction")(function* (
   action: string,
 ): Effect.fn.Return<void, DesktopWindow.DesktopWindowError, DesktopWindow.DesktopWindow> {
@@ -203,6 +207,7 @@ export const make = Effect.gen(function* () {
       ),
     );
   };
+
   const configure = Effect.gen(function* () {
     const checkForUpdatesClick = () => {
       runMenuEffect("check-for-updates", handleCheckForUpdatesMenuClick);
@@ -232,6 +237,7 @@ export const make = Effect.gen(function* () {
       runMenuEffect(command, runMainContentsCommand(command));
     };
     const template: Electron.MenuItemConstructorOptions[] = [];
+
     if (environment.platform === "darwin") {
       template.push({
         label: environment.displayName,
@@ -261,6 +267,7 @@ export const make = Effect.gen(function* () {
         ],
       });
     }
+
     template.push(
       {
         label: m(msg("File", { $context: "menu bar title" })),
@@ -420,19 +427,8 @@ export const make = Effect.gen(function* () {
         ],
       },
     );
-    const settingsService = yield* Effect.serviceOption(
-      DesktopClientSettings.DesktopClientSettings,
-    );
-    const settings = Option.isSome(settingsService)
-      ? yield* settingsService.value.get.pipe(Effect.orElseSucceed(() => Option.none()))
-      : Option.none();
-    const language = Option.isSome(settings) ? settings.value.language : "system";
-    const app = yield* Effect.serviceOption(ElectronApp.ElectronApp);
-    const systemLanguage = Option.isSome(app) ? yield* app.value.systemLocale : "en";
-    const locale = (language === "system" ? systemLanguage : language).startsWith("zh")
-      ? "zh-CN"
-      : "en";
-    yield* electronMenu.setApplicationMenu(localizeApplicationMenu(template, locale));
+
+    yield* electronMenu.setApplicationMenu(template);
   }).pipe(Effect.withSpan("desktop.menu.configure"));
 
   // Load the saved language before the first build so the menu never starts in English.
@@ -460,4 +456,5 @@ export const make = Effect.gen(function* () {
     ),
   });
 });
+
 export const layer = Layer.effect(DesktopApplicationMenu, make);

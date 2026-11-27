@@ -1,4 +1,3 @@
-
 import { findErrorTraceId, thrownErrorMessage } from "@t3tools/client-runtime/errors";
 import {
   isAtomCommandInterrupted,
@@ -294,7 +293,7 @@ export function T3ConnectUserProfilePage() {
             <p className="font-medium text-destructive-foreground">
               <T>Could not load T3 Connect environments</T>
             </p>
-            <p className={"mt-1 text-xs text-muted-foreground"}>{environmentsState.error}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{environmentsState.error}</p>
           </div>
         ) : null}
 
@@ -303,7 +302,7 @@ export function T3ConnectUserProfilePage() {
             <T>Loading environments…</T>
           </p>
         ) : environments.length > 0 ? (
-          <ul className={"border-t"}>
+          <ul className="border-t">
             {environments.map((environment) => (
               <T3ConnectEnvironmentRow
                 key={environment.environmentId}
@@ -318,9 +317,9 @@ export function T3ConnectUserProfilePage() {
             ))}
           </ul>
         ) : environmentsState.error ? null : (
-          <div className={"border-t"}>
-            <Empty size={"compact"}>
-              <EmptyMedia variant={"icon"}>
+          <div className="border-t">
+            <Empty size="compact">
+              <EmptyMedia variant="icon">
                 <ServerIcon />
               </EmptyMedia>
               <EmptyHeader>

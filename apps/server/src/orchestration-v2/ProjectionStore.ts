@@ -601,12 +601,6 @@ export interface ProjectionStoreV2Shape {
     ReadonlyMap<MessageId, OrchestrationV2ConversationMessage>,
     ProjectionStoreV2Error
   >;
-  readonly getArchiveBlockReason: (
-    threadId: ThreadId,
-  ) => Effect.Effect<
-    "active-run" | "pending-request" | "active-child" | "scheduled-task" | "unavailable" | null,
-    ProjectionStoreV2Error
-  >;
   readonly getThreadRecords: <K extends ProjectionRecordField>(
     threadId: ThreadId,
     fields: ReadonlyArray<K>,
@@ -1979,9 +1973,6 @@ export function threadShellFromProjection(
       ? {}
       : { activeOrderKey: projection.thread.activeOrderKey }),
     lineage: projection.thread.lineage,
-    ...(projection.thread.continuedFromThreadId === undefined
-      ? {}
-      : { continuedFromThreadId: projection.thread.continuedFromThreadId }),
     forkedFrom: projection.thread.forkedFrom,
     activeProviderThreadId: projection.thread.activeProviderThreadId,
     ...(projection.thread.historyOrigin === undefined
@@ -2303,9 +2294,6 @@ function shellFromState(input: {
       ? {}
       : { activeOrderKey: input.state.thread.activeOrderKey }),
     lineage: input.state.thread.lineage,
-    ...(input.state.thread.continuedFromThreadId === undefined
-      ? {}
-      : { continuedFromThreadId: input.state.thread.continuedFromThreadId }),
     forkedFrom: input.state.thread.forkedFrom,
     activeProviderThreadId: input.state.thread.activeProviderThreadId,
     ...(input.state.thread.historyOrigin === undefined
@@ -7066,39 +7054,6 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
       (effect, threadId) => effect.pipe(Effect.mapError(controlReadError(threadId))),
     );
 
-    const getArchiveBlockReason: ProjectionStoreV2Shape["getArchiveBlockReason"] = Effect.fn(
-      "ProjectionStore.getArchiveBlockReason",
-    )(function* (threadId) {
-      return yield* sql<{
-        reason: "active-run" | "pending-request" | "active-child" | "scheduled-task" | null;
-      }>`
-        SELECT CASE
-          WHEN EXISTS (SELECT 1 FROM scheduled_tasks WHERE thread_id = ${threadId} AND enabled = 1)
-            THEN 'scheduled-task'
-          WHEN EXISTS (SELECT 1 FROM orchestration_v2_projection_runs
-            WHERE thread_id = ${threadId} AND status IN ('preparing', 'queued', 'starting', 'running', 'waiting'))
-            THEN 'active-run'
-          WHEN EXISTS (SELECT 1 FROM orchestration_v2_projection_runtime_requests
-            WHERE thread_id = ${threadId} AND status = 'pending')
-            THEN 'pending-request'
-          WHEN EXISTS (SELECT 1 FROM orchestration_v2_projection_subagents
-            WHERE thread_id = ${threadId} AND status IN ('pending', 'queued', 'starting', 'running', 'waiting'))
-            OR EXISTS (SELECT 1 FROM orchestration_v2_projection_threads child
-              WHERE child.deleted_at IS NULL
-                AND json_extract(child.payload_json, '$.lineage.parentThreadId') = ${threadId}
-                AND json_extract(child.payload_json, '$.lineage.relationshipToParent') = 'subagent'
-                AND (EXISTS (SELECT 1 FROM orchestration_v2_projection_runs run
-                  WHERE run.thread_id = child.thread_id
-                    AND run.status IN ('preparing', 'queued', 'starting', 'running', 'waiting'))
-                  OR EXISTS (SELECT 1 FROM orchestration_v2_projection_runtime_requests request
-                    WHERE request.thread_id = child.thread_id AND request.status = 'pending')))
-            THEN 'active-child'
-          ELSE NULL END AS reason
-      `.pipe(
-        Effect.map((rows) => rows[0]?.reason ?? null),
-        Effect.mapError((cause) => new ProjectionStoreReadError({ threadId, cause })),
-      );
-    });
     const getForkSourceRunIds = Effect.fn("ProjectionStore.getForkSourceRunIds")(
       function* (threadId: ThreadId) {
         const rows = yield* sql<{ readonly run_ids: string }>`
@@ -10085,7 +10040,6 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
       getNextTurnItemOrdinal: readOnReader(getNextTurnItemOrdinal),
       getTurnItem: readOnReader(getTurnItem),
       getMessagesById: readOnReader(getMessagesById),
-      getArchiveBlockReason: readOnReader(getArchiveBlockReason),
       getForkSourceRunIds: readOnReader(getForkSourceRunIds),
       getThreadRecords: (threadId, fields, filter) =>
         getThreadRecords(threadId, fields, filter).pipe(NodeSqliteClient.readOnly),

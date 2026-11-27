@@ -1,6 +1,3 @@
-
-
-
 import {
   type ProviderApprovalDecision,
   type ProviderApprovalOption,
@@ -27,7 +24,7 @@ interface ComposerPendingApprovalActionsProps {
   ) => Promise<unknown>;
 }
 
-export const DEFAULT_APPROVAL_OPTIONS: ReadonlyArray<ProviderApprovalOption> = [
+const DEFAULT_APPROVAL_OPTIONS = [
   {
     decision: "cancel",
     label: msg("Cancel", { $context: "verb, response to an approval request" }),
@@ -41,7 +38,7 @@ export const DEFAULT_APPROVAL_OPTIONS: ReadonlyArray<ProviderApprovalOption> = [
     decision: "accept",
     label: msg("Approve", { $context: "verb, response to an approval request" }),
   },
-];
+] satisfies ReadonlyArray<ProviderApprovalOption>;
 
 export const ComposerPendingApprovalActions = memo(function ComposerPendingApprovalActions({
   presentation = "composer",

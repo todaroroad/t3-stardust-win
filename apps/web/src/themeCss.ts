@@ -5,6 +5,9 @@ import { themeCssValueFetches, themeCssWithoutDeclarations } from "@t3tools/shar
 // The browser parses the text first, so the checks see normalized values and
 // CSS escapes in a function name cannot dodge them.
 
+let themeSheet: CSSStyleSheet | null = null;
+let appliedCss = "";
+
 type RuleParent = Pick<CSSStyleSheet, "cssRules" | "deleteRule">;
 
 // @keyframes also has both members, but its deleteRule takes a keyframe selector.
@@ -99,21 +102,16 @@ function stripFetches(parent: RuleParent): void {
   }
 }
 
-export function createThemeCssApplier() {
-  let themeSheet: CSSStyleSheet | null = null;
-  let appliedCss = "";
-  return function applyThemeCss(css: string | undefined): void {
-    if (typeof document === "undefined" || typeof CSSStyleSheet === "undefined") return;
-    const next = css ?? "";
-    if (next === appliedCss) return;
-    appliedCss = next;
-    if (!themeSheet) {
-      // Adopted sheets order after the document's own, and they cannot hold @import.
-      themeSheet = new CSSStyleSheet();
-      document.adoptedStyleSheets = [...document.adoptedStyleSheets, themeSheet];
-    }
-    themeSheet.replaceSync(withoutFetchingShorthands(next));
-    stripFetches(themeSheet);
-  };
+export function applyThemeCss(css: string | undefined): void {
+  if (typeof document === "undefined" || typeof CSSStyleSheet === "undefined") return;
+  const next = css ?? "";
+  if (next === appliedCss) return;
+  appliedCss = next;
+  if (!themeSheet) {
+    // Adopted sheets order after the document's own, and they cannot hold @import.
+    themeSheet = new CSSStyleSheet();
+    document.adoptedStyleSheets = [...document.adoptedStyleSheets, themeSheet];
+  }
+  themeSheet.replaceSync(withoutFetchingShorthands(next));
+  stripFetches(themeSheet);
 }
-export const applyThemeCss = createThemeCssApplier();

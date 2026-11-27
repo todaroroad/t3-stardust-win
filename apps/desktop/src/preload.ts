@@ -13,14 +13,6 @@ import { contextBridge, ipcRenderer, webFrame, webUtils } from "electron";
 
 import * as IpcChannels from "./ipc/channels.ts";
 import { mergeLegacyLocalStorage } from "./legacyLocalStorageMerge.ts";
-import { createLocalBootstrapCache } from "./localBootstrapCache.ts";
-const localBootstraps = createLocalBootstrapCache(() => {
-  const result = ipcRenderer.sendSync(IpcChannels.GET_LOCAL_ENVIRONMENT_BOOTSTRAPS_CHANNEL);
-  return Array.isArray(result) ? result : [];
-});
-ipcRenderer.on(IpcChannels.LOCAL_ENVIRONMENT_BOOTSTRAPS_CHANGED_CHANNEL, (_event, entries) => {
-  if (Array.isArray(entries)) localBootstraps.update(entries);
-});
 
 const SNAP_SHOT_EVENT_TYPES = new Set([
   "requested",
@@ -31,10 +23,7 @@ const SNAP_SHOT_EVENT_TYPES = new Set([
 ]);
 function isSnapShotEvent(value: unknown): value is DesktopSnapShotEvent {
   if (typeof value !== "object" || value === null) return false;
-  const { type, id } = value as {
-    type?: unknown;
-    id?: unknown;
-  };
+  const { type, id } = value as { type?: unknown; id?: unknown };
   return (
     typeof type === "string" &&
     SNAP_SHOT_EVENT_TYPES.has(type) &&
@@ -160,8 +149,13 @@ contextBridge.exposeInMainWorld("desktopBridge", {
     );
     return Array.isArray(result) ? result.filter((tag) => typeof tag === "string") : [];
   },
-  getLocalEnvironmentBootstraps: localBootstraps.read,
-  onLocalEnvironmentBootstrapsChanged: localBootstraps.subscribe,
+  getLocalEnvironmentBootstraps: () => {
+    const result = ipcRenderer.sendSync(IpcChannels.GET_LOCAL_ENVIRONMENT_BOOTSTRAPS_CHANNEL);
+    if (!Array.isArray(result)) {
+      return [];
+    }
+    return result as ReturnType<DesktopBridge["getLocalEnvironmentBootstraps"]>;
+  },
   getLocalEnvironmentBearerToken: () =>
     ipcRenderer.invoke(IpcChannels.GET_LOCAL_ENVIRONMENT_BEARER_TOKEN_CHANNEL),
   getLocalEnvironmentEnabled: () =>
@@ -346,8 +340,6 @@ contextBridge.exposeInMainWorld("desktopBridge", {
   downloadUpdate: () => ipcRenderer.invoke(IpcChannels.UPDATE_DOWNLOAD_CHANNEL),
   installUpdate: (expectedVersion) =>
     ipcRenderer.invoke(IpcChannels.UPDATE_INSTALL_CHANNEL, expectedVersion),
-  setUpdateAutoInstall: (enabled) =>
-    ipcRenderer.invoke(IpcChannels.UPDATE_SET_AUTO_INSTALL_CHANNEL, enabled),
   cliCommand: {
     getState: () => ipcRenderer.invoke(IpcChannels.CLI_COMMAND_GET_STATE_CHANNEL),
     install: () => ipcRenderer.invoke(IpcChannels.CLI_COMMAND_INSTALL_CHANNEL),
@@ -502,16 +494,8 @@ contextBridge.exposeInMainWorld("desktopBridge", {
       update: (state) =>
         ipcRenderer.invoke(IpcChannels.PREVIEW_ANNOTATION_VOICE_STATE_CHANNEL, state),
     },
-    pinAction: (tabId, action, ids) =>
-      ipcRenderer.invoke(IpcChannels.PREVIEW_PIN_ACTION_CHANNEL, { tabId, action, ids }),
-    onPinState: (listener) => {
-      const wrapped = (_event: Electron.IpcRendererEvent, tabId: string, count: number) =>
-        listener(tabId, count);
-      ipcRenderer.on(IpcChannels.PREVIEW_PIN_STATE_CHANNEL, wrapped);
-      return () => ipcRenderer.removeListener(IpcChannels.PREVIEW_PIN_STATE_CHANNEL, wrapped);
-    },
-    pickElement: (tabId, voice, pins) =>
-      ipcRenderer.invoke(IpcChannels.PREVIEW_PICK_ELEMENT_CHANNEL, { tabId, voice, pins }),
+    pickElement: (tabId, voice) =>
+      ipcRenderer.invoke(IpcChannels.PREVIEW_PICK_ELEMENT_CHANNEL, { tabId, voice }),
     cancelPickElement: (tabId) =>
       ipcRenderer.invoke(IpcChannels.PREVIEW_CANCEL_PICK_ELEMENT_CHANNEL, { tabId }),
     captureScreenshot: (tabId) =>

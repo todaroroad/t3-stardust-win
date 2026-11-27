@@ -367,7 +367,6 @@ function formatComposerContextProviderPayload(record: KnownComposerContextRecord
           ...record.styleChanges.map((change) => `- ${change}`),
         );
       }
-      for (const pin of record.pins ?? []) lines.push(`pin ${pin.number}: ${JSON.stringify(pin)}`);
       if (record.screenshotContextId) lines.push(`screenshot: ref=${record.screenshotContextId}`);
       for (const [index, element] of (record.elements ?? []).entries()) {
         lines.push(`element ${index + 1}:`, indent(formatElementDetails(element).join("\n")));

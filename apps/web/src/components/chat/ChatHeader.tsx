@@ -1,6 +1,3 @@
-import { uiText } from "~/i18n";
-
-
 import {
   AuthOrchestrationOperateScope,
   type EnvironmentId,
@@ -47,7 +44,6 @@ import { cn } from "~/lib/utils";
 import { textDirection } from "~/textDirection";
 import { useClientSettings } from "../../hooks/useSettings";
 import { GuestShareIndicator } from "./GuestShareControls";
-import { QuotaTopbar } from "../usage/QuotaTopbar";
 import { SharedTooltipTrigger } from "../ui/shared-tooltip";
 
 interface ChatHeaderProps {
@@ -257,12 +253,9 @@ export const ChatHeader = memo(function ChatHeader({
   return (
     <div
       ref={breadcrumbContainerRef}
-      data-liquid-chat-header=""
-      data-right-panel-open={rightPanelOpen}
       className={cn(
-        "@container/quota-header flex min-w-0 flex-1 items-center gap-2 sm:gap-3",
+        "flex min-w-0 flex-1 items-center gap-2 sm:gap-3",
         rightPanelOpen ? "pr-10" : "pr-24",
-        "max-md:pr-36",
       )}
       onContextMenu={handleHeaderContextMenu}
     >
@@ -417,7 +410,6 @@ export const ChatHeader = memo(function ChatHeader({
         </WorkspaceBreadcrumbItem>
       </WorkspaceBreadcrumb>
       {isServerThread ? <GuestShareIndicator threadRef={activeThreadRef} /> : null}
-      <QuotaTopbar />
     </div>
   );
 });

@@ -161,8 +161,6 @@ function SheetDescription({ className, ...props }: SheetPrimitive.Description.Pr
   );
 }
 
-export const SheetTrigger = SheetPrimitive.Trigger;
-
 export {
   Sheet,
   SheetPortal,

@@ -1,4 +1,3 @@
-import { watchThreadCreation } from "./threadSubscriptionWakeups.ts";
 import { mFallback, msg } from "gt-i18n";
 import type { MFunctionType } from "gt-i18n/types";
 import {
@@ -1073,20 +1072,6 @@ export const makeEnvironmentThreadState = Effect.fn("EnvironmentThreadState.make
   yield* markSynchronizing;
   // A 404 can arrive before the thread exists, so a miss asks HTTP again while mounted.
   let httpMisses = 0;
-  yield* watchThreadCreation(
-    environmentId,
-    threadId,
-    Effect.gen(function* () {
-      const current = yield* SubscriptionRef.get(state);
-      if (Option.isSome(current.data) || (httpMisses === 0 && current.status !== "empty")) return;
-      httpMisses = 0;
-      yield* SubscriptionRef.update(state, (value) => ({
-        ...value,
-        status: "synchronizing" as const,
-      }));
-      yield* Queue.offer(resubscribes, undefined);
-    }),
-  );
   let defectRetries = 0;
   const backOffAfterDefect = Effect.suspend(() => {
     const retryDelay = subscriptionRetryDelay(THREAD_SUBSCRIPTION_RETRY_DELAY, defectRetries);

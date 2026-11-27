@@ -1,5 +1,3 @@
-import { GTProvider } from "gt-react";
-import zh from "~/i18n/translations/zh.json";
 import { injectHtmlRenderBootstrap } from "@t3tools/shared/htmlRender";
 import { HtmlRenderDocument } from "../files/BrowserDocumentFrame";
 import { AudioPreview } from "../files/AudioPreview";
@@ -240,22 +238,9 @@ async function renderElement(element: ReactElement, options: { router?: false } 
   });
 }
 
-function renderTimeline(
-  entries: ReadonlyArray<Entry>,
-  props: Partial<TimelineProps> = {},
-  locale?: string,
-) {
-  const timeline = (
-    <MessagesTimeline {...baseProps()} timelineEntries={entries as Entry[]} {...props} />
-  );
+function renderTimeline(entries: ReadonlyArray<Entry>, props: Partial<TimelineProps> = {}) {
   return renderElement(
-    locale ? (
-      <GTProvider locale={locale} translations={{ zh, en: {} } as never}>
-        {timeline}
-      </GTProvider>
-    ) : (
-      timeline
-    ),
+    <MessagesTimeline {...baseProps()} timelineEntries={entries as Entry[]} {...props} />,
   );
 }
 
@@ -422,10 +407,9 @@ describe("MessagesTimeline work rows", () => {
     await vi.waitFor(() => expect(distanceFromEnd()).toBeLessThan(2));
   });
 
-  it.each(["delegated", "legacy", "missing", "delegated-zh"] as const)(
+  it.each(["delegated", "legacy", "missing"] as const)(
     "uses the reported task for %s completion notifications",
-    async (variant) => {
-      const source = variant === "delegated-zh" ? "delegated" : variant;
+    async (source) => {
       setup();
       const now = DateTime.makeUnsafe(CREATED_AT);
       const childThreadId = ThreadId.make("shared-child");
@@ -483,12 +467,7 @@ describe("MessagesTimeline work rows", () => {
           }),
         ),
         { onOpenThread },
-        variant === "delegated-zh" ? "zh" : undefined,
       );
-      if (variant === "delegated-zh") {
-        expect(screen.text()).toContain("已完成");
-        expect(screen.text()).not.toContain("Finished");
-      }
       if (source === "delegated") {
         expect(screen.text()).toContain("Final implementation report");
         expect(screen.text()).toContain("Follow-up explanation");
@@ -501,14 +480,6 @@ describe("MessagesTimeline work rows", () => {
       } else {
         expect(screen.text()).toContain("Notification fallback");
         expect(screen.text()).not.toContain("Old interrupted progress");
-      }
-      if (variant === "delegated-zh") {
-        // GT also exposes a default locale outside its provider; restore it for later fixtures.
-        await screen.rerender(
-          <GTProvider locale="en" translations={{ zh, en: {} } as never}>
-            <span />
-          </GTProvider>,
-        );
       }
     },
   );
@@ -2993,24 +2964,4 @@ it("keeps concurrent approvals actionable outside collapsed work and restores se
   await expect
     .element(screen.getByRole("button", { name: "Open the current tab", exact: true }))
     .toBeVisible();
-});
-
-it("localizes a real runtime notice in the Chinese timeline while retaining original diagnostics", async () => {
-  const original = "Cancelled because the server restarted before the provider work completed.";
-  await using screen = await renderTimeline(
-    [
-      work("restart-notice", {
-        label: original,
-        detail: original,
-        tone: "warning",
-        sourceActivityKind: "runtime.warning",
-      }),
-    ],
-    {},
-    "zh",
-  );
-  await expect
-    .element(screen.getByText("服务重启时任务尚未完成，已取消本次运行。", { exact: true }))
-    .toBeVisible();
-  expect(screen.container.innerText).not.toContain(original);
 });

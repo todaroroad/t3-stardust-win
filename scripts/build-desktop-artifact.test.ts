@@ -44,7 +44,6 @@ import {
   resolveMacPasskeySigningConfiguration,
   resolveMergedStageDependencies,
   resolveBuildOptions,
-  resolveGitHubPublishConfig,
   stageWslRuntimeArchive,
   ancestorNodeModulesPaths,
   copyDirectoryPreservingSymlinks,
@@ -543,15 +542,15 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
       assert.deepStrictEqual(release.publish, [
         {
           provider: "github",
-          owner: "zds-xiaoxin",
-          repo: "xiaoxin-t3code",
+          owner: "pingdotgg",
+          repo: "t3code",
           releaseType: "release",
         },
       ]);
     }).pipe(
       Effect.provide(
         ConfigProvider.layer(
-          ConfigProvider.fromEnv({ env: { GITHUB_REPOSITORY: "zds-xiaoxin/xiaoxin-t3code" } }),
+          ConfigProvider.fromEnv({ env: { GITHUB_REPOSITORY: "pingdotgg/t3code" } }),
         ),
       ),
     ),
@@ -617,7 +616,7 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
     }).pipe(
       Effect.provide(
         ConfigProvider.layer(
-          ConfigProvider.fromEnv({ env: { GITHUB_REPOSITORY: "zds-xiaoxin/xiaoxin-t3code" } }),
+          ConfigProvider.fromEnv({ env: { GITHUB_REPOSITORY: "pingdotgg/t3code" } }),
         ),
       ),
     ),
@@ -2009,25 +2008,4 @@ it.effect.skipIf(!symlinksSupported)("preserves relative links when replacing di
     assert.equal(yield* fs.readLink(path.join(output, app, "Current")), "New.plist");
     assert.equal(yield* fs.readFileString(path.join(output, app, "Current")), "rebuilt-app");
   }).pipe(Effect.provide(NodeServices.layer), Effect.scoped),
-);
-
-it.effect("never bakes the upstream project's update feed into a build", () =>
-  Effect.gen(function* () {
-    const publishFor = (env: Record<string, string>) =>
-      resolveGitHubPublishConfig("latest").pipe(
-        Effect.provide(ConfigProvider.layer(ConfigProvider.fromUnknown(env))),
-      );
-    assert.isUndefined(yield* publishFor({ T3CODE_DESKTOP_UPDATE_REPOSITORY: "pingdotgg/t3code" }));
-    assert.isUndefined(yield* publishFor({ GITHUB_REPOSITORY: "PingDotGG/t3code" }));
-    assert.isUndefined(yield* publishFor({}));
-    assert.deepEqual(
-      yield* publishFor({ T3CODE_DESKTOP_UPDATE_REPOSITORY: "zds-xiaoxin/xiaoxin-t3code" }),
-      {
-        provider: "github",
-        owner: "zds-xiaoxin",
-        repo: "xiaoxin-t3code",
-        releaseType: "release",
-      },
-    );
-  }),
 );

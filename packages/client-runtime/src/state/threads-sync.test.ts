@@ -1,4 +1,3 @@
-import { threadCreated, threadsInShell } from "./threadSubscriptionWakeups.ts";
 import {
   EnvironmentAuthorizationError,
   EnvironmentId,
@@ -121,7 +120,6 @@ const makeHarness = Effect.fn("TestEnvironmentThreads.makeHarness")(function* (o
     readonly latestLocalTurnOrdinal?: number | null;
   };
   readonly httpSnapshot?: ThreadSnapshotLoadResult;
-  readonly loadSnapshot?: () => ThreadSnapshotLoadResult;
   /** Answers per load call; the last one repeats. Overrides `httpSnapshot`. */
   readonly httpSnapshots?: readonly ThreadSnapshotLoadResult[];
   /** The test sends the completion marker itself instead of the fake server sending it first. */
@@ -207,8 +205,7 @@ const makeHarness = Effect.fn("TestEnvironmentThreads.makeHarness")(function* (o
       Ref.updateAndGet(loaderCalls, (count) => count + 1).pipe(
         Effect.map((count) =>
           threadId === THREAD_ID
-            ? (options?.loadSnapshot?.() ??
-              options?.httpSnapshots?.[Math.min(count, options.httpSnapshots.length) - 1] ??
+            ? (options?.httpSnapshots?.[Math.min(count, options.httpSnapshots.length) - 1] ??
               options?.httpSnapshot ??
               ({ _tag: "unavailable" } satisfies ThreadSnapshotLoadResult))
             : ({ _tag: "unavailable" } satisfies ThreadSnapshotLoadResult),
@@ -818,39 +815,6 @@ describe("EnvironmentThreads", () => {
       expect(Option.getOrThrow(state.data)).toEqual(BASE_PROJECTION);
       expect(yield* Ref.get(resumed.loaderCalls)).toBe(1);
     }),
-  );
-
-  it.effect.each(["receipt", "shell"] as const)(
-    "wakes a draft after 40s of misses on %s without waiting for backoff",
-    (source) =>
-      Effect.gen(function* () {
-        let created = false;
-        const harness = yield* makeHarness({
-          loadSnapshot: () =>
-            created
-              ? {
-                  _tag: "present",
-                  snapshot: {
-                    snapshotSequence: CACHED_SNAPSHOT_SEQUENCE,
-                    projection: BASE_PROJECTION,
-                  },
-                }
-              : { _tag: "missing" },
-        });
-        yield* awaitThreadState(harness.observed, (value) => value.status === "deleted");
-        yield* TestClock.adjust("40 seconds");
-        const misses = yield* Ref.get(harness.loaderCalls);
-        created = true;
-        if (source === "receipt") yield* threadCreated(TARGET.environmentId, THREAD_ID);
-        else yield* threadsInShell(TARGET.environmentId, [{ id: THREAD_ID }]);
-        const state = yield* awaitThreadState(harness.observed, (value) => value.status === "live");
-        expect(Option.getOrThrow(state.data)).toEqual(BASE_PROJECTION);
-        expect(yield* Ref.get(harness.loaderCalls)).toBe(misses + 1);
-        const calls = yield* Ref.get(harness.loaderCalls);
-        yield* threadsInShell(TARGET.environmentId, [{ id: THREAD_ID }]);
-        yield* TestClock.adjust("1 second");
-        expect(yield* Ref.get(harness.loaderCalls)).toBe(calls);
-      }),
   );
 
   it.effect("keeps asking a mounted thread over HTTP after a miss until it exists", () =>

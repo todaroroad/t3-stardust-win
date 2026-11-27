@@ -1,4 +1,3 @@
-import { readWorkbench } from "../components/workbench/workPresets";
 import {
   scopedProjectKey,
   scopeProjectRef,
@@ -100,9 +99,6 @@ export type NewThreadHandler = ReturnType<typeof createNewThreadHandler>;
 
 export function createNewThreadHandler(router: AnyRouter) {
   const getCurrentRouteTarget = () => {
-    // Location advances before committed match params during a concurrent draft open.
-    const draftPath = /^\/draft\/([^/]+)\/?$/.exec(router.state.location.pathname);
-    if (draftPath?.[1]) return resolveThreadRouteTarget({ draftId: draftPath[1] });
     const currentRouteParams = router.state.matches[router.state.matches.length - 1]?.params ?? {};
     return resolveThreadRouteTarget(currentRouteParams);
   };
@@ -117,8 +113,6 @@ export function createNewThreadHandler(router: AnyRouter) {
       replace?: boolean;
       /** Composer text for the draft, set before it shows. A draft with user text keeps it. */
       prompt?: string;
-      /** Always create a fresh local draft, preserving any populated draft. */
-      forceNew?: boolean;
     },
   ): Promise<{ draftId: DraftId; threadId: ThreadId } | null> => {
     const projects = readProjects();
@@ -278,14 +272,13 @@ export function createNewThreadHandler(router: AnyRouter) {
       ? scopeThreadRef(storedDraftThread.environmentId, storedDraftThread.threadId)
       : null;
     const reusableStoredDraftThread =
-      !options?.forceNew &&
       storedDraftThread !== null &&
       storedDraftThread.promotedTo == null &&
       storedDraftThreadRef !== null &&
       readThreadShell(storedDraftThreadRef) === null
         ? storedDraftThread
         : null;
-    if (!options?.forceNew && storedDraftThreadRef && reusableStoredDraftThread === null) {
+    if (storedDraftThreadRef && reusableStoredDraftThread === null) {
       markPromotedDraftThreadByRef(storedDraftThreadRef);
     }
     const emptyStoredDraftThread =
@@ -375,7 +368,6 @@ export function createNewThreadHandler(router: AnyRouter) {
     }
 
     if (
-      !options?.forceNew &&
       latestActiveDraftThread &&
       currentRouteTarget?.kind === "draft" &&
       latestActiveDraftThread.logicalProjectKey === logicalProjectKey &&
@@ -423,28 +415,10 @@ export function createNewThreadHandler(router: AnyRouter) {
         runtimeMode: defaultRuntimeMode,
         ...(carryInteractionMode ? { interactionMode: carryInteractionMode } : {}),
       });
-      const presets = readWorkbench().scopes[projectRef.environmentId];
-      const preset = presets?.selectedId ? presets.presets[presets.selectedId] : undefined;
-      const presetProvider = preset
-        ? environmentServerConfigs
-            .get(projectRef.environmentId)
-            ?.providers.find((provider) => provider.instanceId === preset.selection.instanceId)
-        : undefined;
-      if (
-        preset &&
-        presetProvider?.enabled &&
-        presetProvider.models.some((model) => model.slug === preset.selection.model) &&
-        !hasExplicitComposerModelSelection(getComposerDraft(draftId))
-      ) {
-        setModelSelection(draftId, preset.selection, { replaceOptions: true });
-      }
-      // Draft creation may have captured an explicit work-style preset.
-      if (!hasExplicitComposerModelSelection(getComposerDraft(draftId))) {
-        applyStickyState(draftId);
-        const modelSelectionOverride = resolveModelSelectionOverride(draftId);
-        if (modelSelectionOverride) {
-          setModelSelection(draftId, modelSelectionOverride, { replaceOptions: true });
-        }
+      applyStickyState(draftId);
+      const modelSelectionOverride = resolveModelSelectionOverride(draftId);
+      if (modelSelectionOverride) {
+        setModelSelection(draftId, modelSelectionOverride, { replaceOptions: true });
       }
       seedPrompt(draftId);
       defaultEnvMode?.applyProjectFile(draftId);

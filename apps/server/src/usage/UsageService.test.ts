@@ -1,5 +1,3 @@
-import { ProjectId } from "@t3tools/contracts";
-import * as UsageProjectAttribution from "./UsageProjectAttribution.ts";
 // @effect-diagnostics nodeBuiltinImport:off - the suite seeds and grows real
 // transcript trees on disk, outside the service's Effect FileSystem.
 import * as NodeChildProcess from "node:child_process";
@@ -142,9 +140,7 @@ const WINDOW: UsageSummaryInput = {
 
 const setup = Effect.gen(function* () {
   const home = yield* Effect.promise(() =>
-    NodeFSP.mkdtemp(NodePath.join(NodeOS.tmpdir(), "usage-service-test-")).then((directory) =>
-      NodeFSP.realpath(directory),
-    ),
+    NodeFSP.mkdtemp(NodePath.join(NodeOS.tmpdir(), "usage-service-test-")),
   );
   yield* Effect.addFinalizer(() =>
     Effect.promise(() => NodeFSP.rm(home, { recursive: true, force: true })),
@@ -530,115 +526,6 @@ describe("Codex usage history", () => {
 });
 
 describe("UsageService", () => {
-  it.effect("totals usage per T3 project from provider thread bindings", () =>
-    Effect.gen(function* () {
-      const { transcript, settings, home } = yield* setup;
-      const piTranscript = NodePath.join(home, "pi", "sessions", "bound.jsonl");
-      yield* Effect.promise(async () => {
-        await NodeFSP.mkdir(NodePath.dirname(piTranscript), { recursive: true });
-        await NodeFSP.writeFile(
-          piTranscript,
-          [
-            { type: "session", id: "pi-header-id" },
-            {
-              type: "usage",
-              id: "pi-event",
-              timestamp: "2026-08-01T10:00:00Z",
-              provider: "openai",
-              model: "model",
-              usage: { output: 17 },
-            },
-          ]
-            .map((line) => encodeUnknownJsonString(line))
-            .join("\n") + "\n",
-        );
-      });
-      yield* Effect.promise(() =>
-        NodeFSP.writeFile(
-          transcript,
-          claudeLine(1, 3, "claude-fable-5", "bound") +
-            claudeLine(2, 5, "claude-fable-5", "worktree") +
-            claudeLine(3, 7, "claude-fable-5", "ambiguous") +
-            claudeLine(4, 11, "claude-fable-5", "terminal") +
-            claudeLine(5, 13, "claude-fable-5", "deleted-project"),
-        ),
-      );
-      const projectRows = (summary: UsageSummary) =>
-        (summary.projectTotals ?? [])
-          .filter((row) => row.provider !== "pi")
-          .map((row) => [String(row.projectId ?? null), row.totals.outputTokens, row.sessions])
-          .toSorted(([a], [b]) => String(a).localeCompare(String(b)));
-
-      yield* Effect.gen(function* () {
-        const sql = yield* SqlClient.SqlClient;
-        const project = (id: string, title: string, deletedAt: string | null = null) =>
-          sql`INSERT INTO projection_projects (project_id, title, workspace_root, scripts_json, created_at, updated_at, deleted_at)
-            VALUES (${id}, ${title}, ${`/work/${id}`}, '[]', '2026-08-01', '2026-08-01', ${deletedAt})`;
-        const thread = (id: string, projectId: string) =>
-          sql`INSERT INTO orchestration_v2_projection_threads (thread_id, project_id, title, default_provider, runtime_mode, interaction_mode, created_at, updated_at, payload_json)
-            VALUES (${id}, ${projectId}, ${id}, 'claudeAgent', 'full-access', 'default', '2026-08-01', '2026-08-01', '{}')`;
-        const binding = (id: string, threadId: string, nativeId: string, driver = "claudeAgent") =>
-          sql`INSERT INTO orchestration_v2_projection_provider_threads (provider_thread_id, thread_id, provider, driver, status, updated_at, payload_json)
-            VALUES (${id}, ${threadId}, ${driver}, ${driver}, 'idle', '2026-08-01', ${encodeUnknownJsonString(
-              { nativeThreadRef: { driver, nativeId } },
-            )})`;
-        yield* project("p-app", "App");
-        yield* project("p-other", "Other");
-        yield* project("p-gone", "Gone", "2026-08-02");
-        yield* thread("t-main", "p-app");
-        yield* thread("t-worktree", "p-app");
-        yield* thread("t-other", "p-other");
-        yield* thread("t-gone", "p-gone");
-        yield* binding("pt-1", "t-main", "bound");
-        yield* binding("pt-2", "t-worktree", "worktree");
-        yield* binding("pt-3", "t-main", "ambiguous");
-        yield* binding("pt-4", "t-other", "ambiguous");
-        yield* binding("pt-5", "t-gone", "deleted-project");
-        // Another driver's identical native id must not claim a Claude session.
-        yield* binding("pt-6", "t-other", "terminal", "codex");
-        yield* binding("pt-7", "t-main", piTranscript, "pi");
-        yield* binding("pt-8", "t-other", "pi-header-id", "pi");
-
-        const service = yield* UsageService.make;
-        const summary = yield* service.readSummary({ ...WINDOW, awaitRefresh: true });
-        assert.deepStrictEqual(projectRows(summary), [
-          ["null", 18, 2],
-          ["p-app", 8, 2],
-          ["p-gone", 13, 1],
-        ]);
-        assert.deepStrictEqual(
-          summary.projectTotals
-            ?.filter((row) => row.provider === "pi")
-            .map((row) => [row.projectId, row.totals.outputTokens, row.sessions]),
-          [[ProjectId.make("p-app"), 17, 1]],
-        );
-        assert.deepStrictEqual(
-          summary.projects?.toSorted((a, b) => a.projectId.localeCompare(b.projectId)),
-          [
-            { projectId: ProjectId.make("p-app"), title: "App" },
-            { projectId: ProjectId.make("p-gone"), title: "Gone" },
-          ],
-        );
-        assert.strictEqual(totalOutputTokens(summary), 56);
-
-        yield* sql`DROP TABLE orchestration_v2_projection_provider_threads`;
-        const unattributed = yield* service.readSummary({ ...WINDOW, awaitRefresh: true });
-        assert.strictEqual(unattributed.projectTotals, undefined);
-        assert.strictEqual(unattributed.projects, undefined);
-        assert.strictEqual(totalOutputTokens(unattributed), 56);
-      }).pipe(
-        Effect.scoped,
-        Effect.provide(
-          UsageProjectAttribution.layer.pipe(
-            Layer.provideMerge(
-              layerService({ prefix: "usage-service-project-test", home, settings }),
-            ),
-          ),
-        ),
-      );
-    }).pipe(Effect.scoped),
-  );
-
   it.effect("keeps pricing metadata paired with the rates used during a concurrent refresh", () =>
     Effect.gen(function* () {
       const { home, settings } = yield* setup;
@@ -2065,7 +1952,6 @@ describe("UsageService", () => {
             environment: { CURSOR_API_KEY: "test-key" },
           },
         ],
-        keychainUsageEnabled: false,
         windowStartMs: 0,
         retentionCutoffMs: CURSOR_NOW - 92 * 24 * HOUR_MS,
         awaitRefresh: false,
@@ -2138,10 +2024,7 @@ describe("UsageService", () => {
         );
         if (index === 2) {
           assert.deepStrictEqual(cursor.state.credentials, []);
-          assert.strictEqual(
-            cursorSource(summary)?.message,
-            "Cursor account usage is off on this environment.",
-          );
+          assert.isUndefined(cursorSource(summary));
           continue;
         }
         assert.deepStrictEqual(cursor.state.credentials, [
@@ -2282,11 +2165,7 @@ describe("UsageService", () => {
                 Effect.gen(function* () {
                   inFlight++;
                   mostInFlight = Math.max(mostInFlight, inFlight);
-                  if (
-                    typeof credential !== "string" &&
-                    credential.kind === "apiKey" &&
-                    credential.apiKey === "failing-key"
-                  ) {
+                  if (credential.apiKey === "failing-key") {
                     yield* Deferred.await(started);
                     return {
                       accountKey: null,
@@ -2311,7 +2190,6 @@ describe("UsageService", () => {
         const accounts = Context.get(context, CursorUsageAccounts.CursorUsageAccounts);
         const scan = (awaitRefresh: boolean) =>
           accounts.scan({
-            keychainUsageEnabled: false,
             instances: [
               {
                 instanceId: ProviderInstanceId.make("cursor"),
@@ -4577,175 +4455,5 @@ describe("UsageService", () => {
         `interruption left the next matching request pending at scheduler check ${orphanedAt}`,
       );
     }),
-  );
-  it.live("does not read the macOS Cursor Keychain before account usage is enabled", () =>
-    Effect.gen(function* () {
-      const { settings, home } = yield* setup;
-      const service = yield* UsageService.make.pipe(
-        Effect.provide(
-          layerService({
-            prefix: "usage-service-cursor-keychain-disabled",
-            home,
-            settings,
-            platform: "darwin",
-            environment: {},
-          }),
-        ),
-      );
-      const summary = yield* service.readSummary(WINDOW);
-      const cursor = summary.sources.find((source) => source.fingerprint.provider === "cursor");
-      assert.strictEqual(cursor?.status, "missing");
-      assert.strictEqual(cursor?.message, "Cursor account usage is off on this environment.");
-    }).pipe(Effect.scoped),
-  );
-
-  it.effect("ignores a stale macOS Keychain login when Cursor is not installed", () =>
-    Effect.gen(function* () {
-      const { settings, home } = yield* setup;
-      const cursor = makeFakeCursor();
-      cursor.state.error = "Sign in to Cursor again to read account usage.";
-      const readCursorSource = Effect.gen(function* () {
-        const service = yield* makeWithCursor(cursor.read);
-        const summary = yield* service.readSummary({ ...WINDOW, awaitRefresh: true });
-        return cursorSource(summary);
-      }).pipe(
-        Effect.provide(
-          layerService({
-            prefix: "usage-service-cursor-keychain-uninstalled",
-            home,
-            settings: { ...settings, cursorKeychainUsageEnabled: true },
-            platform: "darwin",
-            environment: {},
-          }),
-        ),
-      );
-
-      assert.isUndefined(yield* readCursorSource);
-      assert.lengthOf(cursor.state.calls, 0);
-
-      yield* Effect.promise(() => NodeFSP.mkdir(NodePath.join(home, ".cursor")));
-      const installed = yield* readCursorSource;
-      assert.strictEqual(installed?.message, "Sign in to Cursor again to read account usage.");
-      assert.lengthOf(cursor.state.calls, 1);
-    }).pipe(Effect.scoped),
-  );
-
-  it.effect(
-    "aggregates real provider turn throughput and publishes modelUnitPrices, degrading when SQLite table is missing",
-    () =>
-      Effect.gen(function* () {
-        const { home, settings } = yield* setup;
-        yield* Effect.gen(function* () {
-          const sql = yield* SqlClient.SqlClient;
-          yield* sql`
-            INSERT INTO orchestration_v2_projection_provider_threads (
-              provider_thread_id,
-              thread_id,
-              owner_node_id,
-              provider,
-              driver,
-              provider_instance_id,
-              status,
-              updated_at,
-              payload_json
-            )
-            VALUES (
-              'pt-1',
-              't-1',
-              'n-1',
-              'codex',
-              'codex',
-              'codex',
-              'idle',
-              '2026-08-01T10:00:00Z',
-              ${JSON.stringify({ driver: "codex" })}
-            )
-          `;
-          yield* sql`
-            INSERT INTO orchestration_v2_projection_provider_turns (
-              provider_turn_id,
-              thread_id,
-              provider_thread_id,
-              node_id,
-              ordinal,
-              status,
-              started_at,
-              completed_at,
-              payload_json
-            )
-            VALUES (
-              'turn-1',
-              't-1',
-              'pt-1',
-              'n-1',
-              1,
-              'completed',
-              '2026-08-01T10:00:00.000Z',
-              '2026-08-01T10:00:10.000Z',
-              ${JSON.stringify({
-                id: "turn-1",
-                model: "gpt-5.4",
-                turnTokenUsage: { usageStatus: "complete", outputTokens: 600 },
-              })}
-            )
-          `;
-          yield* sql`
-            INSERT INTO orchestration_v2_projection_turn_items (
-              turn_item_id,
-              thread_id,
-              provider_turn_id,
-              ordinal,
-              type,
-              status,
-              updated_at,
-              payload_json
-            )
-            VALUES (
-              'item-1',
-              't-1',
-              'turn-1',
-              1,
-              'command_execution',
-              'completed',
-              '2026-08-01T10:00:04.000Z',
-              ${JSON.stringify({
-                startedAt: "2026-08-01T10:00:02.000Z",
-                completedAt: "2026-08-01T10:00:04.000Z",
-              })}
-            )
-          `;
-
-          const service = yield* UsageService.make;
-          const summary = yield* service.readSummary({ ...WINDOW, awaitRefresh: true });
-          assert.deepStrictEqual(summary.throughput, [
-            {
-              provider: "codex",
-              model: "gpt-5.4",
-              outputTokens: 600,
-              modelMs: 8000,
-              turns: 1,
-            },
-          ]);
-          assert.strictEqual(summary.pricing.modelUnitPrices?.["gpt-5.4"], 1e-5 + 5e-5);
-          assert.strictEqual(summary.pricing.modelUnitPrices?.["gpt-5.4-mini"], 1e-6 + 4e-6);
-
-          yield* sql`DROP TABLE orchestration_v2_projection_provider_turns`;
-          const degraded = yield* service.readSummary({ ...WINDOW, awaitRefresh: true });
-          assert.strictEqual(degraded.throughput, undefined);
-        }).pipe(
-          Effect.scoped,
-          Effect.provide(
-            layerService({
-              prefix: "usage-service-throughput-test",
-              home,
-              settings,
-              ratesDocument: {
-                "gpt-5.4": { input_cost_per_token: 1e-5, output_cost_per_token: 5e-5 },
-                "gpt-5.4-mini": { input_cost_per_token: 1e-6, output_cost_per_token: 4e-6 },
-              },
-            }),
-          ),
-        );
-      }).pipe(Effect.scoped),
   );
 });

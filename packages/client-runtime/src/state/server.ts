@@ -1540,49 +1540,6 @@ export function createServerEnvironmentAtoms<R, E>(
       tag: WS_METHODS.serverReclaimDatabaseSpace,
       concurrency: { mode: "singleFlight", key: ({ environmentId }) => environmentId },
     }),
-    inspectStorage: createEnvironmentRpcQueryAtomFamily(runtime, {
-      label: "environment-data:server:inspect-storage",
-      tag: WS_METHODS.serverInspectStorage,
-      staleTimeMs: 0,
-      idleTtlMs: 0,
-      execute: (input) => request(WS_METHODS.serverInspectStorage, input),
-    }),
-    manageStorage: createEnvironmentRpcCommand(runtime, {
-      label: "environment-data:server:manage-storage",
-      tag: WS_METHODS.serverManageStorage,
-      concurrency: { mode: "singleFlight", key: ({ environmentId }) => environmentId },
-    }),
-    storageTidyState: createEnvironmentRpcQueryAtomFamily(runtime, {
-      label: "environment-data:server:storage-tidy-state",
-      tag: WS_METHODS.serverStorageTidyState,
-      staleTimeMs: 0,
-      idleTtlMs: 0,
-      execute: (input) => request(WS_METHODS.serverStorageTidyState, input),
-    }),
-    storageTidyAct: createEnvironmentRpcCommand(runtime, {
-      label: "environment-data:server:storage-tidy-act",
-      tag: WS_METHODS.serverStorageTidyAct,
-      concurrency: { mode: "singleFlight", key: ({ environmentId }) => environmentId },
-    }),
-    diskSpace: createEnvironmentRpcQueryAtomFamily(runtime, {
-      label: "environment-data:server:disk-space",
-      tag: WS_METHODS.serverGetDiskSpace,
-      staleTimeMs: 60_000,
-      idleTtlMs: 0,
-      execute: (input, emit) =>
-        request(WS_METHODS.serverGetDiskSpace, input).pipe(
-          Effect.filterOrElse(
-            (report) => !report.measuring,
-            (report) =>
-              emit(report).pipe(
-                Effect.andThen(
-                  request(WS_METHODS.serverGetDiskSpace, { ...input, awaitMeasurement: true }),
-                ),
-                Effect.orElseSucceed(() => report),
-              ),
-          ),
-        ),
-    }),
     storageCleanupReport: createEnvironmentRpcSubscriptionAtomFamily(runtime, {
       label: "environment-data:server:storage-cleanup-report",
       tag: WS_METHODS.serverGetStorageCleanupReport,
@@ -2109,11 +2066,6 @@ export function createServerEnvironmentAtoms<R, E>(
     checkSecretSource: createEnvironmentRpcCommand(runtime, {
       label: "environment-data:server:check-secret-source",
       tag: WS_METHODS.serverCheckSecretSource,
-    }),
-    suggestSidebarCategories: createEnvironmentRpcCommand(runtime, {
-      label: "environment-data:server:suggest-sidebar-categories",
-      tag: WS_METHODS.serverSuggestSidebarCategories,
-      concurrency: { mode: "singleFlight", key: ({ environmentId }) => environmentId },
     }),
     listTextGeneratorModels: createEnvironmentRpcCommand(runtime, {
       label: "environment-data:server:list-text-generator-models",

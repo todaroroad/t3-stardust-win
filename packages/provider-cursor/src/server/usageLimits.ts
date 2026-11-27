@@ -1,5 +1,3 @@
-import * as HostProcess from "@t3tools/shared/HostProcess";
-import * as CursorKeychain from "./CursorKeychain.ts";
 import type { ServerProviderUsageWindow } from "@t3tools/contracts";
 import type { CursorSettings } from "../settings.ts";
 import { CURSOR_USAGE_WINDOWS } from "@t3tools/shared/usageLimits";
@@ -67,8 +65,6 @@ export function cursorUsageResponseToLimits(
 export const readCursorUsageLimits = Effect.fn("readCursorUsageLimits")(function* (
   settings: Pick<CursorSettings, "apiEndpoint">,
   environment: NodeJS.ProcessEnv = process.env,
-  allowKeychain = false,
-  keychainToken: CursorKeychain.CursorKeychain["Service"]["accessToken"] = Effect.succeed(null),
 ) {
   const checkedAt = DateTime.formatIso(yield* DateTime.now);
   return yield* Effect.gen(function* () {
@@ -89,16 +85,6 @@ export const readCursorUsageLimits = Effect.fn("readCursorUsageLimits")(function
       }
       token = yield* exchangeCursorApiKey(apiKey);
     }
-    if (
-      !token &&
-      allowKeychain &&
-      !apiKey &&
-      endpoint === DEFAULT_CURSOR_API_ENDPOINT &&
-      environment.AGENT_CLI_CREDENTIAL_STORE !== "file" &&
-      environment.AGENT_CLI_CREDENTIAL_STORE !== "memory" &&
-      (yield* HostProcess.Platform) === "darwin"
-    )
-      token = (yield* keychainToken)?.trim();
     if (!token) return makeUnavailableUsageLimits({ checkedAt, reason: "unsupported" });
     const client = yield* HttpClient.HttpClient;
     const response = yield* client.execute(

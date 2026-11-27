@@ -1,7 +1,5 @@
-import { T, msg, useGT, useMessages } from "gt-react";
-
-import { uiText } from "~/i18n";
-import { BUILT_IN_THEMES, SKIN_THEMES } from "@t3tools/shared/themePalettes";
+import { BUILT_IN_THEMES } from "@t3tools/shared/themePalettes";
+import { msg, T, useGT, useMessages } from "gt-react";
 import { MonitorIcon, MoonIcon, PaletteIcon, SunIcon } from "lucide-react";
 
 import { m } from "../i18n/messages";
@@ -24,27 +22,9 @@ import {
 import { stackedThreadToast, toastManager } from "./ui/toast";
 
 export const APPEARANCE_OPTIONS = [
-  {
-    mode: "system",
-    get label() {
-      return uiText("System");
-    },
-    icon: MonitorIcon,
-  },
-  {
-    mode: "light",
-    get label() {
-      return uiText("Light");
-    },
-    icon: SunIcon,
-  },
-  {
-    mode: "dark",
-    get label() {
-      return uiText("Dark");
-    },
-    icon: MoonIcon,
-  },
+  { mode: "system", label: msg("System"), icon: MonitorIcon },
+  { mode: "light", label: msg("Light"), icon: SunIcon },
+  { mode: "dark", label: msg("Dark"), icon: MoonIcon },
 ] as const;
 
 export function notifyThemeSaveFailure(): void {
@@ -65,7 +45,7 @@ function useThemeCards() {
   const seen = new Set<string>();
   return [
     ...STANDARD_THEME_CARDS.map((card) => ({ ...card, id: null })),
-    ...[...SKIN_THEMES, ...BUILT_IN_THEMES, ...customThemes, ...environmentThemes]
+    ...[...BUILT_IN_THEMES, ...customThemes, ...environmentThemes]
       .filter((definition) => {
         if (seen.has(definition.id)) return false;
         seen.add(definition.id);

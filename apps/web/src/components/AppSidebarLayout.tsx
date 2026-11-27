@@ -1,7 +1,3 @@
-import { useUiText } from "~/i18n/useUiText";
-import LegacyThreadSidebar from "./LegacySidebar";
-import { useLegacySidebarEnabled } from "../hooks/useSettings";
-import { useWorkbenchMode } from "../workbenchMode";
 import { useAtomValue } from "@effect/atom-react";
 import { useGT } from "gt-react";
 import * as Schema from "effect/Schema";
@@ -428,10 +424,7 @@ export function AppSidebarLayout({
   showSidebar?: boolean;
 }) {
   const gt = useGT();
-  const text = useUiText();
-  const sidebarArea = workspaceAreaProps("sidebar", 0, text("Threads"));
-  const customSidebar = useLegacySidebarEnabled();
-  const workbenchMode = useWorkbenchMode((state) => state.mode);
+  const sidebarArea = workspaceAreaProps("sidebar", 0, gt("Threads"));
   const [sidebarRouteReveal] = useState<SidebarRouteReveal>(() => ({
     observedKey: null,
     pendingKey: null,
@@ -474,8 +467,6 @@ export function AppSidebarLayout({
   return (
     <PanelAnimationSuppressionProvider value={panelAnimationsSuppressed}>
       <SidebarProvider
-        suspended={workbenchMode === "focus" && !pathname.startsWith("/settings")}
-        onResume={() => useWorkbenchMode.getState().setMode(useWorkbenchMode.getState().resumeMode)}
         className="h-dvh! min-h-0!"
         data-panel-animations={routePanelAnimationsActive ? "true" : "false"}
         storageKey="chat_thread_sidebar_open"
@@ -503,11 +494,7 @@ export function AppSidebarLayout({
               }}
               style={windowControlsInsetStyle}
             >
-              {customSidebar && workbenchMode !== "full" ? (
-                <LegacyThreadSidebar routeReveal={sidebarRouteReveal} />
-              ) : (
-                <ThreadSidebar routeReveal={sidebarRouteReveal} />
-              )}
+              <ThreadSidebar routeReveal={sidebarRouteReveal} />
               <SidebarRail onDoubleClick={resetSidebarWidth} />
             </Sidebar>
           </>

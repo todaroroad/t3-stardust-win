@@ -81,20 +81,3 @@ describe("HtmlRenderFrame", () => {
     expect(frameHeight(second)).toBe("1500px");
   });
 });
-
-it("keeps a missing tall HTML attachment compact so adjacent history stays visible", async () => {
-  await using screen = await render(
-    <HtmlRenderFrame
-      environmentId={EnvironmentId.make("environment")}
-      htmlRender={{ attachmentId: "missing", title: "Missing report", height: 1800 }}
-      threadRef={undefined}
-    />,
-  );
-  await expect.element(screen.getByText("Unable to load Missing report")).toBeVisible();
-  expect(
-    screen
-      .getByText("Unable to load Missing report")
-      .element()
-      .parentElement!.getBoundingClientRect().height,
-  ).toBeLessThan(100);
-});

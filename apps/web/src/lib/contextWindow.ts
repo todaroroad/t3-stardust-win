@@ -1,6 +1,6 @@
 export function formatContextWindowTokens(value: number | null): string {
   if (value === null || !Number.isFinite(value)) {
-    return "?";
+    return "0";
   }
   if (value < 1_000) {
     return `${Math.round(value)}`;

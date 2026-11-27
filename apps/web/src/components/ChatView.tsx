@@ -1,20 +1,3 @@
-import { uiText } from "~/i18n";
-import { SendFeedback } from "./chat/SendFeedback";
-import { capturePreviewAnnotationScreenshot } from "~/lib/previewAnnotation";
-import { readComposerImageBytes } from "./chat/composerAttachmentFiles";
-
-import { DraftWorkspaceNotice } from "./chat/DraftWorkspaceNotice";
-import { BranchToolbarEnvironmentSelector } from "./BranchToolbarEnvironmentSelector";
-import { SimilarThreadsHint } from "./chat/SimilarThreadsHint";
-import { useWorkbenchMode } from "../workbenchMode";
-import { StardustStart, StardustSky } from "./chat/StardustStart";
-import { ContextHandoffNotice } from "./chat/ContextHandoffNotice";
-import { SessionStatsBar } from "./chat/SessionStatsBar";
-import { TaskTrailHost } from "./chat/TaskTrailHost";
-import { TaskPlanSummary } from "./chat/TaskPlanSummary";
-import { liveActivityTrailSnapshot, taskTrailDetails } from "./chat/taskTrailModel";
-import { taskProgressSnapshot } from "../taskProgress";
-import { onToggleThreadPanelRequest, onOpenThreadPanelRequest } from "../threadPanelBus";
 import { m } from "../i18n/messages";
 import { thrownErrorMessage } from "@t3tools/client-runtime/errors";
 import { useGT, useMessages } from "gt-react";
@@ -27,7 +10,7 @@ import { workspaceAreaProps } from "../lib/workspaceFocus";
 import { sourceControlClients } from "@t3tools/client-runtime/source-control-clients";
 import { resolveNewThreadModelSelection } from "@t3tools/shared/usageLimits";
 import { queuedRunEditBlockedReason } from "@t3tools/client-runtime/queued-run-edit";
-import { ScrollToEndCircleButton, WorkspaceFileDropOverlay } from "./chat/TimelineOverlays";
+import { ScrollToEndButton, WorkspaceFileDropOverlay } from "./chat/TimelineOverlays";
 import { usePasteToFocusComposer } from "./chat/usePasteToFocusComposer";
 import { useFocusComposerOnThreadOpen } from "./chat/useFocusComposerOnThreadOpen";
 import { configuredHostedAppUrl } from "../hostedPairing";
@@ -339,6 +322,7 @@ import { ThreadTimeline } from "./chat/ThreadTimeline";
 import { NativeChildWorkDialog } from "./chat/NativeChildWorkDialog";
 import { ProviderSubagentBar } from "./chat/ProviderSubagentBar";
 import { getTriggerDisplayModelName } from "./chat/providerIconUtils";
+import { resolveScrollToEndClearance } from "./composerFooterLayout";
 import { ChatHeader } from "./chat/ChatHeader";
 import { useSideChat } from "./chat/useSideChat";
 import { sideThreadComposer, sideThreadKindOf } from "@t3tools/client-runtime/side-thread";
@@ -376,7 +360,6 @@ import {
 import { QueuedRunsControl, type QueuedRunsControlHandle } from "./chat/QueuedRunsControl";
 import { useThreadLinkedPullRequest } from "./pullRequest/useThreadLinkedPullRequest";
 import { useProactivePanels } from "../hooks/useProactivePanels";
-import { backgroundWorkDefersThreadCompletion } from "@t3tools/shared/orchestrationV2PendingBackgroundWork";
 import { useIncrementalTimelineEntries } from "../hooks/useIncrementalTimelineEntries";
 import { useRightPanelSurfaceClose } from "../hooks/useRightPanelSurfaceClose";
 import { ComposerBannerStack, type ComposerBannerStackItem } from "./chat/ComposerBannerStack";
@@ -814,7 +797,7 @@ export default function ChatView(props: ChatViewProps) {
   const [composerReservedHeight, setComposerReservedHeight] = useState(0);
   const composerReservedHeightRef = useRef(0);
   const composerExpandedHeightRef = useRef(0);
-  const [scrollToEndSeenItems, setScrollToEndSeenItems] = useState(0);
+  const [scrollToEndClearance, setScrollToEndClearance] = useState(0);
   const fanoutSelectionsAtom = draftFanoutSelectionsAtom(routeThreadKey);
   const { sendInFlight: sendInFlightRef } = draftSendState(routeThreadKey);
   const multipleModelSelections = useAtomValue(fanoutSelectionsAtom);
@@ -1203,8 +1186,7 @@ export default function ChatView(props: ChatViewProps) {
   );
   const canReuseTerminal = activeThreadKnownSessionsRaw !== null;
   const previewPanelOpen = activeRightPanelKind === "preview" && browserAvailable;
-  const workbenchMode = useWorkbenchMode((state) => state.mode);
-  const rightPanelOpen = rightPanelState.isOpen && workbenchMode !== "focus";
+  const rightPanelOpen = rightPanelState.isOpen;
   const { active: panelAnimationsActive, durationMs: panelAnimationDurationMs } =
     usePanelAnimationSettings();
   const rightPanelPresenceValue = {
@@ -2121,10 +2103,8 @@ export default function ChatView(props: ChatViewProps) {
       ? activePreviewMiniPlayer
       : null;
   const canvasPreview = useThreadPreviewCanvasSource(activeThreadRef, shownPreviewMiniPlayer);
-  const threadPanelInlineOpen = useRightPanelStore(
-    (state) =>
-      workbenchMode !== "focus" &&
-      selectThreadPanelOpen(state.threadPanelVisibilityByThreadKey, activeThreadRef, "inline"),
+  const threadPanelInlineOpen = useRightPanelStore((state) =>
+    selectThreadPanelOpen(state.threadPanelVisibilityByThreadKey, activeThreadRef, "inline"),
   );
   // Selects only the mode, so canvas resizes rerender the chat view only when the
   // card switches presentation.
@@ -2139,14 +2119,12 @@ export default function ChatView(props: ChatViewProps) {
         detailsCardInlineOpen: threadPanelInlineOpen,
       }).detailsCardMode,
   );
-  const threadPanelOpen = useRightPanelStore(
-    (state) =>
-      workbenchMode !== "focus" &&
-      selectThreadPanelOpen(
-        state.threadPanelVisibilityByThreadKey,
-        activeThreadRef,
-        threadPanelPresentation,
-      ),
+  const threadPanelOpen = useRightPanelStore((state) =>
+    selectThreadPanelOpen(
+      state.threadPanelVisibilityByThreadKey,
+      activeThreadRef,
+      threadPanelPresentation,
+    ),
   );
   const supportsThreadPullRequests = serverConfig !== null;
   const visiblePullRequests = visibleThreadPullRequests(
@@ -2195,7 +2173,6 @@ export default function ChatView(props: ChatViewProps) {
     runningTurnId: activeRunningTurnId,
     latestRun: activeLatestRun,
     latestRunSettled,
-    completionDeferred: backgroundWorkDefersThreadCompletion({ pendingBackgroundTasks }),
     turnDiffSummaries,
     isGitRepo: gitStatusQuery.data?.isRepo,
     linkedPullRequest: linkedThreadPullRequest,
@@ -2473,6 +2450,26 @@ export default function ChatView(props: ChatViewProps) {
       composerReservedHeightRef.current = reservedHeight;
       setComposerReservedHeight(reservedHeight);
     }
+    const mainSurface = composerOverlayElement?.querySelector<HTMLElement>(
+      '[data-chat-composer-main-surface="true"]',
+    );
+    const button =
+      composerOverlayElement?.parentElement?.querySelector<HTMLElement>("[data-scroll-to-end]");
+    const clearance =
+      composerOverlayElement && mainSurface && button
+        ? resolveScrollToEndClearance({
+            overlayHeight: nextHeight,
+            mainSurfaceTop: mainSurface.getBoundingClientRect().top,
+            button: button.getBoundingClientRect(),
+            attachments: Array.from(
+              composerOverlayElement.querySelectorAll<HTMLElement>(
+                '[data-composer-banner-surface="attached"]',
+              ),
+              (element) => element.getBoundingClientRect(),
+            ),
+          })
+        : nextHeight;
+    setScrollToEndClearance(clearance);
   };
   const publishComposerOverlayHeightStable = useStableCallback(publishComposerOverlayHeight);
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- measures the composer overlay element before paint for a new thread or composer mount
@@ -2507,11 +2504,13 @@ export default function ChatView(props: ChatViewProps) {
       stack ? [composerOverlayElement, stack] : composerOverlayElement,
       updateHeight,
     );
-  }, [composerOverlayElement, isDraftHeroState, publishComposerOverlayHeightStable]);
-  const currentItemCount = activeThreadShell?.itemCount ?? 0;
-  if (!showScrollToBottom && scrollToEndSeenItems !== currentItemCount) {
-    setScrollToEndSeenItems(currentItemCount);
-  }
+  }, [
+    composerOverlayElement,
+    isDraftHeroState,
+    publishComposerOverlayHeightStable,
+    // oxlint-disable-next-line react/exhaustive-effect-dependencies -- The scroll-to-bottom button changes the overlay's height without resizing the observed node first.
+    showScrollToBottom,
+  ]);
   const openPanelPullRequestUrl = useOpenPanelPullRequestUrl(activeThreadRef);
   const activeThreadReferenceCopyTarget =
     activeThreadRef === null || !isServerThread
@@ -2585,16 +2584,6 @@ export default function ChatView(props: ChatViewProps) {
     onDiffPanelOpen,
     closeRightPanelSurface,
   });
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- Route-owned inspector responds to explicit toolbar and artifact strip actions.
-  useEffect(() => onToggleThreadPanelRequest(toggleThreadPanelStable), [toggleThreadPanelStable]);
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- Explicit artifact links reveal the inspector without closing an already visible one.
-  useEffect(
-    () =>
-      onOpenThreadPanelRequest(() => {
-        if (!threadPanelOpen) toggleThreadPanelStable();
-      }),
-    [threadPanelOpen, toggleThreadPanelStable],
-  );
   const pullRequestSurfaceAvailable = supportsPullRequests && pullRequestPanelTarget !== null;
   const {
     acknowledgeActiveThreadWoke,
@@ -3144,7 +3133,7 @@ export default function ChatView(props: ChatViewProps) {
     scrollToEnd,
     setThreadError,
   });
-  const { onSend, sendFeedback, captureDetachedSend } = useComposerSend({
+  const { onSend, captureDetachedSend } = useComposerSend({
     environmentId,
     routeThreadKey,
     currentRouteThreadKeyRef,
@@ -3233,58 +3222,14 @@ export default function ChatView(props: ChatViewProps) {
   };
   const onWorktreeSetupWorkLocallyStable = useStableCallback(onWorktreeSetupWorkLocally);
   const onComposerSendStable = useStableCallback(onSend);
-  const sendPreviewAnnotation = async (
+  const sendPreviewAnnotation = (
     annotation: PreviewAnnotationPayload,
     image: ComposerImageAttachment | null,
   ) => {
-    const images: ComposerImageAttachment[] = [];
-    for (const pin of annotation.pins ?? []) {
-      if (!pin.screenshot) continue;
-      const captured = capturePreviewAnnotationScreenshot({
-        ...annotation,
-        id: pin.id,
-        screenshot: pin.screenshot,
-      });
-      if (captured.status !== "captured")
-        throw new Error(
-          uiText("Couldn’t read the screenshot for annotation {number}. Add it again.", {
-            number: pin.number,
-          }),
-        );
-      await readComposerImageBytes(captured.file);
-      images.push({
-        type: "image",
-        id: pin.id,
-        name: uiText("annotation-{number}.png", { number: pin.number }),
-        mimeType: captured.file.type,
-        sizeBytes: captured.file.size,
-        previewUrl: pin.screenshot.dataUrl,
-        file: captured.file,
-      });
-    }
-    let accepted = false;
-    await onSend(undefined, "auto", "foreground", {
-      annotation,
-      image,
-      images,
-      onAccepted: () => {
-        accepted = true;
-      },
-    });
-    return accepted;
+    void onSend(undefined, "auto", "foreground", { annotation, image });
   };
   const sendPreviewAnnotationStable = useStableCallback(sendPreviewAnnotation);
   const onComposerResumeStable = useStableCallback(onResume);
-  const onInboxContinue = useStableCallback(async () => {
-    if (currentRouteThreadKeyRef.current !== routeThreadKey)
-      throw new Error(uiText("Return to the original conversation to continue."));
-    if (canResume) {
-      if (!(await onResume()))
-        throw new Error(uiText("The task hasn’t resumed. Check the conversation and try again."));
-    } else {
-      await sendAppMessage(uiText("I’ve taken care of it. Please continue."));
-    }
-  });
   const onComposerCompactContextStable = useStableCallback(onCompactContext);
   // Read from the projection the footer renders, so the scroll below sees the new message.
   const pendingGuestMessageIds =
@@ -3414,93 +3359,13 @@ export default function ChatView(props: ChatViewProps) {
       .join(" · ") || null;
   // The end of the timeline holds the thread's present and next turns: what it is doing now,
   // its lifecycle status, guest messages awaiting you, then your queued messages.
-  const explicitTaskTrailProgress =
-    isServerThread && serverProjection
-      ? taskProgressSnapshot(serverProjection, serverThreadShell, !activeEnvironmentUnavailable)
-      : null;
-  const liveActivityTrail =
-    isServerThread &&
-    serverProjection &&
-    (!explicitTaskTrailProgress || explicitTaskTrailProgress.total === 0)
-      ? liveActivityTrailSnapshot(
-          serverProjection,
-          serverThreadShell,
-          !activeEnvironmentUnavailable,
-        )
-      : null;
-  const taskTrailProgress =
-    explicitTaskTrailProgress && explicitTaskTrailProgress.total > 0
-      ? explicitTaskTrailProgress
-      : (liveActivityTrail?.progress ?? explicitTaskTrailProgress);
-  const taskTrailDetailsValue =
-    explicitTaskTrailProgress && explicitTaskTrailProgress.total > 0
-      ? taskTrailDetails(explicitTaskTrailProgress, serverProjection)
-      : liveActivityTrail?.details;
-  const planKey = `${routeThreadKey}:${serverLatestRun?.runId ?? ""}`;
-  // The capsule floats above the composer while the plan is live. Once a finished plan has
-  // faded, a one-line summary stays in the conversation in its place.
-  const [dismissedPlanKey, setDismissedPlanKey] = useState<string | null>(null);
-  const dismissPlan = useStableCallback(() => setDismissedPlanKey(planKey));
-  const planComplete = taskTrailProgress?.state === "complete";
-  const planSettled = planComplete && dismissedPlanKey === planKey;
-  const taskTrail =
-    taskTrailProgress && taskTrailProgress.total > 0 && !planSettled ? (
-      <TaskTrailHost
-        key={planKey}
-        threadRef={routeThreadRef}
-        progress={taskTrailProgress}
-        projection={serverProjection}
-        details={taskTrailDetailsValue}
-        approvals={{
-          pending: pendingApprovals,
-          respondingRequestIds,
-          heldRequestIds: heldApprovalRequestIds,
-          disabled:
-            !canOperateThread ||
-            activeEnvironmentUnavailable ||
-            isEnvironmentChanging ||
-            isRevertingCheckpoint,
-          onRespond: onRespondToApprovalStable,
-        }}
-        onOpenFile={openFileSurfaceStable}
-        scope={{
-          environmentId,
-          activeThreadId,
-          activePendingUserInput,
-          supportsQuestionAttachments,
-        }}
-        decisionDisabled={activePendingIsResponding || activeEnvironmentUnavailable}
-        onSelect={onSelectActivePendingUserInputOptionStable}
-        onAdvance={onAdvanceActivePendingUserInputStable}
-        onFocus={focusComposerStable}
-        onDismissed={dismissPlan}
-      />
-    ) : null;
-  const taskSummary =
-    taskTrailProgress && planSettled ? (
-      <TaskPlanSummary
-        key={planKey}
-        progress={taskTrailProgress}
-        details={taskTrailDetailsValue ?? taskTrailDetails(taskTrailProgress, serverProjection)}
-        onOpenFile={openFileSurfaceStable}
-      />
-    ) : null;
-  const pendingSendFeedback =
-    sendFeedback &&
-    optimisticUserMessages.some((message) => message.id === sendFeedback.messageId) ? (
-      <SendFeedback feedback={sendFeedback} />
-    ) : null;
   const timelineFooter =
-    pendingSendFeedback === null &&
-    taskSummary === null &&
     pendingHandoff === null &&
     !hasThreadNow &&
     threadStatusLine === null &&
     pendingGuestMessageCount === 0 &&
     !hasQueuedTurns ? null : (
       <>
-        {pendingSendFeedback}
-        {taskSummary}
         {pendingHandoff === null ? null : (
           <div className="chat-content-lane">
             <HandoffRow
@@ -3511,15 +3376,13 @@ export default function ChatView(props: ChatViewProps) {
             />
           </div>
         )}
-        {pendingSendFeedback === null ? (
-          <ThreadNow
-            key={routeThreadKey}
-            attention={attentionNow}
-            work={workNow}
-            syncPhase={shownThreadSyncPhase}
-            goal={goalNow}
-          />
-        ) : null}
+        <ThreadNow
+          key={routeThreadKey}
+          attention={attentionNow}
+          work={workNow}
+          syncPhase={shownThreadSyncPhase}
+          goal={goalNow}
+        />
         {threadStatusLine}
         {pendingGuestMessageCount > 0 && isServerThread && activeThread ? (
           <GuestPendingMessages
@@ -3581,36 +3444,6 @@ export default function ChatView(props: ChatViewProps) {
     runShellCommand: runSideChatShellCommandStable,
   };
 
-  // V10 home: the draft's folder and machine sit under the composer as light chips;
-  // threads keep them in the footer.
-  const draftWorkspaceNotice =
-    draftId && activeProject ? (
-      <DraftWorkspaceNotice
-        draftId={draftId}
-        project={activeProject}
-        workspacePath={activeWorkspaceRoot ?? activeProject.workspaceRoot}
-        canChange={() => !envLocked && !sendInFlightRef.current}
-        environmentControl={
-          <BranchToolbarEnvironmentSelector
-            compactLabel={
-              environmentId === primaryEnvironment?.environmentId
-                ? uiText("Local machine")
-                : undefined
-            }
-            envLocked={envLocked}
-            environmentId={environmentId}
-            availableEnvironments={logicalProjectEnvironments}
-            {...(canChangeEnvironment ? { onEnvironmentChange: onEnvironmentChangeStable } : {})}
-            autoEnvironmentLabel={autoEnvironmentLabel}
-            onAutoEnvironment={
-              !envLocked && canAutoBalanceEnvironments && loadBalancingSettings.loadBalancingEnabled
-                ? onAutoEnvironmentStable
-                : undefined
-            }
-          />
-        }
-      />
-    ) : null;
   if (!activeThread) {
     return embedded ? null : <NoActiveThreadState />;
   }
@@ -3825,7 +3658,6 @@ export default function ChatView(props: ChatViewProps) {
             >
               <WorkspaceMutationIdContext value={workspaceMutationId}>
                 <ThreadTimeline
-                  approvalsInTaskTrail={taskTrail !== null}
                   pendingApprovals={pendingApprovals}
                   heldApprovalRequestIds={heldApprovalRequestIds}
                   respondingRequestIds={respondingRequestIds}
@@ -3934,6 +3766,14 @@ export default function ChatView(props: ChatViewProps) {
                     : { historyControls: threadHistoryControls })}
                 />
               </WorkspaceMutationIdContext>
+
+              {showScrollToBottom && !isThreadFindActive && (
+                <ScrollToEndButton
+                  bottom={scrollToEndClearance + 4}
+                  summary={scrollToEndSummary}
+                  onScrollToEnd={() => scrollToEnd(true)}
+                />
+              )}
             </div>
 
             <div
@@ -3948,22 +3788,19 @@ export default function ChatView(props: ChatViewProps) {
               }}
               inert={isRevertingCheckpoint}
               data-chat-composer-overlay="true"
-              data-stardust-newchat={isDraftHeroState || undefined}
-              className={cn(
-                "scrollbar-gutter-both",
+              className={
                 isDraftHeroState
-                  ? "pointer-events-none absolute inset-0 z-20 flex items-start overflow-y-auto py-12"
-                  : "pointer-events-none absolute inset-x-0 bottom-0 z-20 pt-1.5 sm:pt-2",
-              )}
+                  ? "pointer-events-none absolute inset-0 z-20 flex items-center [@media(max-height:34rem)]:items-end"
+                  : "pointer-events-none absolute inset-x-0 bottom-0 z-20 pt-1.5 sm:pt-2"
+              }
             >
-              {isDraftHeroState ? <StardustSky /> : null}
-              <div ref={draftHeroTransitionGroupRef} className="chat-composer-lane my-auto w-full">
+              <div ref={draftHeroTransitionGroupRef} className="chat-composer-lane w-full">
                 <div
                   data-chat-composer-stack="true"
                   className="group/composer-stack pointer-events-auto relative z-10 mx-auto w-full max-w-(--chat-content-max-width)"
                 >
                   {isDraftHeroState ? (
-                    <div className="relative mb-3">
+                    <div className="absolute inset-x-0 bottom-full">
                       <div
                         className="pb-4 group-has-data-[composer-shoulder-tab]/composer-stack:pb-0"
                         style={
@@ -3989,19 +3826,7 @@ export default function ChatView(props: ChatViewProps) {
                         : undefined
                     }
                   >
-                    {activeMessageCount === 0 &&
-                    optimisticUserMessages.length === 0 &&
-                    activeProjectRef &&
-                    !activeThread?.latestRun ? (
-                      <SimilarThreadsHint
-                        key={routeThreadKey}
-                        target={composerDraftTarget}
-                        current={routeThreadRef}
-                        project={activeProjectRef}
-                      />
-                    ) : null}
                     <ChildThreadApprovals threadRef={activeThreadRef} />
-
                     <div className="relative">
                       <ComposerSurface.Shell contextRow={showComposerContextStrip}>
                         <ComposerSurface.Host
@@ -4035,53 +3860,6 @@ export default function ChatView(props: ChatViewProps) {
                             ) : null}
                             {!composerMounted ? null : (
                               <ChatComposer
-                                floatingPlan={taskTrail}
-                                scrollToEnd={
-                                  !isDraftHeroState ? (
-                                    <ScrollToEndCircleButton
-                                      show={showScrollToBottom && !isThreadFindActive}
-                                      unread={
-                                        showScrollToBottom &&
-                                        currentItemCount > scrollToEndSeenItems
-                                      }
-                                      summary={scrollToEndSummary}
-                                      onScrollToEnd={() => {
-                                        setScrollToEndSeenItems(currentItemCount);
-                                        scrollToEnd(true);
-                                      }}
-                                    />
-                                  ) : null
-                                }
-                                footerLeading={
-                                  <>
-                                    {isServerThread &&
-                                    activeThreadShell &&
-                                    serverProjection &&
-                                    activeWorkspaceRoot ? (
-                                      <ContextHandoffNotice
-                                        key={routeThreadKey}
-                                        environmentId={environmentId}
-                                        thread={activeThreadShell}
-                                        projection={serverProjection}
-                                        cwd={activeWorkspaceRoot}
-                                        enabled={settings.longConversationReminderEnabled}
-                                        onCompact={
-                                          manualCompactionProviderAvailable
-                                            ? () => composerRef.current?.compactContext()
-                                            : undefined
-                                        }
-                                        compactDisabled={compactDisabled}
-                                        showThroughput={settings.turnThroughputEnabled}
-                                        disconnected={Boolean(activeEnvironmentUnavailable)}
-                                        disabled={
-                                          Boolean(activeEnvironmentUnavailable) ||
-                                          isRevertingCheckpoint
-                                        }
-                                      />
-                                    ) : null}
-                                    {isDraftHeroState ? null : draftWorkspaceNotice}
-                                  </>
-                                }
                                 canOperateThread={canOperateThread}
                                 reportedModelSelection={reportedModelSelection}
                                 multipleModelSelections={multipleModelSelections}
@@ -4194,8 +3972,9 @@ export default function ChatView(props: ChatViewProps) {
                                   (activeThreadShell ?? activeThread)?.pullRequests
                                 }
                                 onComposerOverlayHeightChange={publishComposerOverlayHeightStable}
-                                // V9: the footer capsule shows only a non-default mode, in drafts too.
-                                permissionsShownInStrip={false}
+                                permissionsShownInStrip={
+                                  showComposerContextStrip && !isServerThread
+                                }
                                 promptRef={promptRef}
                                 composerImagesRef={composerImagesRef}
                                 composerFilesRef={composerFilesRef}
@@ -4207,7 +3986,6 @@ export default function ChatView(props: ChatViewProps) {
                                 onSend={onComposerSendStable}
                                 captureDetachedSend={captureDetachedSend}
                                 onResume={onComposerResumeStable}
-                                onInboxContinue={onInboxContinue}
                                 onInterrupt={onInterruptStable}
                                 onSelectActivePendingUserInputOption={
                                   onSelectActivePendingUserInputOptionStable
@@ -4245,23 +4023,12 @@ export default function ChatView(props: ChatViewProps) {
                             )}
                           </div>
                         </ComposerSurface.Host>
-                        {isServerThread && serverProjection && activeThreadShell ? (
-                          <div data-session-stats-dock className="pointer-events-auto">
-                            <SessionStatsBar
-                              projection={serverProjection}
-                              environmentId={environmentId}
-                              threadId={threadId}
-                              itemCount={activeThreadShell.itemCount}
-                              disconnected={Boolean(activeEnvironmentUnavailable)}
-                            />
-                          </div>
-                        ) : null}
                         <div className="min-h-0">
                           <div
                             data-terminal-open={terminalUiState.terminalOpen ? "true" : undefined}
                             className="relative z-0"
                           >
-                            {showComposerContextStrip && !isDraftHeroState && (
+                            {showComposerContextStrip && (
                               <div className="pointer-events-auto">
                                 <BranchToolbar
                                   forceNewWorktree={multipleModelSelections !== null}
@@ -4330,12 +4097,6 @@ export default function ChatView(props: ChatViewProps) {
                           </div>
                         </div>
                       </ComposerSurface.Shell>
-                      {isDraftHeroState && draftWorkspaceNotice ? (
-                        <div data-v10-home-chips>{draftWorkspaceNotice}</div>
-                      ) : null}
-                      {isDraftHeroState ? (
-                        <StardustStart project={activeProjectRef} target={composerDraftTarget} />
-                      ) : null}
                       {isDraftHeroState && composerBannerItems.length > 0 ? (
                         // Out of flow, like the headline, so a notice never moves the centered composer.
                         // Short windows pin the composer to the bottom, where an out-of-flow notice
@@ -4375,27 +4136,6 @@ export default function ChatView(props: ChatViewProps) {
                 />
 
                 <ThreadDetailsPanel
-                  continuation={{
-                    thread: activeThread,
-                    projection: serverProjection ?? null,
-                    onQuote: (text) => {
-                      if (currentRouteThreadKeyRef.current !== routeThreadKey) return false;
-                      const inserted =
-                        composerRef.current?.insertTextAtEnd(text, {
-                          ensureLeadingBoundary: true,
-                        }) ?? false;
-                      if (inserted) scheduleComposerFocusStable();
-                      return inserted;
-                    },
-                  }}
-                  onAttachArtifactFiles={(files) => {
-                    if (currentRouteThreadKeyRef.current !== routeThreadKey)
-                      throw new Error(
-                        uiText("Return to the original conversation to reattach the file."),
-                      );
-                    composerRef.current?.addDroppedFiles(files);
-                    scheduleComposerFocusStable();
-                  }}
                   anchor={threadPanelPopoverAnchorRef}
                   handle={threadPanelPopoverHandle}
                   forceNewWorktree={multipleModelSelections !== null}

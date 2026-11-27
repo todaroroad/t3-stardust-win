@@ -30,7 +30,6 @@ export const UPDATE_SET_CHANNEL_CHANNEL = "desktop:update-set-channel";
 export const UPDATE_DOWNLOAD_CHANNEL = "desktop:update-download";
 export const UPDATE_INSTALL_CHANNEL = "desktop:update-install";
 export const UPDATE_CHECK_CHANNEL = "desktop:update-check";
-export const UPDATE_SET_AUTO_INSTALL_CHANNEL = "desktop:update-set-auto-install";
 export const CLI_COMMAND_GET_STATE_CHANNEL = "desktop:cli-command-get-state";
 export const CLI_COMMAND_INSTALL_CHANNEL = "desktop:cli-command-install";
 export const CLI_COMMAND_UNINSTALL_CHANNEL = "desktop:cli-command-uninstall";
@@ -41,8 +40,6 @@ export const GET_RELAY_TELEMETRY_ENABLED_CHANNEL = "desktop:get-relay-telemetry-
 export const GET_SYSTEM_LOCALE_CHANNEL = "desktop:get-system-locale";
 export const GET_PREFERRED_SYSTEM_LANGUAGES_CHANNEL = "desktop:get-preferred-system-languages";
 export const GET_PRIMARY_PASTE_ENABLED_CHANNEL = "desktop:get-primary-paste-enabled";
-export const LOCAL_ENVIRONMENT_BOOTSTRAPS_CHANGED_CHANNEL =
-  "desktop:local-environment-bootstraps-changed";
 export const GET_LOCAL_ENVIRONMENT_BOOTSTRAPS_CHANNEL = "desktop:get-local-environment-bootstraps";
 export const GET_LOCAL_ENVIRONMENT_ENABLED_CHANNEL = "desktop:get-local-environment-enabled";
 export const SET_LOCAL_ENVIRONMENT_ENABLED_CHANNEL = "desktop:set-local-environment-enabled";
@@ -158,6 +155,3 @@ export const COMPLETE_LEGACY_LOCAL_STORAGE_CHANNEL = "desktop:complete-legacy-lo
 export const RESTART_AUDIO_SERVICE_CHANNEL = "desktop:restart-audio-service";
 
 export const START_FILE_DRAG_CHANNEL = "desktop:start-file-drag";
-
-export const PREVIEW_PIN_ACTION_CHANNEL = "desktop:preview-pin-action";
-export const PREVIEW_PIN_STATE_CHANNEL = "desktop:preview-pin-state";

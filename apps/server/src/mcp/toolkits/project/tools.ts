@@ -1,4 +1,3 @@
-import { MemoryScope, MemoryText, MemoryEntry } from "@t3tools/contracts";
 import { McpAttachmentInput } from "../attachment/input.ts";
 import {
   clampedPositiveInt,
@@ -32,7 +31,7 @@ import * as ThreadLaunchService from "../../../orchestration-v2/ThreadLaunchServ
 import * as Digest from "effect/crypto/Digest";
 import * as SecureRandom from "effect/crypto/SecureRandom";
 import * as Schema from "effect/Schema";
-import { Tool, Toolkit, McpSchema } from "effect/ai";
+import { Tool, Toolkit } from "effect/ai";
 import * as ProjectService from "../../../project/ProjectService.ts";
 import * as ProjectCloneTracker from "../../../project/ProjectCloneTracker.ts";
 import * as ManagedProjectFolders from "../../../project/ManagedProjectFolders.ts";
@@ -194,32 +193,7 @@ const ThreadLaunchTool = Tool.make("t3_thread_launch", {
   .annotate(Tool.Destructive, true)
   .annotate(Tool.OpenWorld, true);
 
-const MemoryProposeTool = Tool.make("memory_propose", {
-  ...shared,
-  description:
-    "Propose a short durable fact for user review in Settings → 记忆. This only creates a pending proposal; it never changes approved memory. Scope: global or this thread's project. Never claim it is saved until the user approves. There is no agent approval tool.",
-  parameters: Schema.Struct({ text: MemoryText, scope: MemoryScope }),
-  success: Schema.Struct({ proposalId: Schema.String, status: Schema.Literal("pending") }),
-  dependencies: [...shared.dependencies, ServerSettings.ServerSettingsService],
-})
-  .annotate(Tool.Destructive, false)
-  .annotate(McpSchema.EnabledWhen, McpInvocationContext.hiddenFromOutsideClients);
-
-const MemoryListTool = Tool.make("memory_list", {
-  ...shared,
-  description:
-    "Read approved T3 memories, global plus this thread's project by default. Pending proposals are never returned. Project scope may only name this thread's project.",
-  parameters: Schema.Struct({ scope: Schema.optional(MemoryScope) }),
-  success: Schema.Array(MemoryEntry),
-  dependencies: [...shared.dependencies, ServerSettings.ServerSettingsService],
-})
-  .annotate(Tool.Readonly, true)
-  .annotate(Tool.Destructive, false)
-  .annotate(McpSchema.EnabledWhen, McpInvocationContext.hiddenFromOutsideClients);
-
 export const ProjectToolkit = Toolkit.make(
-  MemoryProposeTool,
-  MemoryListTool,
   ThreadLaunchTool,
   ProjectListTool,
   ProjectReadTool,

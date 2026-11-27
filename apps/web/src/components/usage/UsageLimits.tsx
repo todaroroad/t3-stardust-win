@@ -1,17 +1,3 @@
-import { readUiLocale } from "~/i18n";
-import { quotaWindowLabel } from "./usageQuotaPresentation";
-import {
-  resetAdvanceLabel,
-  resetFailureReason,
-  resetCreditChoices,
-  resetAffectedWindows,
-  resetEffectLabel,
-  resetExpiry,
-  RESET_EARLY_REMAINING_PERCENT,
-} from "./usageResetCreditPresentation";
-import { toastManager } from "../ui/toast";
-import { useUiText } from "~/i18n/useUiText";
-import { uiText } from "~/i18n";
 import {
   AuthProvidersManageScope,
   type EnvironmentId,
@@ -24,10 +10,16 @@ import {
 } from "@t3tools/contracts";
 import { useAtomValue } from "@effect/atom-react";
 import { normalizeProviderAccentColor } from "@t3tools/client-runtime/state/provider-instance-display";
-import { type LimitPace, paceOf, paceRemainingPercent, remainingPercent, type ResetCreditChoice } from "@t3tools/shared/usageLimits";
-import { formatResetsIn } from "@t3tools/shared/usageLimitsCopy";
+import {
+  type LimitPace,
+  paceOf,
+  paceRemainingPercent,
+  remainingPercent,
+  type ResetCreditChoice,
+} from "@t3tools/shared/usageLimits";
 import { GaugeIcon, TrendingDownIcon, TrendingUpIcon } from "lucide-react";
-import { Fragment, useLayoutEffect, useState, type ReactNode } from "react";
+import { msg, T, useGT, useMessages } from "gt-react";
+import { Fragment, useLayoutEffect, useState } from "react";
 
 import { usePrimarySettings } from "../../hooks/useSettings";
 import { observeResize } from "../../lib/observeResize";
@@ -47,27 +39,18 @@ import {
 } from "../ui/alert-dialog";
 import { Button } from "../ui/button";
 import { UsageLimitsPooled } from "./UsageLimitsPooled";
+import { formatResetsIn, resetCreditChoices } from "@t3tools/shared/usageLimitsCopy";
 import { PROVIDER_PRESENTATION } from "./usageProviders";
-import { T, useGT, useMessages } from "gt-react";
 import { SharedTooltipTrigger } from "../ui/shared-tooltip";
 
 const PACE: Record<LimitPace, { readonly label: string; readonly icon: typeof GaugeIcon }> = {
   ahead: {
-    get label() {
-      return uiText("Ahead of pace: spending faster than the window elapses");
-    },
+    label: msg("Ahead of pace: spending faster than the window elapses"),
     icon: TrendingUpIcon,
   },
-  on: {
-    get label() {
-      return uiText("On pace with the window");
-    },
-    icon: GaugeIcon,
-  },
+  on: { label: msg("On pace with the window"), icon: GaugeIcon },
   under: {
-    get label() {
-      return uiText("Under pace: headroom left for the rest of the window");
-    },
+    label: msg("Under pace: headroom left for the rest of the window"),
     icon: TrendingDownIcon,
   },
 };
@@ -81,16 +64,17 @@ export function barColor(driver: ServerProvider["driver"]): string {
 
 export function PaceIcon({ pace }: { readonly pace: LimitPace }) {
   const Icon = PACE[pace].icon;
+  const m = useMessages();
   return (
     <SharedTooltipTrigger
       render={
         <span
           role="img"
-          aria-label={PACE[pace].label}
+          aria-label={m(PACE[pace].label)}
           className="inline-flex text-muted-foreground"
         />
       }
-      label={PACE[pace].label}
+      label={m(PACE[pace].label)}
     >
       <Icon className="size-3.5" aria-hidden />
     </SharedTooltipTrigger>
@@ -144,17 +128,34 @@ function WindowBar({
   readonly window: ServerProviderUsageWindow;
   readonly now: number;
 }) {
+  const timestampFormat = usePrimarySettings((settings) => settings.timestampFormat);
   const gt = useGT();
   const m = useMessages();
-  const timestampFormat = usePrimarySettings((settings) => settings.timestampFormat);
   const remaining = remainingPercent(window);
   const timeLeft = paceRemainingPercent(window, now);
   const [barRef, paceMark] = usePaceMark(timeLeft);
   const resetsIn = formatResetsIn(window, now, m);
   const resetsAt = window.resetsAt
-    ? formatUpcomingTimestamp(window.resetsAt, timestampFormat, now)
+    ? formatUpcomingTimestamp(window.resetsAt, timestampFormat, now, undefined, m)
     : null;
-  const summary = `${window.label}: ${remaining}% left${timeLeft === null ? "" : `, ${timeLeft}% of the window left`}${resetsIn ? `, ${resetsIn}` : ""}`;
+  const label = window.label;
+  const summary =
+    timeLeft === null
+      ? resetsIn
+        ? gt("{label}: {remaining}% left, {resetsIn}", { label, remaining, resetsIn })
+        : gt("{label}: {remaining}% left", { label, remaining })
+      : resetsIn
+        ? gt("{label}: {remaining}% left, {timeLeft}% of the window left, {resetsIn}", {
+            label,
+            remaining,
+            timeLeft,
+            resetsIn,
+          })
+        : gt("{label}: {remaining}% left, {timeLeft}% of the window left", {
+            label,
+            remaining,
+            timeLeft,
+          });
 
   return (
     <SharedTooltipTrigger
@@ -225,8 +226,9 @@ export function LimitWindows({
   readonly now: number;
   readonly compact?: boolean;
 }) {
-  const uiText = useUiText();
   const color = normalizeProviderAccentColor(accentColor) ?? barColor(driver);
+  const gt = useGT();
+  const m = useMessages();
   return (
     <div
       className={
@@ -237,24 +239,19 @@ export function LimitWindows({
     >
       {windows.map((window) => {
         const pace = paceOf(window, now);
-        const resetsIn = formatResetsIn(window, now);
+        const resetsIn = formatResetsIn(window, now, m);
         return (
           <Fragment key={window.id}>
-            <span className={"flex min-w-0 items-center gap-2 text-xs"}>
-              <span className={"truncate text-muted-foreground"}>{window.label}</span>
-              <span className={"ms-auto shrink-0 font-medium text-foreground tabular-nums"}>
-                {remainingPercent(window)}
-                {uiText("% left")}
+            <span className="flex min-w-0 items-center gap-2 text-xs">
+              <span className="truncate text-muted-foreground">{window.label}</span>
+              <span className="ms-auto shrink-0 font-medium text-foreground tabular-nums">
+                {gt("{remaining}% left", { remaining: remainingPercent(window) })}
               </span>
             </span>
             <WindowBar color={color} window={window} now={now} />
-            <span
-              className={
-                "flex items-center gap-2 text-xs whitespace-nowrap text-muted-foreground tabular-nums"
-              }
-            >
+            <span className="flex items-center gap-2 text-xs whitespace-nowrap text-muted-foreground tabular-nums">
               {pace ? <PaceIcon pace={pace} /> : null}
-              <span className={"ms-auto shrink-0"}>{resetsIn ?? ""}</span>
+              <span className="ms-auto shrink-0">{resetsIn ?? ""}</span>
             </span>
           </Fragment>
         );
@@ -264,72 +261,38 @@ export function LimitWindows({
 }
 
 const OUTCOME_TEXT: Record<ProviderConsumeResetCreditOutcome, string> = {
-  reset: "Reset applied. Your windows have cleared.",
-  nothingToReset: "Nothing to reset right now.",
-  noCredit: "No reset credit left.",
-  alreadyRedeemed: "That credit was already redeemed.",
+  reset: msg("Reset applied. Your windows have cleared."),
+  nothingToReset: msg("Nothing to reset right now."),
+  noCredit: msg("No reset credit left."),
+  alreadyRedeemed: msg("That credit was already redeemed."),
 };
 
-export function useResetCredit(environmentId: EnvironmentId, totalCredits?: number) {
-  const text = useUiText();
-  const refresh = useAtomCommand(serverEnvironment.refreshProviders, { reportFailure: false });
+export function useResetCredit(environmentId: EnvironmentId) {
   const canManageProviders = useEnvironmentScope(environmentId, AuthProvidersManageScope);
   const consume = useAtomCommand(serverEnvironment.consumeResetCredit, { reportFailure: false });
+  const m = useMessages();
   // Kept after close so the dialog's text survives its exit animation.
   const [choice, setChoice] = useState<ResetCreditChoice | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
 
-  const executeRedeem = async (target: ResetCreditChoice | null) => {
+  const redeem = async () => {
     setConfirming(false);
-    if (!target || !readEnvironmentScope(environmentId, AuthProvidersManageScope)) return;
+    if (!choice || !readEnvironmentScope(environmentId, AuthProvidersManageScope)) return;
     setBusy(true);
     setStatus(null);
-    await (async () => {
-      const result = await consume({ environmentId, input: target.input });
-      if (result._tag === "Success") {
-        if (result.value.outcome === "reset") {
-          const refreshed = await refresh({ environmentId, input: {} });
-          if (refreshed._tag === "Failure") {
-            const message = text(
-              "Reset applied, but quota refresh failed. Refresh the quota to check its current status.",
-            );
-            setStatus(message);
-            toastManager.add({ type: "warning", title: message });
-            return;
-          }
-          const message = text("Reset applied · {count} credits left", {
-            count: Math.max(0, (totalCredits ?? target.availableCount) - 1),
-          });
-          setStatus(message);
-          toastManager.add({ type: "success", title: message });
-        } else setStatus(text(OUTCOME_TEXT[result.value.outcome]));
-        if (result.value.warning)
-          toastManager.add({
-            type: "warning",
-            title: text("Reset status notice"),
-            description: text("The provider returned a warning: {reason}", {
-              reason: text(result.value.warning),
-            }),
-          });
-        return;
-      }
-      const reason =
-        "error" in result.cause && result.cause.error instanceof Error
-          ? result.cause.error.message
-          : text("Unknown provider error");
-      setStatus(
-        text("Could not use the reset credit: {reason}", { reason: resetFailureReason(reason) }),
-      );
-    })().finally(() => setBusy(false));
-  };
-
-  const redeem = async () => executeRedeem(choice);
-
-  const redeemChoice = async (next: ResetCreditChoice) => {
-    setChoice(next);
-    await executeRedeem(next);
+    const result = await consume({ environmentId, input: choice.input });
+    setBusy(false);
+    if (result._tag === "Success") {
+      setStatus(result.value.warning ?? m(OUTCOME_TEXT[result.value.outcome]));
+      return;
+    }
+    setStatus(
+      "error" in result.cause && result.cause.error instanceof Error
+        ? result.cause.error.message
+        : m(msg("Could not use the reset credit.")),
+    );
   };
 
   const confirm = (next: ResetCreditChoice) => {
@@ -338,17 +301,7 @@ export function useResetCredit(environmentId: EnvironmentId, totalCredits?: numb
     setConfirming(true);
   };
 
-  return {
-    canManageProviders,
-    choice,
-    confirming,
-    setConfirming,
-    confirm,
-    busy,
-    status,
-    redeem,
-    redeemChoice,
-  };
+  return { canManageProviders, choice, confirming, setConfirming, confirm, busy, status, redeem };
 }
 
 /** Require confirmation because redemption spends credits. Mount outside popovers, which stack above
@@ -357,135 +310,30 @@ export function ResetCreditDialog({
   open,
   onOpenChange,
   choice,
-  choices = [],
-  onChoice,
-  credits,
-  windows = [],
-  provider = "",
-  now,
   onConfirm,
   disabled = false,
 }: {
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
   readonly choice: ResetCreditChoice | null;
-  readonly choices?: readonly ResetCreditChoice[];
-  readonly onChoice?: (choice: ResetCreditChoice) => void;
-  readonly credits?: ServerProviderResetCredits | undefined;
-  readonly windows?: readonly ServerProviderUsageWindow[];
-  readonly provider?: string;
-  readonly now: number;
   readonly onConfirm: () => void;
   readonly disabled?: boolean;
 }) {
-  const text = useUiText();
-  const affected = resetAffectedWindows(choice, credits, windows);
-  const early =
-    affected.length > 0 &&
-    affected.every((w) => remainingPercent(w) >= RESET_EARLY_REMAINING_PERCENT);
-  const multiple = choices.length > 1;
-  const available = credits?.availableCount ?? choice?.availableCount ?? 0;
-  const timestampFormat = usePrimarySettings((s) => s.timestampFormat);
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogPopup data-usage-portal variant="usage-reset">
+      <AlertDialogPopup>
         <AlertDialogHeader>
           <AlertDialogTitle>
-            {early
-              ? text("It's a little early to use this")
-              : multiple
-                ? text("Choose a reset credit")
-                : text("Use one reset credit to refill {provider}?", { provider })}
+            <T>Use a reset credit?</T>
           </AlertDialogTitle>
           <AlertDialogDescription>{choice?.confirmDescription}</AlertDialogDescription>
         </AlertDialogHeader>
-        {multiple ? (
-          <fieldset className="usage-reset-options">
-            <legend className="sr-only">{text("Choose a reset credit")}</legend>
-            {choices.map((c) => {
-              const option = credits?.options?.find((o) => o.creditId === c.key);
-              return (
-                <label key={c.key}>
-                  <input
-                    type="radio"
-                    name="reset-credit"
-                    value={c.key}
-                    checked={c.key === choice?.key}
-                    disabled={disabled || c.availableCount <= 0}
-                    onChange={() => onChoice?.(c)}
-                  />
-                  <span>
-                    <b>{resetEffectLabel(option?.label ?? c.actionLabel)}</b>
-                    <small>{c.summary}</small>
-                  </span>
-                </label>
-              );
-            })}
-          </fieldset>
-        ) : null}
-        <div className="usage-reset-effects">
-          {affected.map((w) => (
-            <div className="usage-reset-window" key={w.id}>
-              <div>
-                <span>{quotaWindowLabel(w.label, readUiLocale() === "zh-CN")}</span>
-                <b>{remainingPercent(w)}% → 100%</b>
-              </div>
-              {w.resetsAt ? (
-                <div>
-                  <span>{text("Natural reset")}</span>
-                  <span>
-                    {formatUpcomingTimestamp(w.resetsAt, timestampFormat, now)} ·{" "}
-                    {resetAdvanceLabel(w.resetsAt, now)}
-                  </span>
-                </div>
-              ) : null}
-            </div>
-          ))}
-          {!affected.length ? (
-            <p>
-              {text(
-                "The provider has not reported the exact affected windows. Check the selected reset's effect before using it.",
-              )}
-            </p>
-          ) : null}
-          <div>
-            <span>{text("Reset credits")}</span>
-            <span>
-              {text("{before} → {after} credits · earliest expiry {date}", {
-                before: available,
-                after: Math.max(0, available - 1),
-                date: resetExpiry(
-                  [credits?.nextExpiresAt, ...(credits?.options?.map((o) => o.expiresAt) ?? [])]
-                    .filter((at): at is string => Boolean(at))
-                    .toSorted()[0],
-                ),
-              })}
-            </span>
-          </div>
-        </div>
-        {early ? (
-          <p className="usage-reset-warning">
-            {text(
-              "You still have at least {percent}% left. Waiting will make this credit go further.",
-              { percent: RESET_EARLY_REMAINING_PERCENT },
-            )}
-          </p>
-        ) : null}
-        <p className="usage-reset-note">
-          {text(
-            "One credit is deducted by the provider and cannot be restored. The provider decides which credit to spend.",
-          )}
-        </p>
         <AlertDialogFooter>
-          <AlertDialogClose render={<Button variant={early ? "default" : "outline"} />}>
-            {early ? text("Keep this credit for later") : text("Cancel")}
+          <AlertDialogClose render={<Button variant="outline" />}>
+            <T>Cancel</T>
           </AlertDialogClose>
-          <Button
-            variant={early ? "outline" : "default"}
-            disabled={disabled || !choice || choice.availableCount <= 0}
-            onClick={onConfirm}
-          >
-            {early ? text("Use anyway") : multiple ? text("Use selected") : text("Use one credit")}
+          <Button disabled={disabled} onClick={onConfirm}>
+            <T>Use credit</T>
           </Button>
         </AlertDialogFooter>
       </AlertDialogPopup>
@@ -505,12 +353,13 @@ export function ResetCredits({
   readonly now: number;
 }) {
   const { canManageProviders, choice, confirming, setConfirming, confirm, busy, status, redeem } =
-    useResetCredit(environmentId, credits.availableCount);
-  const choices = resetCreditChoices(credits, input, now);
+    useResetCredit(environmentId);
+  const gt = useGT();
+  const m = useMessages();
   if (credits.availableCount === 0 && status === null) return null;
   return (
     <div className="flex flex-col gap-1 text-xs text-muted-foreground">
-      {choices.map((choice) => (
+      {resetCreditChoices(credits, input, now, false, m).map((choice) => (
         <div key={choice.key} className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <span className="tabular-nums">{choice.summary}</span>
           {choice.availableCount > 0 ? (
@@ -520,7 +369,7 @@ export function ResetCredits({
               disabled={busy || !canManageProviders}
               onClick={() => confirm(choice)}
             >
-              {busy ? uiText("Using…") : choice.actionLabel}
+              {busy ? gt("Using…") : choice.actionLabel}
             </Button>
           ) : null}
         </div>
@@ -530,10 +379,6 @@ export function ResetCredits({
         open={confirming}
         onOpenChange={setConfirming}
         choice={choice}
-        choices={choices}
-        onChoice={confirm}
-        credits={credits}
-        now={now}
         onConfirm={() => void redeem()}
         disabled={!canManageProviders}
       />
@@ -546,9 +391,7 @@ export function UsageLimitsSection({
   selectedEnvironmentIds,
   hiddenProviders,
   now,
-  refreshControl,
 }: {
-  readonly refreshControl?: ReactNode;
   readonly selectedEnvironmentIds: ReadonlySet<EnvironmentId> | null;
   readonly hiddenProviders: ReadonlySet<UsageProviderKind>;
   readonly now: number;
@@ -583,5 +426,5 @@ export function UsageLimitsSection({
       ];
     }),
   );
-  return <UsageLimitsPooled presentations={selected} now={now} refreshControl={refreshControl} />;
+  return <UsageLimitsPooled presentations={selected} now={now} />;
 }

@@ -1,4 +1,3 @@
-import { uiText } from "~/i18n";
 import type { FileDiffMetadata, SelectedLineRange, SelectionSide } from "@pierre/diffs";
 import { PullRequestContextMetadata, type PullRequestReviewPosition } from "@t3tools/contracts";
 import * as Schema from "effect/Schema";
@@ -438,7 +437,7 @@ function getDiffChangeMarker(change: DiffReviewLine["change"]): string {
 function formatDiffReviewRangeLabel(lines: ReadonlyArray<DiffReviewLine>): string {
   const firstLine = lines[0];
   const lastLine = lines.at(-1);
-  if (!firstLine || !lastLine) return uiText("line");
+  if (!firstLine || !lastLine) return "line";
   const firstNumber = firstLine.newLineNumber ?? firstLine.oldLineNumber;
   const lastNumber = lastLine.newLineNumber ?? lastLine.oldLineNumber;
   if (firstNumber === null || lastNumber === null || firstNumber > lastNumber) {

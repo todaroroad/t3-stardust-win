@@ -1,4 +1,3 @@
-import { consumeSpotlightMatch, subscribeSpotlightMatch } from "./spotlightMatchBus";
 import type { InlineSkill } from "@t3tools/shared/inlineSkills";
 import type { OrchestrationV2SearchThreadResult, ScopedThreadRef } from "@t3tools/contracts";
 import { scopedThreadKey } from "@t3tools/client-runtime/environment";
@@ -12,7 +11,6 @@ import type { ThemeAppearance } from "~/themePalette";
 import { type ThreadFindMatch, type ThreadFindStart, stepThreadFindIndex } from "./threadFind";
 import {
   CLOSED_THREAD_FIND,
-  openThreadFindOnQuery,
   closeThreadFind,
   setThreadFindQuery,
   useThreadFindOpen,
@@ -20,7 +18,9 @@ import {
   type ThreadFindLocalSelection,
   type ThreadFindState,
 } from "./threadFindStore";
+
 const EMPTY_SKILLS: readonly InlineSkill[] = [];
+
 export function useThreadFind({
   thread,
   enabled,
@@ -51,21 +51,7 @@ export function useThreadFind({
     useThreadFindStore.setState((previous) =>
       previous.threadKey === threadKey ? update(previous) : previous,
     );
-  const openSpotlightMatch = useEffectEvent(() => {
-    if (!enabled || !thread || !threadKey) return;
-    const target = consumeSpotlightMatch(thread);
-    if (target)
-      openThreadFindOnQuery(threadKey, {
-        query: target.query,
-        start: { entryId: target.messageId, occurrence: 0 },
-      });
-  });
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- Subscribe the current thread to Spotlight navigation events until it changes.
-  useEffect(() => {
-    if (!enabled || !threadKey) return;
-    openSpotlightMatch();
-    return subscribeSpotlightMatch(openSpotlightMatch);
-  }, [threadKey, enabled]);
+
   const remote = useServerResults(
     isOpen ? thread : null,
     state.query,
@@ -178,6 +164,7 @@ export function useThreadFind({
       };
     });
   };
+
   // Runs from the refresh timer and after a coalesced search settles, against
   // the results and selection showing by then.
   const refreshLiveResults = useEffectEvent(() => {
@@ -233,6 +220,7 @@ export function useThreadFind({
       refreshAfterSearchRef.current = false;
     };
   }, [threadKey, isOpen, state.query]);
+
   return {
     barProps: {
       open: isOpen,
@@ -256,6 +244,7 @@ export function useThreadFind({
     timelineProps: timeline,
   };
 }
+
 export interface TimelineFields {
   readonly findOpen: boolean;
   readonly findExpanded: boolean;
@@ -263,6 +252,7 @@ export interface TimelineFields {
   readonly activeFindMatch: ThreadFindMatch | null;
   readonly findNavigationId: number;
 }
+
 function sameTimeline(a: TimelineFields, b: TimelineFields) {
   const aMatch = a.activeFindMatch;
   const bMatch = b.activeFindMatch;
@@ -278,6 +268,7 @@ function sameTimeline(a: TimelineFields, b: TimelineFields) {
         aMatch.occurrence === bMatch.occurrence)
   );
 }
+
 function rebaseLocalSelection(
   selection: ThreadFindLocalSelection | null,
   data: OrchestrationV2SearchThreadResult | null,
@@ -292,6 +283,7 @@ function rebaseLocalSelection(
   const activeIndex = entry.startIndex + selection.match.occurrence;
   return activeIndex === selection.activeIndex ? selection : { ...selection, activeIndex };
 }
+
 function useServerResults(
   thread: ScopedThreadRef | null,
   query: string,
@@ -363,6 +355,7 @@ function useServerResults(
       (normalizedQuery !== debouncedQuery || result.isPending),
   };
 }
+
 function resolveThreadFindAtom(
   target: Parameters<typeof orchestrationEnvironment.threadFind>[0] | null,
   progressive: boolean,

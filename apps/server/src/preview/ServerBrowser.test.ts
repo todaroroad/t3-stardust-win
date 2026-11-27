@@ -4645,8 +4645,6 @@ it.live("a page's title change without navigation reaches its session", () =>
       yield* ServerBrowser.ServerBrowser;
       const manager = yield* Manager.PreviewManager;
       const events = yield* manager.subscribeEvents;
-      // Match ready(): let the server browser subscribe before publishing the open event.
-      yield* Effect.yieldNow;
       yield* manager.open({
         threadId: testThread.threadId,
         runtime: "server",

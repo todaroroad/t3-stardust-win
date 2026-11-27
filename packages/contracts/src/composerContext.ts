@@ -155,18 +155,6 @@ export const PreviewAnnotationContextRecord = Schema.Struct({
   ...recordBase,
   kind: Schema.Literal("preview-annotation"),
   annotationId: ShortString,
-  pins: Schema.optionalKey(
-    Schema.Array(
-      Schema.Struct({
-        number: NonNegativeInt,
-        text: ShortString,
-        tag: ShortString,
-        selectorChain: Schema.Array(ShortString),
-        relative: Schema.Struct({ x: Schema.Number, y: Schema.Number }),
-        pageKey: ShortString,
-      }),
-    ).check(Schema.isMaxLength(100)),
-  ),
   pageUrl: ShortString,
   pageTitle: NullableShortString,
   comment: BoundedString(COMPOSER_CONTEXT_PREVIEW_COMMENT_MAX_CHARS),

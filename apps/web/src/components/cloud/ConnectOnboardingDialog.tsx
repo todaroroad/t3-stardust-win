@@ -1,5 +1,3 @@
-
-import { uiText } from "~/i18n";
 import { useAuth } from "@clerk/react";
 import { useAtomValue } from "@effect/atom-react";
 import { managedCapabilityDenial } from "@t3tools/client-runtime/contract-labels";
@@ -11,7 +9,7 @@ import {
   type EnvironmentId,
 } from "@t3tools/contracts";
 import { AsyncResult, Atom } from "effect/reactivity";
-import { T, useGT, useMessages } from "gt-react";
+import { msg, T, useGT, useMessages } from "gt-react";
 import { useState } from "react";
 
 import {
@@ -334,14 +332,12 @@ function ConfiguredConnectOnboardingDialog() {
     </Dialog>
   );
 }
+
 const STEP_LABELS: Record<OnboardingStep, string> = {
-  get publish() {
-    return uiText("Publish");
-  },
-  get devices() {
-    return uiText("Connect devices");
-  },
+  publish: msg("Publish"),
+  devices: msg("Connect devices"),
 };
+
 function PublishStep({
   exposeEnvironment,
   publishAgentActivity,

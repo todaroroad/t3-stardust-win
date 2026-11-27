@@ -183,31 +183,6 @@ export function claudeRateLimitEventToUpdate(
   return undefined;
 }
 
-/**
- * T3's terminal API tap attaches every unified window from one response's headers. That is a
- * complete, authoritative reading, so all windows are applied together rather than one per event.
- */
-export function claudeUnifiedWindowsToUpdate(
-  info: SDKRateLimitInfo,
-): ProviderUsageLimitsUpdate | undefined {
-  const unified = (info as { readonly unifiedWindows?: unknown }).unifiedWindows;
-  if (!unified || typeof unified !== "object") return undefined;
-  const windows: ServerProviderUsageWindow[] = [];
-  for (const [id, value] of Object.entries(unified as Record<string, unknown>)) {
-    if (!(id in WINDOWS) || !value || typeof value !== "object") continue;
-    const { utilization, resetsAt } = value as { utilization?: unknown; resetsAt?: unknown };
-    if (typeof utilization !== "number" || !Number.isFinite(utilization)) continue;
-    windows.push(
-      makeWindow(
-        id as keyof typeof WINDOWS & string,
-        utilization * 100,
-        isoFromEpochSeconds(typeof resetsAt === "number" ? resetsAt : undefined),
-      ),
-    );
-  }
-  return windows.length > 0 ? { windows } : undefined;
-}
-
 /** get_usage percentages are already 0-100. */
 export function claudeUsageResponseToLimits(input: {
   readonly response: Pick<SDKControlGetUsageResponse, "rate_limits_available" | "rate_limits">;

@@ -2,14 +2,10 @@ import { describe, expect, it } from "vite-plus/test";
 import { page } from "vite-plus/test/browser";
 
 import { render } from "../../../test/render";
-import { refreshTheme } from "../../hooks/useTheme";
 import { UsageModelDialog } from "./UsageModelDialog";
 
 describe("UsageModelDialog", () => {
   it("exposes each stat as its own label and value to screen readers", async () => {
-    // This asserts the default theme's stat labels; never inherit a theme left by an earlier file.
-    localStorage.removeItem("t3code:theme");
-    refreshTheme();
     await using _screen = await render(
       <UsageModelDialog
         model={{

@@ -1,6 +1,5 @@
 import {
   type EnvironmentId,
-  type ProviderDriverKind,
   type ModelSelection,
   type ServerSettings,
   type ProjectId,
@@ -307,11 +306,6 @@ export interface LimitAccount {
     readonly input: ProviderConsumeResetCreditInput;
   } | null;
   readonly limits: ServerProviderUsageLimits;
-  /** Provider instances signed in to this login, so a thread's instance can find its account. */
-  readonly instances?: ReadonlyArray<{
-    readonly environmentId: EnvironmentId;
-    readonly instanceId: ProviderInstanceId;
-  }>;
 }
 
 export function collectHttpQuotaSources(presentations: Parameters<typeof collectLimitAccounts>[0]) {
@@ -394,17 +388,6 @@ export function collectLimitAccounts(presentations: LimitPresentations): readonl
       plan: planSources.get(key)?.plan ?? previous.plan ?? next.plan,
       accentColor: previous.accentColor ?? next.accentColor,
       environments,
-      instances: [
-        ...(previous.instances ?? []),
-        ...(next.instances ?? []).filter(
-          (candidate) =>
-            !previous.instances?.some(
-              (seen) =>
-                seen.environmentId === candidate.environmentId &&
-                seen.instanceId === candidate.instanceId,
-            ),
-        ),
-      ],
       sourceLabel: environments.length > 0 ? null : (previous.sourceLabel ?? next.sourceLabel),
       redeem:
         hubRedeems.get(key)?.redeem ??
@@ -421,15 +404,7 @@ export function collectLimitAccounts(presentations: LimitPresentations): readonl
   for (const [environmentId, presentation] of presentations) {
     const label = presentation.entry.target.label;
     for (const provider of providersWithLimits(presentation.serverConfig?.providers ?? [])) {
-      if (
-        !provider.usageLimits ||
-        (limitsNotice(provider.usageLimits) !== null &&
-          !(
-            provider.usageLimits.unavailable?.reason === "probeFailed" &&
-            provider.usageLimits.windows.length
-          ))
-      )
-        continue;
+      if (!provider.usageLimits || limitsNotice(provider.usageLimits) !== null) continue;
       merge(nativeRowKey(resolveKey, environmentId, provider), {
         key: `${environmentId}:${provider.instanceId}`,
         driver: provider.driver,
@@ -438,7 +413,6 @@ export function collectLimitAccounts(presentations: LimitPresentations): readonl
         plan: provider.auth.label,
         accentColor: provider.accentColor,
         environments: [{ environmentId, label }],
-        instances: [{ environmentId, instanceId: provider.instanceId }],
         sourceLabel: null,
         redeem: { environmentId, input: { instanceId: provider.instanceId } },
         limits: provider.usageLimits,
@@ -452,14 +426,7 @@ export function collectLimitAccounts(presentations: LimitPresentations): readonl
         ? `${presentation.entry.target.label} · ${source.label}`
         : source.label;
       for (const account of source.accounts) {
-        if (
-          limitsNotice(account.usageLimits) !== null &&
-          !(
-            account.usageLimits.unavailable?.reason === "probeFailed" &&
-            account.usageLimits.windows.length
-          )
-        )
-          continue;
+        if (limitsNotice(account.usageLimits) !== null) continue;
         const resolved = resolveKey(account);
         // A resolved account already has an identity; its public key must stay distinct from others'.
         const hub = resolved ? `${environmentId}:${source.id}` : hubIdentity(environmentId, source);
@@ -550,8 +517,6 @@ export interface LimitPoolWindow {
 
 export interface LimitPool {
   readonly driver: ServerProvider["driver"];
-  /** Set when the pool is one login of a driver that shows each login on its own card. */
-  readonly id?: string;
   readonly accounts: readonly LimitAccount[];
   readonly windows: readonly LimitPoolWindow[];
 }
@@ -593,18 +558,9 @@ const WINDOW_KIND_ORDER: Record<ServerProviderUsageWindow["kind"], number> = {
   other: 3,
 };
 
-/** Pools and anchors are keyed by driver, except a driver whose logins each have a card. */
-export const limitPoolId = (pool: Pick<LimitPool, "driver" | "id">): string =>
-  pool.id ?? String(pool.driver);
-
-/**
- * `separateDrivers` lists drivers whose logins are separate subscriptions, so averaging them into
- * one card would hide which login is low. A driver with a single login keeps its one card.
- */
 export function collectLimitPools(
   accounts: readonly LimitAccount[],
   now: number,
-  options: { readonly separateDrivers?: ReadonlyArray<ServerProvider["driver"]> } = {},
 ): readonly LimitPool[] {
   const byDriver = new Map<ServerProvider["driver"], LimitAccount[]>();
   for (const account of accounts) {
@@ -612,7 +568,7 @@ export function collectLimitPools(
     if (list) list.push(account);
     else byDriver.set(account.driver, [account]);
   }
-  return [...byDriver].flatMap(([driver, members]): LimitPool[] => {
+  return [...byDriver].map(([driver, members]) => {
     const orderWindow = members
       .flatMap((account) => account.limits.windows)
       .sort((left, right) => WINDOW_KIND_ORDER[left.kind] - WINDOW_KIND_ORDER[right.kind])[0];
@@ -631,15 +587,7 @@ export function collectLimitPools(
         accountSortName(left).localeCompare(accountSortName(right)) ||
         left.key.localeCompare(right.key),
     );
-    if (sorted.length > 1 && options.separateDrivers?.includes(driver)) {
-      return sorted.map((account) => ({
-        driver,
-        id: `${driver}:${account.key}`,
-        accounts: [account],
-        windows: poolWindows([account], now),
-      }));
-    }
-    return [{ driver, accounts: sorted, windows: poolWindows(sorted, now) }];
+    return { driver, accounts: sorted, windows: poolWindows(sorted, now) };
   });
 }
 
@@ -1139,200 +1087,4 @@ export function collectProviderUsageLimits(
     }
   }
   return { createdAt: DateTime.formatIso(DateTime.makeUnsafe(now)), accounts, notices };
-}
-
-export interface QuotaAccount {
-  readonly id: string;
-  readonly driver: ProviderDriverKind;
-  readonly label: string;
-  readonly alias: string;
-  readonly limits: ServerProviderUsageLimits | undefined;
-  readonly connected: boolean;
-  readonly failed: boolean;
-  /** What to call this login: its instance name when the driver has several, else the driver. */
-  readonly title: string;
-  /** The instance name, empty when it only repeats the driver or is an e-mail. */
-  readonly name: string;
-  readonly instances: ReadonlyArray<{
-    readonly environmentId: EnvironmentId;
-    readonly instanceId: ProviderInstanceId;
-  }>;
-}
-type Presentations = ReadonlyMap<
-  EnvironmentId,
-  LimitPresentations extends ReadonlyMap<EnvironmentId, infer P>
-    ? P & { readonly connection: { readonly phase: string } }
-    : never
->;
-const LABELS: Readonly<Record<string, string>> = {
-  codex: "Codex",
-  claudeAgent: "Claude",
-  antigravity: "Antigravity",
-  cursor: "Cursor",
-  grok: "Grok",
-  opencode: "OpenCode",
-};
-
-// An instance name tells logins apart only when it says more than the driver already does.
-function instanceName(displayName: string | null | undefined, driverLabel: string): string {
-  const name = displayName?.trim() ?? "";
-  return name.includes("@") || name.toLowerCase() === driverLabel.toLowerCase() ? "" : name;
-}
-
-// Preference ids must stay local and must not persist emails or credential fingerprints.
-function preferenceId(value: string): string {
-  let hash = 14695981039346656037n;
-  for (let i = 0; i < value.length; i++)
-    hash = BigInt.asUintN(64, (hash ^ BigInt(value.charCodeAt(i))) * 1099511628211n);
-  return hash.toString(36);
-}
-export function quotaAccounts(presentations: Presentations): readonly QuotaAccount[] {
-  // Failed probes can retain usable cached windows. Unsupported accounts cannot.
-  const cached = new Map(
-    [...presentations].map(([id, p]) => [
-      id,
-      {
-        ...p,
-        serverConfig: p.serverConfig && {
-          ...p.serverConfig,
-          providers: p.serverConfig.providers.map((provider) =>
-            provider.usageLimits?.unavailable?.reason === "probeFailed" &&
-            provider.usageLimits.windows.length
-              ? { ...provider, usageLimits: { ...provider.usageLimits, unavailable: undefined } }
-              : provider,
-          ),
-          usageLimitSources: p.serverConfig.usageLimitSources?.map((source) => ({
-            ...source,
-            accounts: source.accounts.map((account) =>
-              account.usageLimits.unavailable?.reason === "probeFailed" &&
-              account.usageLimits.windows.length
-                ? { ...account, usageLimits: { ...account.usageLimits, unavailable: undefined } }
-                : account,
-            ),
-          })),
-        },
-      },
-    ]),
-  );
-  const known = collectLimitAccounts(cached);
-  const nativeLogins = [...presentations].flatMap(([id, p]) =>
-    (p.serverConfig?.providers ?? []).map((provider) => ({
-      key: `${id}:${provider.instanceId}`,
-      provider,
-    })),
-  );
-  const accounts: QuotaAccount[] = known.map((account) => {
-    const related = [...presentations].filter(
-      ([id, p]) =>
-        account.environments.some((e) => e.environmentId === id) ||
-        p.serverConfig?.usageLimitSources?.some(
-          (source) =>
-            account.key.startsWith(`${id}:${source.id}:`) ||
-            (!!source.endpoint && account.key.startsWith(`${source.endpoint}:`)),
-        ),
-    );
-    const failed = related.some(
-      ([id, p]) =>
-        p.serverConfig?.providers.some(
-          (provider) =>
-            provider.driver === account.driver &&
-            ((provider.usageLimits?.credentialFingerprint ===
-              account.limits.credentialFingerprint &&
-              !!account.limits.credentialFingerprint) ||
-              (provider.auth.email === account.email && !!account.email) ||
-              (account.redeem &&
-                "instanceId" in account.redeem.input &&
-                provider.instanceId === account.redeem.input.instanceId)) &&
-            provider.usageLimits?.unavailable?.reason === "probeFailed",
-        ) ||
-        p.serverConfig?.usageLimitSources?.some(
-          (source) =>
-            (account.key.startsWith(`${id}:${source.id}:`) ||
-              (!!source.endpoint && account.key.startsWith(`${source.endpoint}:`))) &&
-            (!!source.error ||
-              source.accounts.some((a) => a.usageLimits.unavailable?.reason === "probeFailed")),
-        ),
-    );
-    const alias =
-      account.displayName && !account.displayName.includes("@")
-        ? account.displayName
-        : (account.plan ?? "");
-    const label = LABELS[account.driver] ?? String(account.driver);
-    return {
-      id: preferenceId(account.key),
-      driver: account.driver,
-      label,
-      alias,
-      limits: account.limits,
-      connected: related.some(([, p]) => p.connection.phase === "connected"),
-      failed,
-      title: label,
-      name: instanceName(account.displayName, label),
-      instances: account.instances ?? [],
-    };
-  });
-  for (const [environmentId, p] of presentations) {
-    for (const provider of p.serverConfig?.providers ?? []) {
-      if (!provider.enabled || !provider.installed) continue;
-      const exists = known.some(
-        (a) =>
-          a.driver === provider.driver &&
-          ((a.redeem &&
-            "instanceId" in a.redeem.input &&
-            a.redeem.input.instanceId === provider.instanceId &&
-            a.redeem.environmentId === environmentId) ||
-            (a.environments.some((e) => e.environmentId === environmentId) &&
-              provider.auth.email &&
-              a.email === provider.auth.email &&
-              nativeLogins.find((login) => login.key === a.key)?.provider.auth.workspaceId ===
-                provider.auth.workspaceId)),
-      );
-      if (exists) continue;
-      const alias =
-        provider.displayName && !provider.displayName.includes("@")
-          ? provider.displayName
-          : (provider.auth.label ?? "");
-      const label = LABELS[provider.driver] ?? (alias || String(provider.driver));
-      accounts.push({
-        id: preferenceId(`${environmentId}:${provider.instanceId}`),
-        driver: provider.driver,
-        label,
-        alias,
-        limits: provider.usageLimits,
-        connected: p.connection.phase === "connected",
-        failed: provider.usageLimits?.unavailable?.reason === "probeFailed",
-        title: label,
-        name: instanceName(provider.displayName, label),
-        instances: [{ environmentId, instanceId: provider.instanceId }],
-      });
-    }
-  }
-  const siblings = new Map<string, number>();
-  for (const a of accounts) siblings.set(a.driver, (siblings.get(a.driver) ?? 0) + 1);
-  const counts = new Map<string, number>();
-  return accounts.map((a) => {
-    const index = (counts.get(a.driver) ?? 0) + 1;
-    counts.set(a.driver, index);
-    return {
-      ...a,
-      alias: `${index}${a.alias ? ` · ${a.alias}` : ""}`,
-      title: (siblings.get(a.driver) ?? 0) > 1 ? a.name || `${a.label} ${index}` : a.label,
-    };
-  });
-}
-
-export function quotaReadingStale(
-  limits: ServerProviderUsageLimits | undefined,
-  now: number,
-  connected = true,
-  failed = false,
-) {
-  const checked = Date.parse(limits?.checkedAt ?? "");
-  return (
-    !connected ||
-    failed ||
-    limits?.unavailable?.reason === "probeFailed" ||
-    !Number.isFinite(checked) ||
-    now - checked > 10 * 60_000
-  );
 }

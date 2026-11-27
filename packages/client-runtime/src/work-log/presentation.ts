@@ -22,7 +22,7 @@ import { sourceControlClients } from "@t3tools/client-runtime/source-control-cli
 import { isWorkspaceImagePreviewPath } from "@t3tools/shared/mediaPreview";
 import { formatTokens } from "@t3tools/shared/usageFormat";
 import { classifyToolActivity } from "@t3tools/shared/toolActivity";
-import { commandHadNoMatches, toolOutputIndicatesFailure } from "@t3tools/shared/toolOutput";
+import { toolOutputIndicatesFailure } from "@t3tools/shared/toolOutput";
 
 import {
   summarizeT3ToolCalls,
@@ -338,16 +338,10 @@ function workLogEntryIsToolLike(entry: WorkLogPresentationEntry): boolean {
   return entry.itemType !== undefined && isToolLifecycleItemType(entry.itemType);
 }
 
-export function workEntryHasNoMatches(entry: WorkLogPresentationEntry): boolean {
-  const item = entry.structuredPayload;
-  return item?.type === "command_execution" && commandHadNoMatches(item);
-}
-
 function workEntryIndicatesToolFailureFromOutput(
   entry: WorkLogPresentationEntry,
   includeCommand: boolean,
 ): boolean {
-  if (workEntryHasNoMatches(entry)) return false;
   if (
     entry.tone === "error" ||
     entry.toolLifecycleStatus === "failed" ||

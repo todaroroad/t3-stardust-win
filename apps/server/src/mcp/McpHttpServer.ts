@@ -1,7 +1,4 @@
 import * as Cache from "effect/Cache";
-import { ArtifactToolkit } from "./toolkits/artifact/tools.ts";
-import * as ArtifactHandlers from "./toolkits/artifact/handlers.ts";
-import * as ArtifactWall from "../artifacts/ArtifactWall.ts";
 import * as Cause from "effect/Cause";
 import * as Clock from "effect/Clock";
 import * as Context from "effect/Context";
@@ -1477,8 +1474,6 @@ const layerThemeToolkit = toolkitRegistration(ThemeToolkit, ThemeHandlers.layer)
   Layer.provide(ThreadCommandExecutor.layer),
 );
 
-export const layerArtifactToolkit = toolkitRegistration(ArtifactToolkit, ArtifactHandlers.layer);
-
 export const layerProjectRegistration = toolkitRegistration(ProjectToolkit, ProjectHandlers.layer);
 
 // Reports may name any tool this server advertises, read when a report arrives.
@@ -1555,7 +1550,6 @@ export const layerTools = Layer.mergeAll(
   layerThreadToolkit,
   layerWorkflowToolkit,
   layerAttachmentToolkit,
-  layerArtifactToolkit,
   layerProjectRegistration,
   layerFeedbackToolkit,
   layerEnvironmentToolkit,
@@ -1680,4 +1674,4 @@ export const layerMilestoneEvents = Layer.effectDiscard(
 
 export const layer = layerMcpTransport(
   Layer.mergeAll(layerTools, layerToolSearch, layerMilestoneEvents),
-).pipe(Layer.provide(ArtifactWall.layer));
+);

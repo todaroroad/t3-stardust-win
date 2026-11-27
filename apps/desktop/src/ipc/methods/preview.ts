@@ -3,7 +3,6 @@ import {
   DesktopPreviewAnnotationThemeInputSchema,
   DesktopPreviewAnnotationVoiceStateSchema,
   DesktopPreviewPickElementInputSchema,
-  DesktopPreviewPinActionSchema,
   DesktopPreviewArtifactInputSchema,
   DesktopPreviewConfigInputSchema,
   DesktopPreviewFindInPageInputSchema,
@@ -471,23 +470,13 @@ const setAnnotationTheme = DesktopIpc.makeIpcMethod({
   }),
 });
 
-const pinAction = DesktopIpc.makeIpcMethod({
-  channel: IpcChannels.PREVIEW_PIN_ACTION_CHANNEL,
-  payload: DesktopPreviewPinActionSchema,
-  result: Schema.Void,
-  handler: Effect.fn("desktop.ipc.preview.pinAction")(function* ({ tabId, action, ids }) {
-    const manager = yield* PreviewManager.PreviewManager;
-    yield* manager.pinAction(tabId, action, ids);
-  }),
-});
-
 const pickElement = DesktopIpc.makeIpcMethod({
   channel: IpcChannels.PREVIEW_PICK_ELEMENT_CHANNEL,
   payload: DesktopPreviewPickElementInputSchema,
   result: Schema.NullOr(PreviewAnnotationSubmissionResultSchema),
-  handler: Effect.fn("desktop.ipc.preview.pickElement")(function* ({ tabId, voice, pins }) {
+  handler: Effect.fn("desktop.ipc.preview.pickElement")(function* ({ tabId, voice }) {
     const manager = yield* PreviewManager.PreviewManager;
-    return yield* manager.pickElement(tabId, voice, pins);
+    return yield* manager.pickElement(tabId, voice);
   }),
 });
 
@@ -590,7 +579,6 @@ export const methods = [
   setAnnotationTheme,
   setAnnotationSendEnabled,
   pickElement,
-  pinAction,
   cancelPickElement,
   captureScreenshot,
   revealArtifact,

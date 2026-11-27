@@ -98,29 +98,6 @@ describe("applyServerConfigProjection provider catalogs", () => {
     Option.getOrThrow(applyServerConfigProjection(current, event as ServerConfigStreamEvent)).config
       .providers[0]!;
 
-  it("keeps the config identity for repeated provider statuses and deltas", () => {
-    const held = provider({ enabled: true, status: "ready", skills: [], slashCommands: [] });
-    const current = projection([held]);
-    for (const type of ["providerStatuses", "providerStatusDeltas"] as const) {
-      const next = Option.getOrThrow(
-        applyServerConfigProjection(current, {
-          version: 1,
-          type,
-          payload: { providers: [structuredClone(held)] },
-        } as unknown as ServerConfigStreamEvent),
-      );
-      expect(next.config.providers).toBe(Option.getOrThrow(current).config.providers);
-      expect(next.config).toBe(Option.getOrThrow(current).config);
-      expect(next.latestEvent.type).toBe(type);
-      expect(next.source).toBe("live");
-    }
-    const changed = apply(current, {
-      type: "providerStatuses",
-      payload: { providers: [{ ...held, checkedAt: "b" }] },
-    });
-    expect(changed.checkedAt).toBe("b");
-  });
-
   it("keeps held slash commands and skills when the server sends a digest in their place", () => {
     const slashCommands = [{ name: "compact" }];
     const skills = [{ name: "review", path: "/skills/review", enabled: true }];

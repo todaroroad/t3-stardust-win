@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 /**
- * Idempotently applies and verifies all T3星辰版 (Windows) customizations & guards:
- *  1. Purges any third-party telemetry (`StardustStats` / `CommunityUpdates` / `xiaoxin666.cn`).
- *  2. Ensures 3-star gradient `StardustThoughtIcon` & per-Thought `ThoughtUsageBadge` are wired.
- *  3. Rebrands visible desktop & web UI to `T3星辰版` while preserving ASCII `executableName`
- *     (`T3 Stardust`), `artifactName` (`T3-Stardust-${version}-${arch}.${ext}`), `stagePackageJson.name`
- *     (`t3-stardust`), and `appId` (`com.todaroroad.t3stardust`) for seamless `electron-updater` upgrades.
+ * Idempotently applies and verifies T3星辰版 (Pure Official Base Edition) source customizations:
+ *  1. Pure official pingdotgg/t3code base — zero xiaoxin-t3code macOS bloat.
+ *  2. 3-star gradient `StardustThoughtIcon` & per-Thought `ThoughtUsageBadge`.
+ *  3. Side-by-side Windows identity (`com.todaroroad.t3stardust`, `T3星辰版`, `T3 Stardust.exe`)
+ *     for seamless electron-updater upgrades without touching official `T3 Code (Beta)`.
+ *  4. Remote server (`gcp-tw-agent`) version-skew & self-update suppression (`1.13.x` <-> `0.1.13`).
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -38,63 +38,14 @@ function assertIncludes(haystack, needle, contextLabel) {
 }
 
 // ---------------------------------------------------------------------------
-// 1. Privacy & Telemetry Purge (StardustStats + CommunityUpdates)
-// ---------------------------------------------------------------------------
-for (const dirRel of ["apps/web/src/state", "apps/web/src/components/settings"]) {
-  const dirFull = path.join(repoRoot, dirRel);
-  if (!fs.existsSync(dirFull)) continue;
-  for (const name of fs.readdirSync(dirFull)) {
-    if (/^(stardustStats|StardustStats|communityUpdates|CommunityUpdates)\b/.test(name)) {
-      fs.unlinkSync(path.join(dirFull, name));
-    }
-  }
-}
-
-for (const rel of ["apps/web/src/routes/__root.tsx", "apps/web/src/components/settings/SettingsPanels.tsx"]) {
-  if (!fs.existsSync(path.join(repoRoot, rel))) continue;
-  let src = readText(rel);
-  src = src.replace(/^import\s+\{\s*CommunityUpdateCoordinator\s*\}\s+from\s+"[^"]+";\r?\n/m, "");
-  src = src.replace(/^import\s+\{\s*StardustStatsCoordinator\s*\}\s+from\s+"[^"]+";\r?\n/m, "");
-  src = src.replace(/^import\s+\{\s*CommunityUpdateSettings\s*\}\s+from\s+"[^"]+";\r?\n/m, "");
-  src = src.replace(/^\s*<CommunityUpdateCoordinator\s*\/>\r?\n/gm, "");
-  src = src.replace(/^\s*<StardustStatsCoordinator\s*\/>\r?\n/gm, "");
-  src = src.replace(/^\s*\{isElectron\s*&&\s*<CommunityUpdateSettings\s*\/>\}\r?\n/gm, "");
-  if (
-    src.includes("StardustStatsCoordinator") ||
-    src.includes("CommunityUpdateCoordinator") ||
-    src.includes("CommunityUpdateSettings")
-  ) {
-    throw new Error(`[apply-overlay] Failed to strip community/stats coordinators from ${rel}`);
-  }
-  writeText(rel, src);
-}
-
-// ---------------------------------------------------------------------------
-// 2. Rebrand UI Copy & Translations (星尘 -> 星辰 / T3星辰版)
-// ---------------------------------------------------------------------------
-for (const rel of ["apps/web/src/i18n/catalog.ts", "apps/web/src/i18n/translations/zh.json"]) {
-  const full = path.join(repoRoot, rel);
-  if (!fs.existsSync(full)) continue;
-  let src = readText(rel);
-  src = src.replaceAll("xiaoxin666.cn", "removed.local");
-  src = src.replaceAll("zds-xiaoxin/xiaoxin-t3code", TARGET_REPO);
-  src = src.replaceAll("zds-xiaoxin/stardust", TARGET_REPO);
-  src = src.replaceAll("T3 星尘版", DISPLAY_BRAND_NAME);
-  src = src.replaceAll("T3 星尘", DISPLAY_BRAND_NAME);
-  src = src.replaceAll("星尘版", "星辰版");
-  src = src.replaceAll("星尘", "星辰");
-  writeText(rel, src);
-}
-
-// ---------------------------------------------------------------------------
-// 3. Stardust Thought Icon & Per-Thought Usage Badge
+// 1. Stardust Thought Icon & Per-Thought Usage Badge
 // ---------------------------------------------------------------------------
 fs.copyFileSync(
   path.join(assetsDir, "ThoughtUsageBadge.tsx"),
   path.join(repoRoot, "apps/web/src/components/chat/ThoughtUsageBadge.tsx"),
 );
 
-// 3a. TimelineToolActivityIcon.tsx
+// 1a. TimelineToolActivityIcon.tsx
 {
   const rel = "apps/web/src/components/chat/TimelineToolActivityIcon.tsx";
   let src = readText(rel);
@@ -157,7 +108,7 @@ fs.copyFileSync(
   assertIncludes(src, "StardustThoughtIcon", rel);
 }
 
-// 3b. TimelineWorkEntryRow.tsx
+// 1b. TimelineWorkEntryRow.tsx
 {
   const rel = "apps/web/src/components/chat/TimelineWorkEntryRow.tsx";
   let src = readText(rel);
@@ -176,7 +127,7 @@ fs.copyFileSync(
   assertIncludes(src, "ThoughtUsageBadge", rel);
 }
 
-// 3c. TimelineWorkGroupRows.tsx
+// 1c. TimelineWorkGroupRows.tsx
 {
   const rel = "apps/web/src/components/chat/TimelineWorkGroupRows.tsx";
   let src = readText(rel);
@@ -197,7 +148,7 @@ fs.copyFileSync(
 }
 
 // ---------------------------------------------------------------------------
-// 4. Windows Side-by-Side T3星辰版 Branding, Icons & Native Auto-Updater Config
+// 2. Windows Side-by-Side T3星辰版 Branding, Icons & Native Auto-Updater Config
 // ---------------------------------------------------------------------------
 const icoSrc = path.join(assetsDir, "stardust-windows.ico");
 if (fs.existsSync(icoSrc)) {
@@ -206,7 +157,7 @@ if (fs.existsSync(icoSrc)) {
   fs.copyFileSync(icoSrc, path.join(repoRoot, "apps/desktop/resources/icon.ico"));
 }
 
-// 4a. apps/desktop/package.json
+// 2a. apps/desktop/package.json
 {
   const rel = "apps/desktop/package.json";
   const pkg = JSON.parse(readText(rel));
@@ -214,7 +165,7 @@ if (fs.existsSync(icoSrc)) {
   writeText(rel, `${JSON.stringify(pkg, null, 2)}\n`);
 }
 
-// 4b. apps/desktop/src/app/DesktopEnvironment.ts
+// 2b. apps/desktop/src/app/DesktopEnvironment.ts
 {
   const rel = "apps/desktop/src/app/DesktopEnvironment.ts";
   let src = readText(rel);
@@ -222,90 +173,135 @@ if (fs.existsSync(icoSrc)) {
     'isDevelopment ? "com.t3tools.t3code.dev" : "com.t3tools.t3code"',
     `isDevelopment ? "${TARGET_APP_ID}.dev" : "${TARGET_APP_ID}"`,
   );
-  if (src.includes("STARDUST_DISPLAY_NAME")) {
-    src = src.replace(
-      /export const STARDUST_DISPLAY_NAME = "[^"]+";/,
-      `export const STARDUST_DISPLAY_NAME = "${DISPLAY_BRAND_NAME}";`,
-    );
-  } else {
-    src = src.replace(
-      /displayName:\s*`?\$\{APP_BASE_NAME\}\s*\(\$\{stageLabel\}\)`?,/,
-      `displayName: stageLabel === "Dev" ? \`\${APP_BASE_NAME} (\${stageLabel})\` : "${DISPLAY_BRAND_NAME}",`,
-    );
-  }
+  src = src.replace(
+    /displayName:\s*`\$\{APP_BASE_NAME\}\s*\(\$\{stageLabel\}\)`/,
+    `displayName: stageLabel === "Dev" ? \`\${APP_BASE_NAME} (\${stageLabel})\` : "${DISPLAY_BRAND_NAME}"`,
+  );
   assertIncludes(src, TARGET_APP_ID, rel);
   assertIncludes(src, DISPLAY_BRAND_NAME, rel);
   writeText(rel, src);
 }
 
-// 4c. apps/web/src/components/desktopUpdate.logic.ts & DesktopStartupRecovery.ts & branding.ts
+// 2c. apps/web/src/branding.ts & apps/web/vite.config.ts
+{
+  const rel = "apps/web/src/branding.ts";
+  let src = readText(rel);
+  src = src.replace(
+    'export const APP_BASE_NAME = injectedDesktopAppBranding?.baseName ?? "T3 Code";',
+    `export const APP_BASE_NAME = injectedDesktopAppBranding?.baseName ?? "${DISPLAY_BRAND_NAME}";`,
+  );
+  src = src.replace(
+    /export const APP_DISPLAY_NAME =[\s\S]*?formatAppDisplayName\(\{\s*baseName:\s*APP_BASE_NAME,\s*stageLabel:\s*APP_STAGE_LABEL\s*\}\);/,
+    `export const APP_DISPLAY_NAME = injectedDesktopAppBranding?.displayName ?? "${DISPLAY_BRAND_NAME}";`,
+  );
+  src = src.replaceAll("https://t3.codes/download", `https://github.com/${TARGET_REPO}/releases`);
+  assertIncludes(src, DISPLAY_BRAND_NAME, rel);
+  writeText(rel, src);
+}
+
+{
+  const rel = "apps/web/vite.config.ts";
+  let src = readText(rel);
+  src = src.replace(
+    'const title = formatAppDisplayName({ baseName: "T3 Code", stageLabel });',
+    `const title = development ? formatAppDisplayName({ baseName: "${DISPLAY_BRAND_NAME}", stageLabel }) : "${DISPLAY_BRAND_NAME}";`,
+  );
+  assertIncludes(src, DISPLAY_BRAND_NAME, rel);
+  writeText(rel, src);
+}
+
+// 2d. apps/web/src/components/desktopUpdate.logic.ts & test
 {
   const rel = "apps/web/src/components/desktopUpdate.logic.ts";
-  if (fs.existsSync(path.join(repoRoot, rel))) {
-    let src = readText(rel);
+  let src = readText(rel);
+  src = src.replace(
+    /const DEFAULT_DESKTOP_RELEASE_REPOSITORY = "[^"]+";/,
+    `const DEFAULT_DESKTOP_RELEASE_REPOSITORY = "${TARGET_REPO}";`,
+  );
+  assertIncludes(src, TARGET_REPO, rel);
+  writeText(rel, src);
+
+  const testRel = "apps/web/src/components/desktopUpdate.logic.test.ts";
+  if (fs.existsSync(path.join(repoRoot, testRel))) {
+    let testSrc = readText(testRel);
+    testSrc = testSrc.replaceAll(
+      "https://github.com/pingdotgg/t3code/releases",
+      `https://github.com/${TARGET_REPO}/releases`,
+    );
+    writeText(testRel, testSrc);
+  }
+}
+
+// 2e. apps/web/src/components/sidebar/SidebarChrome.tsx -> T3 星辰版 wordmark
+{
+  const rel = "apps/web/src/components/sidebar/SidebarChrome.tsx";
+  let src = readText(rel);
+  if (!src.includes('"星辰版"')) {
+    src = src.replace('{"Code"}', '{"星辰版"}');
+    writeText(rel, src);
+  }
+  assertIncludes(src, '"星辰版"', rel);
+}
+
+// ---------------------------------------------------------------------------
+// 3. Remote Server Version-Skew & Update Capsule Suppression (`gcp-tw-agent`)
+// ---------------------------------------------------------------------------
+{
+  const rel = "apps/web/src/versionSkew.ts";
+  let src = readText(rel);
+  if (!src.includes("toOfficialCompatVersion")) {
+    const helper = `function toOfficialCompatVersion(version: string): string {
+  const m = /^1\\.(\\d+)\\.\\d+(?:[-+].*)?$/.exec(version.trim());
+  return m ? \`0.1.\${m[1]}\` : version;
+}
+
+`;
     src = src.replace(
-      /const DEFAULT_DESKTOP_RELEASE_REPOSITORY = "[^"]+";/,
-      `const DEFAULT_DESKTOP_RELEASE_REPOSITORY = "${TARGET_REPO}";`,
+      "export function resolveVersionMismatch(",
+      `${helper}export function resolveVersionMismatch(`,
+    );
+    src = src.replace(
+      "const normalizedClientVersion = normalizeVersion(clientVersion);",
+      "const normalizedClientVersion = normalizeVersion(clientVersion ? toOfficialCompatVersion(clientVersion) : clientVersion);",
+    );
+    src = src.replace(
+      /export function resolveServerSelfUpdateCapability\([\s\S]*?\): ServerSelfUpdateCapability \| null \{\r?\n  return [^\n]+\r?\n\}/,
+      `export function resolveServerSelfUpdateCapability(\n  _serverConfig: Pick<ServerConfig, "environment"> | null | undefined,\n): ServerSelfUpdateCapability | null {\n  return null;\n}`,
     );
     writeText(rel, src);
   }
+  assertIncludes(src, "toOfficialCompatVersion", rel);
 }
 
-for (const rel of [
-  "apps/desktop/src/app/DesktopStartupRecovery.ts",
-  "apps/web/src/branding.ts",
-]) {
-  if (fs.existsSync(path.join(repoRoot, rel))) {
-    let src = readText(rel)
-      .replaceAll("zds-xiaoxin/xiaoxin-t3code", TARGET_REPO)
-      .replaceAll("zds-xiaoxin/stardust", TARGET_REPO)
-      .replaceAll("https://t3.codes/download", `https://github.com/${TARGET_REPO}/releases`);
-    if (rel === "apps/web/src/branding.ts") {
-      src = src.replace(
-        /export function appBaseName\(\): string \{[\s\S]*?\n\}/,
-        `export function appBaseName(): string {\n  return "${DISPLAY_BRAND_NAME}";\n}`,
-      );
-      src = src.replace(
-        /export function appDisplayName\(\): string \{[\s\S]*?\n\}/,
-        `export function appDisplayName(): string {\n  return "${DISPLAY_BRAND_NAME}";\n}`,
-      );
-      if (!src.includes("export const APP_BASE_NAME")) {
-        src += `\nexport const APP_BASE_NAME = "${DISPLAY_BRAND_NAME}";\n`;
-      } else {
-        src = src.replace(
-          /export const APP_BASE_NAME = [^;]+;/,
-          `export const APP_BASE_NAME = "${DISPLAY_BRAND_NAME}";`,
-        );
-      }
-      if (!src.includes("export const APP_DISPLAY_NAME")) {
-        src += `export const APP_DISPLAY_NAME = "${DISPLAY_BRAND_NAME}";\n`;
-      } else {
-        src = src.replace(
-          /export const APP_DISPLAY_NAME = [^;]+;/,
-          `export const APP_DISPLAY_NAME = "${DISPLAY_BRAND_NAME}";`,
-        );
-      }
-    }
+{
+  const rel = "apps/web/src/components/sidebar/useUpdateEverything.ts";
+  let src = readText(rel);
+  if (!src.includes("// stardust: remote server updates suppressed")) {
+    src = src.replace(
+      /const \{ targets: servers, skipped \} = channelSwitch\r?\n\s*\? collectChannelSwitchTargets\(machines, channelSwitch, resolve\)\r?\n\s*: collectServerUpdateTargets\(machines, targetVersion, resolve\);/,
+      `// stardust: remote server updates suppressed\n  void channelSwitch;\n  void targetVersion;\n  void collectChannelSwitchTargets;\n  void collectServerUpdateTargets;\n  const { targets: servers, skipped } = { targets: [] as ReturnType<typeof collectServerUpdateTargets>["targets"], skipped: [] as ReturnType<typeof collectServerUpdateTargets>["skipped"] };`,
+    );
     writeText(rel, src);
   }
+  assertIncludes(src, "stardust: remote server updates suppressed", rel);
 }
 
-// 4d. SidebarChrome.tsx wordmark -> T3✦星辰版
 {
-  const rel = "apps/web/src/components/sidebar/SidebarChrome.tsx";
-  if (fs.existsSync(path.join(repoRoot, rel))) {
-    let src = readText(rel);
-    if (!src.includes("星辰版")) {
-      src = src.replace(
-        /(<svg[\s\S]*?<\/svg>)\s*(<\/span>)/,
-        '$1\n      <span className="ml-0.5 text-[12px] font-medium tracking-normal opacity-90">星辰版</span>\n    $2',
-      );
-      writeText(rel, src);
-    }
+  const rel = "apps/web/src/components/sidebar/SidebarUpdatePill.tsx";
+  let src = readText(rel);
+  if (!src.includes("stardust: suppress remote server update capsule")) {
+    src = src.replace(
+      "const run = useUpdateEverythingRun();",
+      "// stardust: suppress remote server update capsule\n  void useUpdateEverythingRun;\n  const run = null as UpdateEverythingRun | null;",
+    );
+    writeText(rel, src);
   }
+  assertIncludes(src, "stardust: suppress remote server update capsule", rel);
 }
 
-// 4e. scripts/build-desktop-artifact.ts
+// ---------------------------------------------------------------------------
+// 4. scripts/build-desktop-artifact.ts (Windows NSIS & electron-updater)
+// ---------------------------------------------------------------------------
 {
   const rel = "scripts/build-desktop-artifact.ts";
   let src = readText(rel);
@@ -328,9 +324,10 @@ for (const rel of [
   );
   assertIncludes(src, 'artifactName: "T3-Stardust-${version}-${arch}.${ext}",', rel);
 
-  src = src
-    .replaceAll("https://github.com/zds-xiaoxin/xiaoxin-t3code", `https://github.com/${TARGET_REPO}`)
-    .replaceAll("https://github.com/pingdotgg/t3code", `https://github.com/${TARGET_REPO}`);
+  src = src.replaceAll(
+    "https://github.com/pingdotgg/t3code",
+    `https://github.com/${TARGET_REPO}`,
+  );
 
   const publishSnippet = `  buildConfig.publish = [
     {
@@ -357,7 +354,6 @@ for (const rel of [
   );
   assertIncludes(src, 'name: "t3-stardust",', rel);
 
-  // NSIS Chinese shortcut name ("T3星辰版") + ASCII executableName ("T3 Stardust") for smooth Windows upgrades
   if (!src.includes(`shortcutName: "${DISPLAY_BRAND_NAME}"`)) {
     src = src.replace(
       'include: "apps/desktop/resources/installer.nsh",',
@@ -392,23 +388,4 @@ for (const rel of [
   writeText(rel, src);
 }
 
-// ---------------------------------------------------------------------------
-// 5. Verify T3星辰版 Sidebar Project Rail, Server Update Suppression & Usage CSS
-// ---------------------------------------------------------------------------
-assertIncludes(
-  readText("apps/web/src/branding.ts"),
-  "OFFICIAL_COMPAT_VERSION",
-  "apps/web/src/branding.ts",
-);
-assertIncludes(
-  readText("apps/web/src/components/Sidebar.tsx"),
-  "SidebarProjectRail",
-  "apps/web/src/components/Sidebar.tsx",
-);
-assertIncludes(
-  readText("apps/web/src/components/usage/usagePresentation.css"),
-  ".usage-reset-timeline {",
-  "apps/web/src/components/usage/usagePresentation.css",
-);
-
-console.log(`[apply-overlay] All ${DISPLAY_BRAND_NAME} customizations, guards & auto-updater settings verified.`);
+console.log(`[apply-overlay] Successfully applied & verified ${DISPLAY_BRAND_NAME} overlay on pure official base (${TARGET_REPO}).`);

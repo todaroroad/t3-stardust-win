@@ -25,7 +25,6 @@ import * as DesktopPrimaryPaste from "../app/DesktopPrimaryPaste.ts";
 import { makeComponentLogger } from "../app/DesktopObservability.ts";
 import * as DesktopState from "../app/DesktopState.ts";
 import * as ElectronMenu from "../electron/ElectronMenu.ts";
-import * as ElectronDialog from "../electron/ElectronDialog.ts";
 import { getDesktopOrigin, getDesktopUrl } from "../electron/ElectronProtocol.ts";
 import * as ElectronShell from "../electron/ElectronShell.ts";
 import * as ElectronTheme from "../electron/ElectronTheme.ts";
@@ -63,10 +62,6 @@ class ContextMenuImageCopyError extends Schema.TaggedError<ContextMenuImageCopyE
     return "Could not copy the context-menu image.";
   }
 }
-class DesktopShutdownPreparationError extends Schema.TaggedError<DesktopShutdownPreparationError>()(
-  "DesktopShutdownPreparationError",
-  { cause: Schema.Defect() },
-) {}
 // Match --workspace-topbar-height in apps/web/src/index.css; native macOS buttons stay 14 points at any zoom.
 const MACOS_WORKSPACE_TOPBAR_HEIGHT = 52;
 const MACOS_WINDOW_BUTTON_RADIUS = 7;
@@ -101,10 +96,10 @@ const TITLEBAR_COLOR = "#01000000"; // #00000000 does not work correctly on Linu
 const TITLEBAR_LIGHT_SYMBOL_COLOR = "#1f2937";
 const TITLEBAR_DARK_SYMBOL_COLOR = "#f8fafc";
 const MAIN_WINDOW_BOUNDS_PERSIST_DEBOUNCE_MS = 500;
-const DEVELOPMENT_LOAD_RETRY_DELAYS_MS = [100, 250, 500, 1000, 2000] as const;
+const DEVELOPMENT_LOAD_RETRY_DELAYS_MS = [100, 250, 500, 1_000, 2_000] as const;
 const RENDERER_RECOVERY_RELOAD_DELAY_MS = 500;
 const RENDERER_RECOVERY_MAX_ATTEMPTS = 3;
-const RENDERER_RECOVERY_WINDOW_MS = 60000;
+const RENDERER_RECOVERY_WINDOW_MS = 60_000;
 const DEVELOPMENT_RETRYABLE_LOAD_ERROR_CODES = new Set([-2, -7, -9, -102, -105, -106, -118]);
 
 type WindowTitleBarOptions = Pick<
@@ -142,16 +137,13 @@ export class DesktopWindow extends Context.Service<
     readonly activate: Effect.Effect<void, DesktopWindowError>;
     readonly createMainIfBackendReady: Effect.Effect<void, DesktopWindowError>;
     readonly showConnectingSplash: Effect.Effect<void>;
-    readonly prepareForShutdown: Effect.Effect<boolean>;
     readonly handleBackendReady: (httpBaseUrl: URL) => Effect.Effect<void, DesktopWindowError>;
     readonly handleBackendNotReady: Effect.Effect<void>;
     readonly flushMainWindowBounds: Effect.Effect<void>;
     readonly prepareCaptureReveal: Effect.Effect<void>;
     readonly dispatchMenuAction: (
       action: string,
-      options?: {
-        readonly reveal?: boolean;
-      },
+      options?: { readonly reveal?: boolean },
     ) => Effect.Effect<void, DesktopWindowError>;
     readonly dispatchSnapShotEvent: (
       event: DesktopSnapShotEvent,
@@ -169,11 +161,7 @@ const { logInfo: logWindowInfo, logWarning: logWindowWarning } =
 function getIconOption(
   iconPaths: DesktopAssets.DesktopIconPaths,
   platform: NodeJS.Platform,
-):
-  | {
-      icon: string;
-    }
-  | Record<string, never> {
+): { icon: string } | Record<string, never> {
   if (platform === "darwin") return {};
   const ext = platform === "win32" ? "ico" : "png";
   return Option.match(iconPaths[ext], {
@@ -283,20 +271,15 @@ export function resolveInitialMainWindowBounds(
 
 function buildConnectingSplashDataUrl(
   shouldUseDarkColors: boolean,
-  progressOrMode: DatabaseMigrationProgress | "local" | "wsl" | "closing" | null = null,
+  progress: DatabaseMigrationProgress | null,
 ): string {
   const background = getInitialWindowBackgroundColor(shouldUseDarkColors);
   const label = shouldUseDarkColors ? "#9ca3af" : "#6b7280";
   const accent = shouldUseDarkColors ? "#f8fafc" : "#1f2937";
   const track = shouldUseDarkColors ? "rgba(248,250,252,0.18)" : "rgba(31,41,55,0.18)";
-  const message =
-    progressOrMode === "closing"
-      ? "Closing T3星辰版…"
-      : progressOrMode === "local"
-        ? "Starting T3星辰版…"
-        : progressOrMode !== null && typeof progressOrMode === "object"
-          ? `Upgrading database (${progressOrMode.current} of ${progressOrMode.total})`
-          : "Connecting to WSL…";
+  const message = progress
+    ? `Upgrading database (${progress.current} of ${progress.total})`
+    : "Connecting to WSL…";
   const html = `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'"><style>html,body{margin:0;height:100%}body{background:${background};color:${label};font-family:system-ui,-apple-system,'Segoe UI',sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;-webkit-user-select:none;user-select:none;-webkit-app-region:drag}.spinner{width:26px;height:26px;border:3px solid ${track};border-top-color:${accent};border-radius:50%;animation:spin .8s linear infinite}.label{font-size:13px}@keyframes spin{to{transform:rotate(360deg)}}</style></head><body><div class="spinner"></div><div class="label">${message}</div></body></html>`;
   return `data:text/html;charset=utf-8,${encodeURIComponent(html)}`;
 }
@@ -943,7 +926,7 @@ export const make = Effect.gen(function* () {
         developmentLoadRetryIndex,
         DEVELOPMENT_LOAD_RETRY_DELAYS_MS.length - 1,
       );
-      const retryInMs = DEVELOPMENT_LOAD_RETRY_DELAYS_MS[retryIndex] ?? 2000;
+      const retryInMs = DEVELOPMENT_LOAD_RETRY_DELAYS_MS[retryIndex] ?? 2_000;
       developmentLoadRetryIndex += 1;
       developmentLoadRetryFiber = runFork(
         Effect.sleep(retryInMs).pipe(
@@ -1287,52 +1270,6 @@ export const make = Effect.gen(function* () {
     handleBackendNotReady: Ref.set(backendReadyRef, false).pipe(
       Effect.withSpan("desktop.window.handleBackendNotReady"),
     ),
-    prepareForShutdown: Effect.gen(function* () {
-      const main = yield* currentMainWindow;
-      if (Option.isNone(main) || main.value.isDestroyed()) return true;
-      const window = main.value;
-      const canClose = yield* Effect.tryPromise({
-        try: () =>
-          window.webContents.executeJavaScript(
-            "window.dispatchEvent(new Event('t3:prepare-shutdown', {cancelable: true}))",
-          ),
-        catch: (cause) => new DesktopShutdownPreparationError({ cause }),
-      }).pipe(
-        Effect.timeout("3 seconds"),
-        Effect.catchCause((cause) =>
-          logWindowWarning("could not verify renderer draft flush", { cause }).pipe(
-            Effect.as(false),
-          ),
-        ),
-      );
-      if (!canClose) {
-        window.setOpacity(1);
-        yield* electronWindow.reveal(window);
-        const dialog = yield* Effect.serviceOption(ElectronDialog.ElectronDialog);
-        if (Option.isNone(dialog)) return false;
-        const choice = yield* dialog.value
-          .showMessageBox({
-            type: "warning",
-            title: "Drafts are not saved",
-            message: "Quit without saving draft changes?",
-            detail:
-              "Keep T3 Code open to retry saving or export drafts from the composer. Quitting now can lose unsaved input and attachments.",
-            buttons: ["Keep T3 Code open", "Quit without saving"],
-            defaultId: 0,
-            cancelId: 0,
-            noLink: true,
-          })
-          .pipe(Effect.option);
-        if (Option.isNone(choice) || choice.value.response !== 1) return false;
-      }
-      const dark = yield* electronTheme.shouldUseDarkColors;
-      window.setOpacity(1);
-      yield* Effect.tryPromise({
-        try: () => window.loadURL(buildConnectingSplashDataUrl(dark, "closing")),
-        catch: (cause) => new DesktopShutdownPreparationError({ cause }),
-      }).pipe(Effect.timeout("3 seconds"), Effect.ignore);
-      return true;
-    }),
     flushMainWindowBounds: Effect.suspend(() => flushMainWindowBounds).pipe(
       Effect.withSpan("desktop.window.flushMainWindowBounds"),
     ),

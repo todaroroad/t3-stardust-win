@@ -1,4 +1,3 @@
-import { SidebarCategorySettingsSection } from "./SidebarCategorySettings";
 import { thrownErrorMessage } from "@t3tools/client-runtime/errors";
 import { m as resolveMessage } from "~/i18n/messages";
 import { useAtomValue } from "@effect/atom-react";
@@ -94,8 +93,6 @@ import { Input } from "../ui/input";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
 import { Switch } from "../ui/switch";
 import { ScopedSwitch } from "./ScopedSwitch";
-import { TelemetryConsentRow } from "./TelemetryConsentRow";
-
 import { stackedThreadToast, toastManager } from "../ui/toast";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import {
@@ -173,14 +170,6 @@ const QUIT_CONFIRMATION_MODE_LABELS: Record<QuitConfirmationMode, string> = {
 
 const DEFAULT_DRIVER_KIND = ProviderDriverKind.make("codex");
 function AboutVersionSection() {
-  return (
-    <>
-      <UpstreamAboutVersionSection />
-    </>
-  );
-}
-
-function UpstreamAboutVersionSection() {
   const setting = useSearchableSetting();
   const gt = useGT();
   const messages = useMessages();
@@ -2008,8 +1997,7 @@ export function ThreadsSettingsPanel() {
 
   return (
     <SettingsPageContainer>
-      <SidebarCategorySettingsSection />
-      <SettingsSection id="new-projects" title="New projects">
+      <SettingsSection id="new-projects" title={gt("New projects")}>
         <SettingsRow
           serverScoped
           settingKeys={["addProjectBaseDirectory"]}
@@ -2593,8 +2581,7 @@ export function AboutSettingsPanel() {
         )}
       </SettingsSection>
 
-      <SettingsSection id="legal" title="Legal">
-        <TelemetryConsentRow />
+      <SettingsSection id="legal" title={gt("Legal")}>
         <SettingsRow
           {...setting("privacy-policy")}
           description={

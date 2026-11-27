@@ -186,24 +186,21 @@ function applyProviderInstanceBranding(
   };
 }
 
-/** Picker order: user-defined providerOrder first, then each driver's default and custom instances. */
+/** Picker order: each driver's default instance first, then its custom instances. */
 export function providerInstanceEntriesFor(
   providers: ReadonlyArray<ServerProvider>,
-  settings: Pick<ServerSettings, "providerInstances" | "projectSettingsOverrides"> & {
-    readonly providerOrder?: ReadonlyArray<ProviderInstanceId>;
-  },
+  settings: Pick<ServerSettings, "providerInstances" | "projectSettingsOverrides">,
   projectId: ProjectId | null,
 ): ReadonlyArray<ProviderInstanceEntry> {
   return pipe(
     deriveProviderInstanceEntries(providers),
     (entries) => applyProviderInstanceSettings(entries, settings, projectId),
-    (entries) => sortProviderInstanceEntries(entries, settings.providerOrder),
+    sortProviderInstanceEntries,
   );
 }
 
 function sortProviderInstanceEntries(
   entries: ReadonlyArray<ProviderInstanceEntry>,
-  providerOrder?: ReadonlyArray<ProviderInstanceId>,
 ): ReadonlyArray<ProviderInstanceEntry> {
   const byKind = new Map<ProviderDriverKind, ProviderInstanceEntry[]>();
   for (const entry of entries) {
@@ -220,16 +217,7 @@ function sortProviderInstanceEntries(
     const customs = bucket.filter((entry) => !entry.isDefault);
     sorted.push(...defaults, ...customs);
   }
-  if (!providerOrder || providerOrder.length === 0) return sorted;
-  const rank = new Map(providerOrder.map((id, index) => [String(id), index] as const));
-  return sorted.toSorted((left, right) => {
-    const leftRank = rank.get(String(left.instanceId));
-    const rightRank = rank.get(String(right.instanceId));
-    if (leftRank !== undefined && rightRank !== undefined) return leftRank - rightRank;
-    if (leftRank !== undefined) return -1;
-    if (rightRank !== undefined) return 1;
-    return 0;
-  });
+  return sorted;
 }
 
 function getProviderInstanceEntry(

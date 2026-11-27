@@ -2,10 +2,7 @@
 import { cursorRateModel } from "./accountUsage.ts";
 import type { UsageRecord } from "@t3tools/provider-core/server/usage";
 
-export type CursorCredentialSource =
-  | { readonly kind: "apiKey"; readonly apiKey: string }
-  | { readonly kind: "keychain" }
-  | string;
+export type CursorCredentialSource = { readonly kind: "apiKey"; readonly apiKey: string };
 
 export const CURSOR_ACCOUNT_TTL_MS = 60 * 1000;
 

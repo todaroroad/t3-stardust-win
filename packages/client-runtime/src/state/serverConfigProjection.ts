@@ -141,15 +141,11 @@ export function applyServerConfigProjection(
           event.type === "providerStatuses"
             ? event.payload.providers
             : applyServerProviderDeltas(previous, event.payload.providers);
-        const nextProviders = reuseUnchanged(
-          previous,
-          withHeldProviderCatalogs(previous, providers),
-        );
         return {
-          config:
-            nextProviders === previous
-              ? projection.config
-              : { ...projection.config, providers: nextProviders },
+          config: {
+            ...projection.config,
+            providers: reuseUnchanged(previous, withHeldProviderCatalogs(previous, providers)),
+          },
           latestEvent: event,
           source: "live",
         };

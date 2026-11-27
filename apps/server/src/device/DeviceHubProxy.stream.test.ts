@@ -117,12 +117,7 @@ it.live("closes an upstream socket that is still connecting without an unhandled
       Effect.promise(
         () =>
           new Promise<NodeNet.Server>((resolve) => {
-            const server = NodeNet.createServer((socket) => {
-              // Consume the handshake without answering it, so the peer FIN can be observed.
-              // An unread paused socket retains buffered headers and never emits close.
-              socket.resume();
-              dialed.resolve(socket);
-            });
+            const server = NodeNet.createServer((socket) => dialed.resolve(socket));
             server.listen(0, "127.0.0.1", () => resolve(server));
           }),
       ),

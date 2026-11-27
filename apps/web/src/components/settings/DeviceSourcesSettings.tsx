@@ -1,4 +1,3 @@
-import { uiText } from "~/i18n";
 import { thrownErrorMessage } from "@t3tools/client-runtime/errors";
 import { useAtomValue } from "@effect/atom-react";
 import { Fragment, useState, type ReactNode } from "react";
@@ -443,7 +442,7 @@ export function DeviceSourcesSettings(props: {
   for (const group of sshGroups) {
     const host = group.host;
     const holders = new Set(group.members.map((member) => member.environmentId));
-    const _testing = group.members.some((member) => testingHosts.has(member.host.id));
+    const testing = group.members.some((member) => testingHosts.has(member.host.id));
     rows.push({
       key: `ssh:${host.id}:${group.members.map((member) => member.environmentId).join(",")}`,
       shared: true,
@@ -456,9 +455,9 @@ export function DeviceSourcesSettings(props: {
         );
         if (!held)
           return { environmentId: member.environmentId, label: member.label, added: false };
-        const status = testingHosts.has(host.id)
-          ? ({ tone: "pending", label: uiText("Testing connection") } as const)
-          : hostStatus(member.state, held.host.id);
+        const status = testing
+          ? ({ tone: "pending", label: gt("Testing connection") } as const)
+          : hostStatus(member.state, held.host.id, m);
         return {
           environmentId: member.environmentId,
           label: member.label,
@@ -654,20 +653,8 @@ export function DeviceSourcesSettings(props: {
 }
 
 const PLATFORMS = [
-  {
-    platform: "ios",
-    get label() {
-      return uiText("iOS");
-    },
-    Icon: AppleIcon,
-  },
-  {
-    platform: "android",
-    get label() {
-      return uiText("Android");
-    },
-    Icon: AndroidIcon,
-  },
+  { platform: "ios", label: "iOS", Icon: AppleIcon },
+  { platform: "android", label: "Android", Icon: AndroidIcon },
 ] as const satisfies ReadonlyArray<{ platform: DevicePlatform; label: string; Icon: unknown }>;
 
 /** The platforms a source offers: one icon each, solid where available, muted where not. */

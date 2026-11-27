@@ -1,5 +1,3 @@
-import { useUiText } from "~/i18n/useUiText";
-import { uiText } from "~/i18n";
 import { msg, T, useGT, useMessages } from "gt-react";
 import type { MessageResolver } from "~/i18n/messages";
 import { useNativeFileDrag } from "../../useNativeFileDrag";
@@ -160,7 +158,6 @@ function UserMessagePreviewAnnotationDetails(props: {
   record: Extract<KnownComposerContextRecord, { kind: "preview-annotation" }>;
   image: ChatImageAttachment | null;
 }) {
-  const uiText = useUiText();
   const ctx = use(TimelineRowCtx);
   const gt = useGT();
   const messages = useMessages();
@@ -185,20 +182,12 @@ function UserMessagePreviewAnnotationDetails(props: {
             className="max-h-64 w-full object-contain"
           />
         </button>
-      ) : props.record.pins?.length ? null : (
+      ) : (
         <div className="border-b border-border/70 bg-muted/40 px-3 py-2 text-secondary-label text-xs">
           <T>Screenshot unavailable</T>
         </div>
       )}
       <div className="min-w-0 px-3 py-2.5">
-        {props.record.pins?.length ? (
-          <details>
-            <summary>{uiText("What the assistant received")}</summary>
-            <pre className="overflow-auto whitespace-pre-wrap text-xs">
-              {JSON.stringify(props.record.pins, null, 2)}
-            </pre>
-          </details>
-        ) : null}
         <div className="text-message-foreground text-xs font-medium">
           {props.record.pageTitle?.trim() || props.record.pageUrl || gt("Preview annotation")}
         </div>
@@ -303,6 +292,7 @@ interface UserMessageContextRenderContext {
   onOpenFile: (file: ChatFileAttachment) => void;
   m: MessageResolver;
 }
+
 function UnavailableUserMessageContextChip(props: UserMessageContextRenderContext) {
   return (
     <UnresolvedChip
@@ -312,6 +302,7 @@ function UnavailableUserMessageContextChip(props: UserMessageContextRenderContex
     />
   );
 }
+
 const userMessageContextPresentationRegistry = createContextPresentationRegistry<
   KnownComposerContextRecord,
   UserMessageContextRenderContext,
@@ -554,7 +545,7 @@ const userMessageContextPresentationRegistry = createContextPresentationRegistry
             accessibleLabel={context.m(msg("Preview annotation, {label}", { label: record.label }))}
             kind="preview-annotation"
             icon={<MousePointerClickIcon />}
-            label={record.pins ? uiText("What the assistant received") : record.label}
+            label={record.label}
           >
             <UserMessagePreviewAnnotationDetails record={record} image={context.annotationImage} />
           </UserMessageContextPopover>

@@ -1,5 +1,4 @@
 import * as React from "react";
-import { manualClipboard } from "../manualClipboard";
 import * as Schema from "effect/Schema";
 import {
   COMPOSER_CONTEXT_CLIPBOARD_MIME,
@@ -137,11 +136,7 @@ function writeTextWithExecCommand(
   } finally {
     textarea.removeEventListener("copy", copy);
     textarea.remove();
-    const restoreFocus = (
-      previouslyFocused as {
-        focus?: unknown;
-      } | null
-    )?.focus;
+    const restoreFocus = (previouslyFocused as { focus?: unknown } | null)?.focus;
     if (typeof restoreFocus === "function") {
       restoreFocus.call(previouslyFocused);
     }
@@ -177,7 +172,6 @@ export async function writeTextToClipboard(
 
   if (typeof navigator === "undefined" || !navigator.clipboard?.writeText) {
     if (writeTextWithExecCommand(value, extraFlavors, options?.requireHtml)) return true;
-      manualClipboard.reveal(value);
     throw new ClipboardApiUnavailableError(clipboardTargetFields(target, "unavailable"));
   }
 

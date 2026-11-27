@@ -1,4 +1,3 @@
-
 import { thrownErrorMessage } from "@t3tools/client-runtime/errors";
 import { m as resolveMessage } from "~/i18n/messages";
 import { managedCapabilityDenial } from "@t3tools/client-runtime/contract-labels";
@@ -905,6 +904,7 @@ export const PairingClientsList = memo(function PairingClientsList({
           canRevoke={canRevoke}
         />
       ))}
+
       {pairingLinks.length === 0 && clientSessions.length === 0 && !isLoading ? (
         <div className={ITEM_ROW_CLASSNAME}>
           <p className="text-xs text-muted-foreground/60">
@@ -915,6 +915,7 @@ export const PairingClientsList = memo(function PairingClientsList({
     </>
   );
 });
+
 type AdvertisedEndpointListRowProps = {
   endpoint: AdvertisedEndpoint;
   isDefault: boolean;
@@ -1022,6 +1023,7 @@ export function NetworkAccessDescription({
   if (!endpoint) {
     return fallback;
   }
+
   const summary = (
     <>
       <span className="min-w-0 truncate">{endpoint.httpBaseUrl}</span>
@@ -1032,6 +1034,7 @@ export function NetworkAccessDescription({
       ) : null}
     </>
   );
+
   return (
     <span className="inline-flex min-w-0 max-w-full items-baseline gap-1">
       <span className="shrink-0">

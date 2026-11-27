@@ -1,7 +1,3 @@
-import { uiText } from "~/i18n";
-import { Switch } from "../ui/switch";
-
-
 import type { EnvironmentId, UnifiedSettings } from "@t3tools/contracts";
 import { T, useGT, Var } from "gt-react";
 import { PlusIcon } from "lucide-react";
@@ -28,14 +24,12 @@ export function UsageProviderSettings({
   environmentId,
   environmentLabel,
   sources,
-  cursorKeychainUsageEnabled,
   readOnly,
 }: {
   readonly environmentId: EnvironmentId;
   readonly environmentLabel: string;
   readonly sources: UnifiedSettings["usageLimitSources"];
   readonly readOnly: boolean;
-  readonly cursorKeychainUsageEnabled: boolean;
 }) {
   const gt = useGT();
   const searchableSetting = useSearchableSetting();
@@ -62,20 +56,6 @@ export function UsageProviderSettings({
           ) : null
         }
       >
-        <SettingsRow
-          title={uiText("Read Cursor account usage")}
-          description={uiText(
-            "Uses your existing Cursor CLI sign-in from the macOS Keychain to show usage and monthly limits. macOS may ask for permission.",
-          )}
-          control={
-            <Switch
-              checked={cursorKeychainUsageEnabled}
-              disabled={readOnly}
-              onCheckedChange={(enabled) => updateSettings({ cursorKeychainUsageEnabled: enabled })}
-              aria-label={uiText("Read Cursor account usage")}
-            />
-          }
-        />
         {entries.length === 0 ? (
           <SettingsRow title={gt("No usage sources configured.")} />
         ) : (
@@ -151,7 +131,7 @@ function RemoveUsageProviderButton({
               <T>Cancel</T>
             </AlertDialogClose>
             <Button
-              variant={"destructive"}
+              variant="destructive"
               onClick={() => {
                 setOpen(false);
                 onConfirm();

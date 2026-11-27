@@ -1,8 +1,4 @@
 import { ThoughtUsageBadge } from "./ThoughtUsageBadge";
-
-import { conversationLabel } from "~/i18n/conversationLabel";
-import { useUiText } from "~/i18n/useUiText";
-
 import { TimelinePendingApprovalRow } from "./TimelinePendingApprovalRow";
 import { WorkLogDetails, WorkLogRow } from "./WorkLog";
 import {
@@ -295,7 +291,6 @@ export function ViewedImagesTimelineRow({
 }
 
 function WorkEntryLogRow(props: WorkEntryRowProps) {
-  const uiText = useUiText();
   const { workEntry, workspaceRoot, displayLabel } = props;
   const ctx = use(TimelineRowCtx);
   const gt = useGT();
@@ -385,7 +380,7 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
           <span
             className={cn("text-sm font-medium", warning ? "text-warning" : "text-destructive")}
           >
-            {conversationLabel(label, uiText)}
+            {label}
           </span>
         }
         trailing={
@@ -447,18 +442,12 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
   const questionHeading = workEntry.questionAnswer
     ? getQuestionTextPreview(workEntry.questionAnswer)
     : "";
-  const rawPreviewText =
+  const previewText =
     isReasoning && expanded
       ? workEntry.toolLifecycleStatus === "inProgress"
-        ? uiText("Thinking")
-        : uiText("Thought")
-      : questionHeading || (displayLabel ?? workEntryDisplayLabel(workEntry, workspaceRoot));
-  // App-generated labels ("Tasks 4/6 · …", "Running pnpm") are localized; the agent's own thought text
-  // and question headings are not ours to translate.
-  const previewText =
-    showWarningIndicator || !(isReasoning || questionHeading)
-      ? conversationLabel(rawPreviewText, uiText)
-      : rawPreviewText;
+        ? gt("Thinking")
+        : gt("Thought")
+      : questionHeading || (displayLabel ?? workEntryDisplayLabel(workEntry, workspaceRoot, m));
   const answerPreview =
     workEntry.questionAnswer && hasQuestionAnswer(workEntry.questionAnswer)
       ? getQuestionAnswerPreview(workEntry.questionAnswer)

@@ -1,6 +1,3 @@
-import { PinStore } from "./PinStore.ts";
-import { previewPinKey } from "@t3tools/shared/previewPins";
-import { PreviewPinSchema } from "@t3tools/contracts";
 // @effect-diagnostics-next-line nodeBuiltinImport:off -- FileSystem.copyFile cannot request an exclusive copy.
 import * as NodeFSP from "node:fs/promises";
 import * as NodeZlib from "node:zlib";
@@ -72,16 +69,12 @@ import * as DesktopRendererHistory from "../telemetry/DesktopRendererHistory.ts"
 import {
   MENU_ACTION_CHANNEL,
   PREVIEW_ANNOTATION_VOICE_EVENT_CHANNEL,
-  PREVIEW_PIN_STATE_CHANNEL,
   PREVIEW_PICTURE_IN_PICTURE_FRAME_CHANNEL,
 } from "../ipc/channels.ts";
 import * as DesktopBrowserHost from "./DesktopBrowserHost.ts";
 import * as PreviewPasskeys from "./Passkeys.ts";
 import * as BrowserSession from "./BrowserSession.ts";
 import {
-  PIN_REQUEST_CHANNEL,
-  PIN_COMMAND_CHANNEL,
-  PIN_STATE_CHANNEL,
   ANNOTATION_CAPTURED_CHANNEL,
   ANNOTATION_SEND_ENABLED_CHANNEL,
   ANNOTATION_VOICE_EVENT_CHANNEL,
@@ -566,9 +559,6 @@ const isPreviewInputSignal = (value: unknown): value is PreviewInputSignal => {
   );
 };
 
-const decodePreviewPins = Schema.decodeUnknownSync(Schema.Array(PreviewPinSchema));
-const validatePreviewPins = Schema.decodeSync(Schema.Array(PreviewPinSchema));
-
 const makeNativeOperations = Effect.fn("PreviewManager.makeOperations")(function* (
   artifactDirectory: string,
   pictureInPicturePreloadPath: string,
@@ -586,11 +576,6 @@ const makeNativeOperations = Effect.fn("PreviewManager.makeOperations")(function
   const runFork = Effect.runForkWith(context);
   const runPromise = Effect.runPromiseWith(context);
   const resolvedArtifactDirectory = path.resolve(artifactDirectory);
-  const pinStore = new PinStore(
-    path.join(path.dirname(resolvedArtifactDirectory), "preview-pins-v1.json"),
-    fileSystem,
-    () => runPromise(random.uuidV4()),
-  );
 
   let forwardedShortcuts: ReadonlyArray<PreviewForwardedShortcut> = [];
   const annotationThemeRef = yield* Ref.make(DEFAULT_ANNOTATION_THEME);
@@ -1182,10 +1167,6 @@ const makeNativeOperations = Effect.fn("PreviewManager.makeOperations")(function
   ) {
     const session = (yield* Ref.get(pickSessionsRef)).get(tabId);
     if (session) yield* session.cancel;
-    else
-      yield* withWebContents("cancelPickElement", tabId, (wc) => wc.send(CANCEL_PICK_CHANNEL)).pipe(
-        Effect.ignore,
-      );
   });
 
   const detachListeners = Effect.fn("PreviewManager.detachListeners")(function* (
@@ -2357,46 +2338,9 @@ const makeNativeOperations = Effect.fn("PreviewManager.makeOperations")(function
     );
   });
 
-  const pendingPinBatches = new Map<string, { key: string; ids: readonly string[] }>();
-  const pinAction = Effect.fn("PreviewManager.pinAction")(function* (
-    tabId: string,
-    action: "send" | "accepted" | "close",
-    ids: readonly string[],
-  ) {
-    if (action === "send" || action === "close") {
-      const closing = action === "close" ? (yield* Ref.get(pickSessionsRef)).get(tabId) : undefined;
-      const wc = yield* requireWebContents(tabId);
-      if (action === "close" || annotationSendEnabled.get(tabId) === true)
-        yield* attempt({ operation: "pinAction", tabId }, () =>
-          wc.send(PIN_COMMAND_CHANNEL, action),
-        );
-      if (closing) {
-        yield* Effect.sleep(500);
-        if ((yield* Ref.get(pickSessionsRef)).get(tabId) === closing) yield* closing.cancel;
-      }
-      return;
-    }
-    const batch = pendingPinBatches.get(tabId);
-    if (!batch || ids.length !== batch.ids.length || ids.some((id) => !batch.ids.includes(id)))
-      return;
-    yield* attemptPromise({ operation: "pinAccepted", tabId }, async () => {
-      const records = await pinStore.load(batch.key);
-      await pinStore.save(
-        batch.key,
-        records.map((pin) =>
-          ids.includes(pin.id) && pin.status === "unsent"
-            ? { ...pin, status: "sent", wasSent: true }
-            : pin,
-        ),
-      );
-      pendingPinBatches.delete(tabId);
-    });
-  });
-
   const pickElement = Effect.fn("PreviewManager.pickElement")(function* (
     tabId: string,
     voice?: DesktopPreviewAnnotationVoiceConfig,
-    pins = false,
   ) {
     const wc = yield* requireWebContents(tabId);
     yield* cancelPickElement(tabId);
@@ -2410,14 +2354,9 @@ const makeNativeOperations = Effect.fn("PreviewManager.makeOperations")(function
         const cleanup = Effect.fn("PreviewManager.cleanupPickElement")(function* () {
           yield* attempt({ operation: "pickElement.cleanup", tabId, webContentsId: wc.id }, () => {
             wc.ipc.removeListener(ELEMENT_PICKED_CHANNEL, onMessage);
-            if (pins) {
-              wc.ipc.removeHandler(PIN_REQUEST_CHANNEL);
-              wc.ipc.removeListener(PIN_STATE_CHANNEL, onPinState);
-            }
             wc.ipc.removeListener(ANNOTATION_VOICE_EVENT_CHANNEL, onVoiceEvent);
             wc.off("destroyed", onDestroyed);
             wc.off("did-start-navigation", onNavigated);
-            if (pins) wc.off("did-finish-load", onPinLoaded);
           }).pipe(Effect.ignore);
           // A newer session may already own the slot when this one is cancelled.
           yield* Ref.update(pickSessionsRef, (sessions) =>
@@ -2469,68 +2408,10 @@ const makeNativeOperations = Effect.fn("PreviewManager.makeOperations")(function
           }
           resume(Effect.succeed(null));
         });
-        const onPinState = (_event: Electron.IpcMainEvent, count: unknown) => {
-          if (typeof count !== "number" || !Number.isInteger(count) || count < 0 || count > 100)
-            return;
-          runFork(
-            Ref.get(mainWindowRef).pipe(
-              Effect.tap((main) =>
-                Effect.sync(() => {
-                  if (Option.isSome(main) && !main.value.isDestroyed())
-                    main.value.webContents.send(PREVIEW_PIN_STATE_CHANNEL, tabId, count);
-                }),
-              ),
-            ),
-          );
-        };
-        const onPinRequest = async (_event: Electron.IpcMainInvokeEvent, request: unknown) => {
-          if (settled || typeof request !== "object" || request === null)
-            throw new Error("批注会话已关闭");
-          const input = request as Record<string, unknown>;
-          const key = previewPinKey(wc.getURL());
-          if (input.action === "load") return pinStore.load(key);
-          if (input.action === "save") {
-            const values = decodePreviewPins(input.pins);
-            if (values.some((pin) => pin.pageKey !== key)) throw new Error("批注页面不匹配");
-            await pinStore.save(key, values);
-            return null;
-          }
-          if (input.action === "capture") {
-            const rect = normalizeCaptureRect(input.rect);
-            if (!rect) throw new Error("批注截图范围无效");
-            const image = await runPromise(
-              capturePageWithRetry(
-                { operation: "capturePin", tabId, webContentsId: wc.id },
-                tabId,
-                wc,
-              ),
-            );
-            return cropAnnotationScreenshot(
-              image,
-              rect,
-              typeof input.ratio === "number" ? input.ratio : 1,
-              [rect],
-            );
-          }
-          throw new Error("不支持的批注操作");
-        };
         const onMessage = (_event: Electron.IpcMainEvent, ...args: unknown[]): void => {
           const payload = args[0];
           if (!isPreviewAnnotationPayload(payload)) {
             settle(null);
-            return;
-          }
-          if (pins) {
-            if (annotationSendEnabled.get(tabId) !== true || !payload.pins?.length) return;
-            try {
-              validatePreviewPins(payload.pins);
-            } catch {
-              return;
-            }
-            const key = previewPinKey(wc.getURL());
-            if (payload.pins.some((pin) => pin.pageKey !== key || pin.status !== "unsent")) return;
-            pendingPinBatches.set(tabId, { key, ids: payload.pins.map((pin) => pin.id) });
-            settle({ annotation: payload, submission: "send" });
             return;
           }
           const cropRect = normalizeCaptureRect(args[1]);
@@ -2600,30 +2481,11 @@ const makeNativeOperations = Effect.fn("PreviewManager.makeOperations")(function
             }),
           );
         };
-        const onPinLoaded = () => {
-          if (!pins || settled || wc.isDestroyed()) return;
-          runFork(
-            Ref.get(annotationThemeRef).pipe(
-              Effect.tap((theme) =>
-                attempt({ operation: "pins.reanchor", tabId }, () =>
-                  wc.send(
-                    START_PICK_CHANNEL,
-                    theme,
-                    annotationSendEnabled.get(tabId) === true,
-                    undefined,
-                    true,
-                  ),
-                ),
-              ),
-              Effect.ignore,
-            ),
-          );
-        };
         const onDestroyed = () => settle(null);
         const onNavigated = (
           event: Electron.Event<Electron.WebContentsDidStartNavigationEventParams>,
         ) => {
-          if (event.isMainFrame && !pins) settle(null);
+          if (event.isMainFrame) settle(null);
         };
         const registerPickElement = Effect.fn("PreviewManager.registerPickElement")(function* () {
           // Atomically swap/cancel overlapping picks so another pick cannot claim a transient empty slot.
@@ -2638,21 +2500,15 @@ const makeNativeOperations = Effect.fn("PreviewManager.makeOperations")(function
           if (settled) return;
           yield* attempt({ operation: "pickElement.register", tabId, webContentsId: wc.id }, () => {
             wc.ipc.on(ELEMENT_PICKED_CHANNEL, onMessage);
-            if (pins) {
-              wc.ipc.handle(PIN_REQUEST_CHANNEL, onPinRequest);
-              wc.ipc.on(PIN_STATE_CHANNEL, onPinState);
-            }
             if (voice) wc.ipc.on(ANNOTATION_VOICE_EVENT_CHANNEL, onVoiceEvent);
             wc.once("destroyed", onDestroyed);
             wc.on("did-start-navigation", onNavigated);
-            if (pins) wc.on("did-finish-load", onPinLoaded);
             if (!wc.isFocused()) wc.focus();
             wc.send(
               START_PICK_CHANNEL,
               annotationTheme,
               annotationSendEnabled.get(tabId) === true,
               voice,
-              ...(pins ? [true] : []),
             );
           });
         });
@@ -3906,7 +3762,6 @@ const makeNativeOperations = Effect.fn("PreviewManager.makeOperations")(function
     openPictureInPicture,
     openDevTools,
     pickElement,
-    pinAction,
     updateAnnotationVoice,
     prepareWebview,
     reapplyZoom,
@@ -4159,15 +4014,9 @@ export class PreviewManager extends Context.Service<
       tabId: string,
       enabled: boolean,
     ) => Effect.Effect<void, PreviewManagerError>;
-    readonly pinAction: (
-      tabId: string,
-      action: "send" | "accepted" | "close",
-      ids: readonly string[],
-    ) => Effect.Effect<void, PreviewManagerError>;
     readonly pickElement: (
       tabId: string,
       voice?: DesktopPreviewAnnotationVoiceConfig,
-      pins?: boolean,
     ) => Effect.Effect<PreviewAnnotationSubmissionResult | null, PreviewManagerError>;
     readonly updateAnnotationVoice: (
       state: DesktopPreviewAnnotationVoiceState,
@@ -4340,7 +4189,6 @@ export const make = Effect.gen(function* PreviewManagerMake() {
     setAnnotationTheme: operations.setAnnotationTheme,
     setAnnotationSendEnabled: operations.setAnnotationSendEnabled,
     pickElement: operations.pickElement,
-    pinAction: operations.pinAction,
     updateAnnotationVoice: operations.updateAnnotationVoice,
     cancelPickElement: operations.cancelPickElement,
     captureScreenshot: operations.captureScreenshot,

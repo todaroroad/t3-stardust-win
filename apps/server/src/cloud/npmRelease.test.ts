@@ -36,7 +36,6 @@ const makeService = Effect.fnUntraced(function* (
   run: ProcessRunner.ProcessRunner["Service"]["run"],
   publicRegistry: HttpClient.HttpClient = noPublicRegistry,
   npmInstalled = true,
-  lookupAllowed = true,
 ) {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
@@ -50,7 +49,6 @@ const makeService = Effect.fnUntraced(function* (
     Effect.provideService(HostProcess.Environment, {
       PATH: npmInstalled ? npmBin : "",
       PATHEXT: ".CMD",
-      ...(lookupAllowed ? { [NpmRelease.UPSTREAM_NPM_LOOKUP_ENV]: "1" } : {}),
     }),
   );
 }, Effect.provide(NodeServices.layer));
@@ -197,28 +195,4 @@ it.effect.each(["--registry=https://example.com", "../other", "other-package@lat
       const service = yield* makeService(() => Effect.die("invalid specs must not spawn npm"));
       expect(Result.isFailure(yield* service.get({ spec }).pipe(Effect.result))).toBe(true);
     }),
-);
-
-it.effect("refuses every lookup, without running npm or fetching, unless an operator opts in", () =>
-  Effect.gen(function* () {
-    let calls = 0;
-    const service = yield* makeService(
-      () => {
-        calls += 1;
-        return Effect.die("the upstream package must not be queried");
-      },
-      HttpClient.make(() => {
-        calls += 1;
-        return Effect.die("the public registry must not be queried");
-      }),
-      false,
-      false,
-    );
-    for (const spec of ["latest", "nightly", "9.9.9"]) {
-      const result = yield* service.get({ spec }).pipe(Effect.result);
-      expect(Result.isFailure(result)).toBe(true);
-      if (Result.isFailure(result)) expect(result.failure).toBeInstanceOf(ServerNpmReleaseError);
-    }
-    expect(calls).toBe(0);
-  }),
 );

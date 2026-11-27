@@ -1,5 +1,3 @@
-
-
 import type {
   DiffLineAnnotation,
   FileDiffContentsLoader,

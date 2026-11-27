@@ -18,7 +18,6 @@ export const THREAD_SEARCH_QUERY_MAX_LENGTH = 200;
 // The server's SQLite client is synchronous and single-connection. Bound both
 // scan input and response size so a search cannot monopolize that connection.
 export const OrchestrationSearchThreadsInput = Schema.Struct({
-  searchMode: Schema.optionalKey(Schema.Literal("spotlight")),
   query: TrimmedString.check(
     Schema.isMinLength(2),
     Schema.isMaxLength(THREAD_SEARCH_QUERY_MAX_LENGTH),
@@ -44,23 +43,6 @@ export const OrchestrationThreadSearchMatch = Schema.Struct({
   hits: Schema.optionalKey(Schema.Int),
   /** The message the snippet is from. Older servers omit it. */
   messageId: Schema.optionalKey(MessageId),
-  title: Schema.optionalKey(Schema.String),
-  archivedAt: Schema.optionalKey(Schema.NullOr(IsoDateTime)),
-  score: Schema.optionalKey(Schema.Number),
-  matchedQuery: Schema.optionalKey(Schema.String),
-  familyKey: Schema.optionalKey(Schema.String),
-  familyTitle: Schema.optionalKey(Schema.String),
-  familyThreads: Schema.optionalKey(
-    Schema.Array(
-      Schema.Struct({
-        threadId: ThreadId,
-        title: Schema.String,
-        updatedAt: IsoDateTime,
-        archivedAt: Schema.NullOr(IsoDateTime),
-      }),
-    ),
-  ),
-  isSubagent: Schema.optionalKey(Schema.Boolean),
 });
 export type OrchestrationThreadSearchMatch = typeof OrchestrationThreadSearchMatch.Type;
 

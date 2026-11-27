@@ -1,5 +1,3 @@
-
-import { uiText } from "~/i18n";
 import { useAtomValue } from "@effect/atom-react";
 import type { OtlpEndpointCheckResult, OtlpSignal, ServerObservability } from "@t3tools/contracts";
 import { useEffect, useEffectEvent, useState } from "react";
@@ -16,35 +14,31 @@ import { useSettingsScope } from "./SettingsScopeContext";
 import { useScopedSettings } from "./useScopedSettings";
 import { SettingsSection } from "./settingsLayout";
 import { SettingsScopeNotice } from "./SettingsScopeNotice";
+
 const SIGNALS = [
   {
     key: "otlpTracesUrl",
     sourceKey: "otlpTracesSource",
     variableKey: "otlpTracesVariable",
-    get label() {
-      return uiText("Traces");
-    },
+    label: msg("Traces endpoint"),
     signal: "traces",
   },
   {
     key: "otlpMetricsUrl",
     sourceKey: "otlpMetricsSource",
     variableKey: "otlpMetricsVariable",
-    get label() {
-      return uiText("Metrics");
-    },
+    label: msg("Metrics endpoint"),
     signal: "metrics",
   },
   {
     key: "otlpLogsUrl",
     sourceKey: "otlpLogsSource",
     variableKey: "otlpLogsVariable",
-    get label() {
-      return uiText("Logs");
-    },
+    label: msg("Logs endpoint"),
     signal: "logs",
   },
 ] as const;
+
 type SignalDescriptor = (typeof SIGNALS)[number];
 type SignalKey = SignalDescriptor["key"];
 
@@ -178,6 +172,7 @@ function TelemetryExportForm() {
     // oxlint-disable-next-line react/set-state-in-effect -- State changes only after the response arrives.
     if (canCheck) sendPendingChecks();
   }, [canCheck]);
+
   return (
     <SettingsSection title={gt("OpenTelemetry export")} id="telemetry-export">
       <form

@@ -1,4 +1,3 @@
-
 import type { ProjectIconColor } from "@t3tools/contracts";
 import { msg } from "gt-react";
 

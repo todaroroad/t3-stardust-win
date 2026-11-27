@@ -166,7 +166,7 @@ export function CodexSetupSection(props: CodexSetupSectionProps) {
               <T>Checking...</T>
             </span>
           ) : existingAuthenticated ? (
-            <span className={"text-xs text-muted-foreground"}>{existingSummary.headline}</span>
+            <span className="text-xs text-muted-foreground">{existingSummary.headline}</span>
           ) : (
             <ManagedControl reason={chatGptDenial}>
               <ChatGptConnectionButton
@@ -735,7 +735,7 @@ function ManagedCodexSetup({
           <T>If sign-in doesn't return to T3 Code, paste the URL from the final localhost page.</T>
         </p>
         <form
-          className={"flex flex-col gap-2 sm:flex-row sm:items-center"}
+          className="flex flex-col gap-2 sm:flex-row sm:items-center"
           onSubmit={(event) => {
             event.preventDefault();
             if (!auth.flowId || !callbackUrl.trim()) return;
@@ -766,8 +766,8 @@ function ManagedCodexSetup({
             />
           </div>
           <Button
-            variant={"outline"}
-            type={"submit"}
+            variant="outline"
+            type="submit"
             disabled={pending || readOnly || !callbackUrl.trim()}
           >
             <T>Connect</T>
@@ -776,8 +776,8 @@ function ManagedCodexSetup({
         {!remoteWeb ? (
           <div>
             <Button
-              size={"xs"}
-              variant={"ghost-muted"}
+              size="xs"
+              variant="ghost-muted"
               onClick={() => void ensureLocalApi().shell.openExternal(url)}
             >
               <T>Try sign-in in your browser</T>
@@ -799,14 +799,14 @@ function ManagedCodexSetup({
     ) : null;
   const callbackHelpContent =
     callbackCompletion && callbackHelpOpen ? (
-      <div id={callbackHelpId} className={"w-full border-t border-border/50 pt-3"}>
+      <div id={callbackHelpId} className="w-full border-t border-border/50 pt-3">
         {callbackCompletion}
       </div>
     ) : null;
   const callbackFallback = needsManualCallback ? (
     callbackCompletion
   ) : callbackCompletion ? (
-    <div className={"space-y-3 text-xs leading-relaxed text-muted-foreground"}>
+    <div className="space-y-3 text-xs leading-relaxed text-muted-foreground">
       <CodexSignInDescription
         label={gt("Having trouble signing in?")}
         expanded={callbackHelpOpen}
@@ -905,7 +905,7 @@ function ManagedCodexSetup({
               waitingControl
             ) : (
               <ChatGptConnectionButton
-                size={"sm"}
+                size="sm"
                 disabled={
                   unavailable ||
                   busy ||
@@ -927,8 +927,8 @@ function ManagedCodexSetup({
           secondaryControl={
             (authActive && !finishingSignIn) || installActive ? (
               <Button
-                size={"sm"}
-                variant={"ghost-muted"}
+                size="sm"
+                variant="ghost-muted"
                 disabled={pending || readOnly}
                 onClick={() => {
                   abortOperation();
@@ -1005,8 +1005,8 @@ function ManagedCodexSetup({
               </>
             ) : installActive ? (
               <Button
-                size={"sm"}
-                variant={"ghost"}
+                size="sm"
+                variant="ghost"
                 disabled={pending || readOnly}
                 onClick={() => {
                   if (!installation?.operationId) return;
@@ -1074,8 +1074,8 @@ function ManagedCodexSetup({
                 </ChatGptConnectionButton>
                 {hasSavedAccount ? (
                   <Button
-                    size={"sm"}
-                    variant={"ghost"}
+                    size="sm"
+                    variant="ghost"
                     disabled={unavailable || busy}
                     onClick={() => void setup("chatgpt-change-account")}
                   >
@@ -1098,18 +1098,18 @@ function ManagedCodexSetup({
         }
       />
       {authenticated ? (
-        <div className={"flex justify-end px-3 py-1 sm:px-4"}>
+        <div className="flex justify-end px-3 py-1 sm:px-4">
           <ChatGptUsageButton />
         </div>
       ) : null}
       {logoutWarning ? (
-        <p role={"alert"} className={"px-3 py-2 text-xs text-muted-foreground sm:px-4"}>
+        <p role="alert" className="px-3 py-2 text-xs text-muted-foreground sm:px-4">
           {logoutWarning}
         </p>
       ) : null}
-      {callbackFallback ? <div className={"px-3 py-3 sm:px-4"}>{callbackFallback}</div> : null}
+      {callbackFallback ? <div className="px-3 py-3 sm:px-4">{callbackFallback}</div> : null}
       {error || authQuery.error || installQuery.error || installation?.phase === "failed" ? (
-        <p role={"alert"} className={"px-3 py-2 text-xs text-destructive sm:px-4"}>
+        <p role="alert" className="px-3 py-2 text-xs text-destructive sm:px-4">
           {error ??
             (installation?.phase === "failed"
               ? installation.message
@@ -1144,7 +1144,7 @@ export function CodexManagedRuntimeFields({
         title={gt("Binary path")}
         description={gt("Selected by T3 Code.")}
         control={
-          <div className={"w-full sm:w-80"}>
+          <div className="w-full sm:w-80">
             <Input
               aria-label={gt("Codex binary path")}
               value={executablePath}
@@ -1161,7 +1161,7 @@ export function CodexManagedRuntimeFields({
         title={gt("CODEX_HOME path")}
         description={gt("Shared Codex config, sessions, and state.")}
         control={
-          <div className={"w-full sm:w-80"}>
+          <div className="w-full sm:w-80">
             <Input
               aria-label={gt("Codex home path")}
               value={provider?.runtimePaths?.homePath ?? ""}
@@ -1180,7 +1180,7 @@ export function CodexManagedRuntimeFields({
             : gt("This instance uses the shared Codex home directly.")
         }
         control={
-          <div className={"w-full sm:w-80"}>
+          <div className="w-full sm:w-80">
             <Input
               aria-label={gt("Codex shadow home path")}
               value={provider?.runtimePaths?.shadowHomePath ?? ""}

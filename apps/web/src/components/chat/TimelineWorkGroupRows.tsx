@@ -1,9 +1,4 @@
 import { ThoughtUsageBadge } from "./ThoughtUsageBadge";
-import { conversationLabel, chineseDuration } from "~/i18n/conversationLabel";
-import { useLocale } from "gt-react";
-
-import { useUiText } from "~/i18n/useUiText";
-
 import { TimelinePendingApprovalRow } from "./TimelinePendingApprovalRow";
 import { WorkLogButton, WorkLogList, WorkLogRow } from "./WorkLog";
 import type { WorktreeSetupSnapshot } from "@t3tools/contracts";
@@ -12,7 +7,6 @@ import {
   liveThoughtLine,
   resolveViewedImageAsset,
   workEntriesViewedImagePaths,
-  workEntryHasNoMatches,
 } from "@t3tools/client-runtime/work-log/presentation";
 import { resolveWorkGroupScrollAnchor } from "@t3tools/client-runtime/work-log/scroll-anchor";
 import { useAssetUrls } from "~/assets/assetUrls";
@@ -116,6 +110,7 @@ export const WorkGroupSection = memo(function WorkGroupSection({
       />
     );
   }
+
   return (
     <section aria-label={gt("Activity")}>
       {nonEmptyEntries.map((workEntry) => (
@@ -135,14 +130,10 @@ export const WorkGroupSection = memo(function WorkGroupSection({
 });
 
 function WorkingTimer({ createdAt }: { createdAt: string }) {
-  const locale = useLocale();
   const { activeThreadEnvironmentId } = use(TimelineRowCtx);
   return (
     <span
-      ref={tickTextContent(() => {
-        const value = formatWorkingTimerNow(createdAt, activeThreadEnvironmentId);
-        return locale.startsWith("zh") ? chineseDuration(value) : value;
-      }, true)}
+      ref={tickTextContent(() => formatWorkingTimerNow(createdAt, activeThreadEnvironmentId), true)}
       className="tabular-nums"
     />
   );
@@ -360,21 +351,20 @@ function ExpandedWorkGroupEntries({
 const workEntryKey = (entry: TimelineWorkEntry) => entry.id;
 
 export function WorkingTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "working" }> }) {
-  const uiText = useUiText();
   const { isCompacting, isPreparingWorktree, backgroundWorktreeSetup } =
     use(TimelineRowActivityCtx);
   const compacting = row.compacting === true || isCompacting;
   const shimmer = isPreparingWorktree || compacting;
   const label = isPreparingWorktree ? (
-    uiText("Setting up worktree…")
+    <T>Setting up worktree…</T>
   ) : compacting ? (
     <CompactingLabel createdAt={row.createdAt} />
   ) : row.createdAt ? (
-    <>
-      {uiText("Working for")} <WorkingTimer createdAt={row.createdAt} />
-    </>
+    <T>
+      Working for <WorkingTimer createdAt={row.createdAt} />
+    </T>
   ) : (
-    uiText("Working...")
+    <T>Working...</T>
   );
   return (
     <div className="border-b border-border/60 pb-2 pt-1">
@@ -395,7 +385,6 @@ export function WorkingTimelineRow({ row }: { row: Extract<TimelineRow, { kind: 
 }
 
 function BackgroundWorktreeSetupChip({ snapshot }: { snapshot: WorktreeSetupSnapshot }) {
-  const uiText = useUiText();
   const ctx = use(TimelineRowCtx);
   const gt = useGT();
   const terminalId = snapshot.setupScript?.terminalId ?? null;
@@ -410,9 +399,10 @@ function BackgroundWorktreeSetupChip({ snapshot }: { snapshot: WorktreeSetupSnap
             variant="ghost-muted"
             size="micro"
             className="ml-auto min-w-0 shrink-0"
-            aria-label={uiText("Background setup is still running: {name}. Show setup progress.", {
-              name: scriptName,
-            })}
+            aria-label={gt(
+              "Background setup is still running: {scriptName}. Show setup progress.",
+              { scriptName },
+            )}
           />
         }
       >
@@ -607,8 +597,7 @@ function LiveActivityContent({
           className={cn(
             "block truncate",
             highlighted && "text-foreground",
-            // Static emphasis: the old text sheen cost ~9% CPU for as long as a tool ran.
-            active && "text-foreground",
+            active && "live-tool-shine",
           )}
         >
           {label}
@@ -628,7 +617,6 @@ export function LiveWorkEntryTimelineRow({
 }: {
   row: Extract<TimelineRow, { kind: "work-live" }>;
 }) {
-  const uiText = useUiText();
   const ctx = use(TimelineRowCtx);
   const gt = useGT();
   const m = useMessages();
@@ -642,7 +630,6 @@ export function LiveWorkEntryTimelineRow({
   if (pendingApproval) return <TimelinePendingApprovalRow approval={pendingApproval} />;
 
   const failed = workEntryDisplayIndicatesToolFailure(row.entry);
-  const noMatches = workEntryHasNoMatches(row.entry);
   const thoughtLine =
     row.thought && !row.expanded
       ? liveThoughtLine(sliceThoughtPreviewSource(row.thought.detail ?? ""))
@@ -719,11 +706,6 @@ export function LiveWorkEntryTimelineRow({
               environmentId={ctx.activeThreadEnvironmentId}
               linked={false}
             />
-          ) : noMatches ? (
-            <>
-              {label}{" "}
-              <span className="text-xs text-muted-foreground">· {uiText("No matches")}</span>
-            </>
           ) : (
             label
           )
@@ -742,11 +724,10 @@ export function WorkGroupToggleTimelineRow({
 }: {
   row: Extract<TimelineRow, { kind: "work-toggle" }>;
 }) {
-  const uiText = useUiText();
   const ctx = use(TimelineRowCtx);
   return (
     <WorkGroupHeader
-      label={conversationLabel(row.summary, uiText)}
+      label={row.summary}
       iconName={row.toolSurface ?? toolGroupSummaryIconName(row.summaryKind)}
       toolIcon={row.toolIcon}
       failed={row.hasFailure}

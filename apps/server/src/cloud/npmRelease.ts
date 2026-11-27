@@ -4,7 +4,6 @@ import {
   type ServerNpmRelease,
 } from "@t3tools/contracts";
 import { npmReleaseDatabaseMigration } from "@t3tools/shared/cliRelease";
-import * as HostProcess from "@t3tools/shared/HostProcess";
 import { resolveCommandPath } from "@t3tools/shared/shell";
 import * as Cache from "effect/Cache";
 import * as Context from "effect/Context";
@@ -56,15 +55,7 @@ function toRelease(spec: string, json: string) {
   });
 }
 
-/**
- * The `t3` package on npm is the upstream T3 Code project's, not this fork's. A lookup would
- * name an upstream version the user could be moved to, so it stays off unless an operator who
- * runs their own `t3` package opts in with this variable.
- */
-export const UPSTREAM_NPM_LOOKUP_ENV = "T3CODE_ALLOW_UPSTREAM_NPM_LOOKUP";
-
 export const make = Effect.fn("NpmRelease.make")(function* () {
-  const lookupAllowed = (yield* HostProcess.Environment)[UPSTREAM_NPM_LOOKUP_ENV] === "1";
   const runner = yield* ProcessRunner.ProcessRunner;
   const http = yield* HttpClient.HttpClient;
   const lookupPublic = Effect.fn("NpmRelease.lookupPublic")(function* (spec: string) {
@@ -131,11 +122,6 @@ export const make = Effect.fn("NpmRelease.make")(function* () {
           () => new ServerNpmReleaseError({ reason: "Invalid release version or track." }),
         ),
       );
-      if (!lookupAllowed) {
-        return yield* new ServerNpmReleaseError({
-          reason: "Release lookup through the upstream npm package is turned off in this build.",
-        });
-      }
       return yield* Cache.get(cache, spec);
     }),
   });

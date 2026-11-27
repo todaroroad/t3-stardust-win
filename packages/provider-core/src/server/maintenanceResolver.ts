@@ -1411,19 +1411,10 @@ export const resolveProviderMaintenanceCapabilitiesEffect = Effect.fn(
     if (!realCommandPath) {
       return yield* resolver.resolve(null);
     }
-    // A small launcher script that only sets environment and execs the real CLI is not the
-    // installation; follow it so npm/Homebrew installs behind it stay one-click updatable.
-    const wrapped = yield* fileSystem.readFileString(realCommandPath).pipe(
-      Effect.map((source) => execWrapperTarget(source)),
-      Effect.orElseSucceed(() => null),
-    );
-    const wrappedRealPath = wrapped
-      ? yield* fileSystem.realPath(wrapped).pipe(Effect.orElseSucceed(() => null))
-      : null;
     return yield* resolver.resolve({
       binaryPath,
-      resolvedCommandPath: wrappedRealPath ? wrapped! : resolvedCommandPath,
-      realCommandPath: wrappedRealPath ?? realCommandPath,
+      resolvedCommandPath,
+      realCommandPath,
       env,
       platform: yield* HostProcess.Platform,
     });
@@ -1446,28 +1437,6 @@ export const makeCachedProviderMaintenanceResolution = Effect.fn(
   return (options?: { readonly fresh?: boolean }) =>
     options?.fresh ? Cache.invalidate(cache, undefined).pipe(Effect.andThen(cached)) : cached;
 });
-
-const WRAPPER_MAX_BYTES = 4096;
-const EXEC_LINE = /^exec\s+(?:'([^']+)'|"([^"$`\\]+)")\s+"\$@"\s*$/;
-
-/**
- * The absolute target of a POSIX shell launcher whose only command is `exec '<path>' "$@"`
- * (after `export` lines and comments), or null for anything else.
- */
-export function execWrapperTarget(source: string): string | null {
-  if (source.length > WRAPPER_MAX_BYTES || !/^#!\s*\/bin\/(?:ba)?sh\b/.test(source)) return null;
-  const lines = source
-    .split("\n")
-    .slice(1)
-    .map((line) => line.trim())
-    .filter((line) => line && !line.startsWith("#"));
-  const last = lines.at(-1);
-  if (!last || !lines.slice(0, -1).every((line) => /^export\s+[A-Za-z_][A-Za-z0-9_]*=/.test(line)))
-    return null;
-  const match = EXEC_LINE.exec(last);
-  const target = match?.[1] ?? match?.[2] ?? null;
-  return target && target.startsWith("/") ? target : null;
-}
 
 function manualUpdateMessage(latestVersion: string, installPath: string | undefined): string {
   return installPath

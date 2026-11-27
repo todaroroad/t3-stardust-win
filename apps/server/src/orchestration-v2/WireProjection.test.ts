@@ -301,26 +301,6 @@ describe("orchestration V2 wire projection", () => {
     expect(toolOutputImages(output)).toHaveLength(MAX_TOOL_OUTPUT_IMAGES);
   });
 
-  it("distinguishes a quiet search miss from diagnostics before dropping command output", () => {
-    const item = {
-      ...base,
-      type: "command_execution" as const,
-      input: 'rg "needle|other" docs',
-      status: "failed" as const,
-      exitCode: 1,
-    };
-    const miss = projectTurnItemForWire({ ...item, output: "" });
-    expect(miss).toMatchObject({ exitCode: 1, status: "failed" });
-    expect(miss).not.toHaveProperty("outputIndicatesFailure");
-    const diagnostic = projectTurnItemForWire({ ...item, output: "rg: Permission denied" });
-    expect(diagnostic).toMatchObject({
-      exitCode: 1,
-      outputOmitted: true,
-      outputIndicatesFailure: true,
-    });
-    expect(projectTurnItemForWire(diagnostic)).toEqual(diagnostic);
-  });
-
   it("keeps failure evidence without retaining command output", () => {
     const item = {
       ...base,

@@ -1,7 +1,5 @@
-import { m } from "~/i18n/messages";
 import { msg } from "gt-react";
-import { startTaskBoardNotifications } from "../taskBoardNotifications";
-import { threadRuntimeIsActive } from "@t3tools/client-runtime/state/shell";
+import { m } from "../i18n/messages";
 import {
   type EnvironmentThreadShell,
   type PendingSubagentRequest,
@@ -11,7 +9,7 @@ import { isShownUnderParent } from "@t3tools/client-runtime/state/threads";
 import type { AnyRouter } from "@tanstack/react-router";
 import { parseThreadKey, threadKey } from "@t3tools/client-runtime/state/entities";
 import type { EnvironmentId, OrchestrationV2ThreadShell, ThreadId } from "@t3tools/contracts";
-import { backgroundWorkDefersThreadCompletion } from "@t3tools/shared/orchestrationV2PendingBackgroundWork";
+import { monitorHoldsWakeCompletion } from "@t3tools/shared/orchestrationV2PendingBackgroundWork";
 import type { ClientSettings } from "@t3tools/contracts/settings";
 import * as Option from "effect/Option";
 import type { AtomRegistry } from "effect/reactivity";
@@ -22,8 +20,6 @@ import {
   ShieldQuestionIcon,
 } from "lucide-react";
 
-import { scopedThreadKey } from "@t3tools/client-runtime/environment";
-import { useResumeCardStore } from "../resumeCardStore";
 import { getClientSettings, subscribeClientSettings } from "../hooks/useSettings";
 import { isWindowsPlatform } from "../lib/utils";
 import { environmentSummaries } from "../state/presentation";
@@ -158,38 +154,8 @@ export function startThreadNotifications(
             : status === "failed"
               ? m(msg("Thread failed"))
               : status === "request"
-                ? "Guest request"
-                : "Input needed";
-    if (kind === "waiting") {
-      // A light hint: in-app only, never a sound, badge or desktop notification.
-      if (
-        !inAppNotificationsEnabled ||
-        document.visibilityState !== "visible" ||
-        !document.hasFocus() ||
-        (active.environmentId === environmentId && active.threadId === thread.id)
-      )
-        return;
-      const waitingKey = threadKey({ environmentId, threadId: thread.id });
-      const waitingToastId: ToastId = toastManager.add({
-        onRemove: (): void => forgetToast(waitingKey, waitingToastId),
-        type: "info",
-        title: "Waiting for background tasks",
-        description: thread.title,
-        data: { hideCopyButton: true },
-        actionProps: {
-          children: "Open thread",
-          onClick: () => {
-            toastManager.close(waitingToastId);
-            void router.navigate({
-              to: "/$environmentId/$threadId",
-              params: { environmentId, threadId: thread.id },
-            });
-          },
-        },
-      });
-      openToasts.set(waitingKey, [...(openToasts.get(waitingKey) ?? []), waitingToastId]);
-      return;
-    }
+                ? m(msg("Guest request"))
+                : m(msg("Input needed"));
     if (hasNotificationSound(mode)) {
       void playNotificationSound(kind, () =>
         hasNotificationSound(getClientSettings().notificationMode),
@@ -202,8 +168,6 @@ export function startThreadNotifications(
       (active.environmentId !== environmentId || active.threadId !== thread.id)
     ) {
       const toastKey = threadKey({ environmentId, threadId: thread.id });
-      // The waiting hint gives way to the completion it announced.
-      closeToasts((key) => key === toastKey);
       const toastId: ToastId = toastManager.add({
         onRemove: (): void => forgetToast(toastKey, toastId),
         type: kind === "completion" ? "success" : status === "failed" ? "error" : "warning",
@@ -318,10 +282,8 @@ export function startThreadNotifications(
         : requestId !== null
           ? `${status}:${requestId}`
           : `${thread.latestRun?.runId ?? ""}:${status}`;
-      const finished = thread.latestRun?.status === "completed";
-      const completed = status === "ready" && finished;
-      const deferred = backgroundWorkDefersThreadCompletion(rawThread);
-      const settled = completed && !deferred;
+      const completed = status === "ready" && thread.latestRun?.status === "completed";
+      const settled = completed && !monitorHoldsWakeCompletion(rawThread);
       const parsedCompletedAt = Date.parse(thread.latestRun?.completedAt ?? "");
       const completedAt = Number.isFinite(parsedCompletedAt) ? parsedCompletedAt : null;
       const state = {
@@ -334,14 +296,6 @@ export function startThreadNotifications(
         settled,
         completedAt: settled ? completedAt : null,
         backgroundWake: rawThread.latestRunBackgroundWake === true,
-        // A parked run reads as waiting, not ready; a progress wake is not worth a hint.
-        waitingRun:
-          finished &&
-          deferred &&
-          (status === "ready" || status === "waiting") &&
-          rawThread.latestRunBackgroundWake !== true
-            ? (thread.latestRun?.runId ?? null)
-            : null,
       };
       next.set(thread.id, state);
       changed.push([prior, state]);
@@ -486,29 +440,13 @@ export function startThreadNotifications(
     registry.subscribe(environmentThreadShells.threadRefsAtom, closeHiddenPending),
   ];
   const unsubscribeRoute = router.subscribe("onResolved", closeOpenedThreadToasts);
-  // Dismissing a thread's inbox card also retires its toast, so one result is never asked for twice.
-  const unsubscribeInbox = useResumeCardStore.subscribe((state, previous) => {
-    if (state.hidden === previous.hidden) return;
-    const changed = new Set(
-      Object.keys(state.hidden).filter((key) => state.hidden[key] !== previous.hidden[key]),
-    );
-    if (changed.size === 0) return;
-    closeToasts((key) => changed.has(scopedThreadKey(parseThreadKey(key))));
-  });
   onSettings();
-  const stopTaskBoard = startTaskBoardNotifications(registry, router, () =>
-    registry
-      .get(environmentThreadShells.threadShellsAtom)
-      .some((thread) => threadRuntimeIsActive(thread.runtime)),
-  );
 
   return () => {
-    stopTaskBoard();
     unsubscribeSettings();
     unsubscribeEnvironmentIds();
     for (const unsubscribe of unsubscribeHidden) unsubscribe();
     unsubscribeRoute();
-    unsubscribeInbox();
     for (const entry of watched.values()) entry.unsubscribe();
     watched.clear();
     stopModeListeners();

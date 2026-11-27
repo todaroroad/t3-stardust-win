@@ -1,4 +1,3 @@
-import * as UsageLimitSources from "../usage/UsageLimitSources.ts";
 import * as DocumentText from "../provider/DocumentText.ts";
 import { NodeHttpServer } from "@effect/platform-node";
 import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
@@ -573,14 +572,7 @@ const boxToolkitLayer = (thread: BoxThread) => {
       ),
   });
   return Layer.merge(
-    McpHttpServer.layerOrchestratorToolkit.pipe(
-      Layer.provide(
-        Layer.mock(UsageLimitSources.UsageLimitSources)({
-          current: Effect.succeed([]),
-          refresh: Effect.void,
-        }),
-      ),
-    ),
+    McpHttpServer.layerOrchestratorToolkit,
     McpHttpServer.layerProjectRegistration,
   ).pipe(
     Layer.provide(DocumentText.layer.pipe(Layer.provideMerge(NodeServices.layer))),
@@ -709,12 +701,6 @@ const makeLaptop = (
       Layer.provideMerge(Layer.merge(layerOrchestrator, ServerSettings.layerTest())),
     );
     const layerHere = McpHttpServer.layerOrchestratorToolkit.pipe(
-      Layer.provide(
-        Layer.mock(UsageLimitSources.UsageLimitSources)({
-          current: Effect.succeed([]),
-          refresh: Effect.void,
-        }),
-      ),
       Layer.provideMerge(McpHttpServer.layerInProcessMcpServer),
       Layer.provideMerge(
         RemoteDelegation.layer.pipe(

@@ -201,9 +201,7 @@ export function createSidebarSortingStrategy(input: {
       const moved = item.kind === "thread" && item.key === active.key;
       return item.kind === "marker" &&
         (item.marker === "pinned-header" || item.marker === "pinned-divider")
-        ? rect && rect.height > 0
-          ? rect.height
-          : labelHeight
+        ? labelHeight
         : item.kind === "marker" && item.marker.endsWith("placeholder")
           ? slimHeight
           : moved

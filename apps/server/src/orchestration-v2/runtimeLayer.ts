@@ -1,5 +1,3 @@
-import * as ClaudeUsageProtection from "./ClaudeUsageProtection.ts";
-import * as ClaudeUsageProtectionWorker from "./ClaudeUsageProtectionWorker.ts";
 import * as WorktreeBranchSync from "./WorktreeBranchSync.ts";
 import * as GuestShareService from "../guest/GuestShareService.ts";
 import * as UsageLimitRecoveryWorker from "./UsageLimitRecoveryWorker.ts";
@@ -246,7 +244,6 @@ const layerRunFinalizationServiceProvided = RunFinalizationService.layer.pipe(
 );
 
 const layerOrchestratorProvided = Orchestrator.layer.pipe(
-  Layer.provide(ClaudeUsageProtection.layer),
   Layer.provide(
     Layer.mergeAll(
       layerCheckpointServiceProvided,
@@ -460,9 +457,6 @@ export const layerProduction = Layer.mergeAll(
         layerOrchestratorProvided,
       ),
     ),
-  ),
-  ClaudeUsageProtectionWorker.layer.pipe(
-    Layer.provide(Layer.mergeAll(ClaudeUsageProtection.layer, layerOrchestratorProvided)),
   ),
   layerProviderContinuationWorkerProvided,
   layerAgentSessionScannerProvided,

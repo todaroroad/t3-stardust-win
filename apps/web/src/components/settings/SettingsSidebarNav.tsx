@@ -1,4 +1,3 @@
-import { useUiText } from "~/i18n/useUiText";
 import {
   lazy,
   Suspense,
@@ -16,7 +15,6 @@ import {
   CalendarClockIcon,
   FileDiffIcon,
   FolderTreeIcon,
-  HardDriveIcon,
   GitBranchIcon,
   GlobeIcon,
   InfoIcon,
@@ -80,6 +78,7 @@ const SnapShotIcon = createLucideIcon("snap-shot", [
   ["rect", { width: "10", height: "8", x: "7", y: "8", rx: "2", key: "window" }],
   ["circle", { cx: "12", cy: "12", r: "1.5", key: "lens" }],
 ]);
+
 const T3ConnectSidebarSignIn = lazy(() =>
   import("../clerk/T3ConnectSidebarSignIn").then((module) => ({
     default: module.T3ConnectSidebarSignIn,
@@ -90,13 +89,9 @@ const T3ConnectSidebarAvatar = lazy(() =>
     default: module.T3ConnectSidebarAvatar,
   })),
 );
+
 const SETTINGS_SECTION_ICONS: Readonly<
-  Record<
-    SettingsPath,
-    ComponentType<{
-      className?: string;
-    }>
-  >
+  Record<SettingsPath, ComponentType<{ className?: string }>>
 > = {
   "/settings/general": Settings2Icon,
   "/settings/diagnostics": WrenchIcon,
@@ -108,7 +103,6 @@ const SETTINGS_SECTION_ICONS: Readonly<
   "/settings/keybindings": KeyboardIcon,
   "/settings/snap-shot": SnapShotIcon,
   "/settings/providers": BotIcon,
-  "/settings/memory": MessagesSquareIcon,
   "/settings/threads": MessagesSquareIcon,
   "/settings/browser": GlobeIcon,
   "/settings/devices": SmartphoneIcon,
@@ -119,7 +113,6 @@ const SETTINGS_SECTION_ICONS: Readonly<
   "/settings/access": ShieldCheckIcon,
   "/settings/secrets": KeyRoundIcon,
   "/settings/maintenance": WrenchIcon,
-  "/settings/storage": HardDriveIcon,
   "/settings/labs": FlaskConicalIcon,
   "/settings/about": InfoIcon,
   "/settings/archived": ArchiveIcon,
@@ -142,7 +135,6 @@ function SettingsSectionIcon({ to }: { to: SettingsPath }) {
 }
 
 export function SettingsSidebarNav({ pathname }: { pathname: string }) {
-  const uiText = useUiText();
   const gt = useGT();
   const m = useMessages();
   const navArea = workspaceAreaProps("settings-nav", 0, gt("Settings sections"));
@@ -196,6 +188,7 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
       ) {
         return;
       }
+
       event.preventDefault();
       setCompactSearchOpen(true);
       searchInputRef.current?.focus();
@@ -209,6 +202,7 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
   useEffect(() => {
     if (compactSearchOpen) searchInputRef.current?.focus();
   }, [compactSearchOpen]);
+
   const handleSectionClick = (to: SettingsPath) => {
     void navigate({
       to,
@@ -217,6 +211,7 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
       hashScrollIntoView: false,
     });
   };
+
   const clearSearch = () => {
     setQuery("");
     setActiveResultIndex(0);
@@ -238,6 +233,7 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
       state: { settingsTargetHighlight: true },
     });
   };
+
   const handleSearchKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.nativeEvent.isComposing || event.keyCode === 229) return;
     if (event.key === "Escape" && (query || event.repeat)) {
@@ -269,6 +265,7 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
       if (result) handleSearchResultClick(result);
     }
   };
+
   return (
     <nav
       {...navArea}
@@ -332,7 +329,7 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
                   <XIcon className="size-3" />
                 </Button>
               ) : (
-                <Kbd>{"/"}</Kbd>
+                <Kbd>/</Kbd>
               )}
             </div>
             {isSearching && results.length === 0 ? (
@@ -370,7 +367,7 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
                       <SettingsSectionIcon to={item.to} />
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm font-medium text-sidebar-foreground">
-                          {uiText(m(item.title))}
+                          {m(item.title)}
                         </span>
                         <span className="block truncate text-2xs text-sidebar-muted-foreground/75">
                           {m(SETTINGS_SECTION_LABELS[item.to])}
@@ -407,15 +404,14 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
                           group.headingHidden ? "sr-only" : !compactSearchOpen && "max-md:sr-only",
                         )}
                       >
-                        {uiText(m(group.heading))}
+                        {m(group.heading)}
                       </h3>
                       {/* The heading stays outside the group it names so NVDA does not read the name twice. */}
                       <div role="group" aria-labelledby={`settings-nav-group-${index}`}>
                         <SidebarMenu>
                           {group.paths.map((to) => {
                             const Icon = SETTINGS_SECTION_ICONS[to];
-                            const isActive =
-                              activePath === to || activePath.startsWith(`${to}/`);
+                            const isActive = activePath === to || activePath.startsWith(`${to}/`);
                             return (
                               <SidebarMenuItem key={to}>
                                 <SidebarMenuButton

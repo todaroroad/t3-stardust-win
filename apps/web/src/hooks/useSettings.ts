@@ -1,4 +1,3 @@
-import { useUiText } from "~/i18n/useUiText";
 import { thrownErrorMessage } from "@t3tools/client-runtime/errors";
 import { useRef, useSyncExternalStore, use } from "react";
 import { useSyncExternalStoreWithSelector } from "use-sync-external-store/with-selector";
@@ -475,18 +474,12 @@ export function useUpdateEnvironmentModelPreferences(environmentId: EnvironmentI
     return save({ environmentId, input: { patch: prepared } });
   };
 }
+
 /** Send the desired state so two clients adding a favorite do not cancel each other. */
 export function useToggleEnvironmentModelFavorite(environmentId: EnvironmentId | null) {
   const registry = use(RegistryContext);
   const pendingFavorites = useRef(
-    new Map<
-      string,
-      {
-        favorite: boolean;
-        settings: ServerSettings;
-        pending: boolean;
-      }
-    >(),
+    new Map<string, { favorite: boolean; settings: ServerSettings; pending: boolean }>(),
   );
   const save = useUpdateEnvironmentModelPreferences(environmentId);
   return async (provider: ProviderInstanceId, model: string) => {
@@ -621,10 +614,9 @@ function deniedSettingsDescription(environmentLabel: string | null | undefined):
 }
 
 function useUpdateSettingsTarget(environmentId: EnvironmentId | null) {
-  const uiText = useUiText();
   useEnvironmentScope(environmentId, AuthSettingsWriteScope);
   const persist = useAtomCommand(serverEnvironment.updateSettings, {
-    label: uiText("server settings update"),
+    label: "server settings update",
     reportFailure: false,
   });
   const { environments } = useEnvironments();
@@ -838,8 +830,4 @@ export function __setClientSettingsForTests(settings: ClientSettings): void {
   clientSettingsSnapshot = settings;
   clientSettingsHydrationStatus = "ready";
   clientSettingsHydrationPromise = null;
-}
-
-export function useLegacySidebarEnabled() {
-  return false;
 }

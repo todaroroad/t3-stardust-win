@@ -9,9 +9,6 @@ import "culori/css";
 import { converter, parse } from "culori/fn";
 import {
   BUILT_IN_THEMES,
-  SKIN_THEMES,
-  HARBOR_THEME,
-  MIST_THEME,
   EMBER_THEME,
   GROVE_THEME,
   IRIS_THEME,
@@ -39,16 +36,7 @@ import { applyThemeBackground } from "./themeBackground";
 import { applyThemeCss } from "./themeCss";
 import { themeServerEnvironmentThemesAtom } from "./state/server";
 
-export {
-  EMBER_THEME,
-  GROVE_THEME,
-  HARBOR_THEME,
-  MIST_THEME,
-  IRIS_THEME,
-  OCEAN_THEME,
-  T3_CHAT_THEME,
-  THEME_COLOR_ROLES,
-};
+export { EMBER_THEME, GROVE_THEME, IRIS_THEME, OCEAN_THEME, T3_CHAT_THEME, THEME_COLOR_ROLES };
 export type { ThemeAppearance, ThemeColorRole, ThemeColors, ThemeDefinition, ThemeVariants };
 
 const T3_CHAT_THEME_ID = "t3-chat" as const;
@@ -1238,10 +1226,7 @@ export function updateThemeColorFamily(
   }
 }
 
-const BUILT_IN_THEME_DEFINITIONS: ReadonlyArray<ThemeDefinition> = [
-  ...BUILT_IN_THEMES,
-  ...SKIN_THEMES,
-];
+const BUILT_IN_THEME_DEFINITIONS: ReadonlyArray<ThemeDefinition> = BUILT_IN_THEMES;
 
 export function getThemeDefinition(theme: ThemePreference): ThemeDefinition | null {
   const themeId = themeIdFromPreference(theme);

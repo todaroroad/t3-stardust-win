@@ -1,11 +1,6 @@
 import * as Schema from "effect/Schema";
 
-import {
-  ForwardCompatibleArray,
-  NonNegativeInt,
-  ProjectId,
-  TrimmedNonEmptyString,
-} from "./baseSchemas.ts";
+import { ForwardCompatibleArray, NonNegativeInt, TrimmedNonEmptyString } from "./baseSchemas.ts";
 
 /** Bump for incompatible UsageSummary changes; skipped unknown array variants need no bump. */
 export const USAGE_CONTRACT_VERSION = 6 as const;
@@ -77,26 +72,6 @@ export const UsageBucket = Schema.Struct({
 });
 export type UsageBucket = typeof UsageBucket.Type;
 
-/** Window-wide usage of one project in one source; buckets stay unsplit so older clients merge unchanged. */
-export const UsageProjectTotals = Schema.Struct({
-  /** Environment-local; absent for usage no T3 thread claims, such as terminal sessions. */
-  projectId: Schema.optional(ProjectId),
-  provider: UsageProviderKind,
-  sourcePath: Schema.optional(TrimmedNonEmptyString),
-  totals: UsageTokenTotals,
-  costUsd: Schema.Number,
-  records: NonNegativeInt,
-  unpricedRecords: NonNegativeInt,
-  sessions: NonNegativeInt,
-});
-export type UsageProjectTotals = typeof UsageProjectTotals.Type;
-
-export const UsageProject = Schema.Struct({
-  projectId: ProjectId,
-  title: TrimmedNonEmptyString,
-});
-export type UsageProject = typeof UsageProject.Type;
-
 export const UsageSourceFingerprint = Schema.Struct({
   hostId: TrimmedNonEmptyString,
   provider: UsageProviderKind,
@@ -138,20 +113,8 @@ export const UsagePricing = Schema.Struct({
   source: TrimmedNonEmptyString,
   fetchedAt: Schema.NullOr(Schema.String),
   knownModels: NonNegativeInt,
-  /** Combined input + output cost per token (USD) for known and overridden models. */
-  modelUnitPrices: Schema.optional(Schema.Record(Schema.String, Schema.Number)),
 });
 export type UsagePricing = typeof UsagePricing.Type;
-
-/** Real output-token throughput measured from completed T3 provider turns. */
-export const UsageThroughput = Schema.Struct({
-  provider: UsageProviderKind,
-  model: TrimmedNonEmptyString,
-  outputTokens: NonNegativeInt,
-  modelMs: NonNegativeInt,
-  turns: NonNegativeInt,
-});
-export type UsageThroughput = typeof UsageThroughput.Type;
 
 /**
  * Matches a provider's original model ID, before usage model aliases apply. Omit provider to
@@ -197,11 +160,6 @@ export const UsageSummary = Schema.Struct({
   scanDurationMs: NonNegativeInt,
   /** The filter the server applied; absent means unfiltered, including servers that predate filters. */
   modelFilter: Schema.optional(UsageModelFilter),
-  /** Absent when the server predates projects or could not read them; totals are unaffected. */
-  projectTotals: Schema.optional(ForwardCompatibleArray(UsageProjectTotals)),
-  projects: Schema.optional(ForwardCompatibleArray(UsageProject)),
-  /** Absent when the server predates throughput tracking or could not read it. */
-  throughput: Schema.optional(ForwardCompatibleArray(UsageThroughput)),
 });
 export type UsageSummary = typeof UsageSummary.Type;
 

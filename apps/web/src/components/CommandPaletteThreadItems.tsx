@@ -1,4 +1,3 @@
-import { uiText } from "../i18n";
 import { scopedThreadKey, scopeThreadRef } from "@t3tools/client-runtime/environment";
 import { findForMessageMatch, openThreadFindOnQuery } from "./chat/threadFindStore";
 import {
@@ -13,7 +12,6 @@ import {
   pickedQuery,
   rankMessageMatches,
 } from "@t3tools/shared/paletteSearch";
-import { requestSpotlightMatch } from "./chat/spotlightMatchBus";
 import type { EnvironmentId, ThreadId } from "@t3tools/contracts";
 import { useAtomValue } from "@effect/atom-react";
 import { useNavigate } from "@tanstack/react-router";
@@ -40,12 +38,7 @@ import { useAtomCommand } from "../state/use-atom-command";
 import { buildThreadRouteParams } from "../threadRoutes";
 import { formatRelativeTimeLabel } from "../timestampFormat";
 import type { SidebarThreadSummary } from "../types";
-import {
-  buildThreadActionItems,
-  ITEM_ICON_CLASS,
-  RECENT_THREAD_LIMIT,
-  type CommandPaletteActionItem,
-} from "./CommandPalette.logic";
+import { buildThreadActionItems, ITEM_ICON_CLASS } from "./CommandPalette.logic";
 import { useEnvironmentLookups, useProjectLookups } from "./CommandPaletteLookups";
 import { ThreadCommandSubtitle } from "./ThreadCommandSubtitle";
 import {
@@ -53,6 +46,7 @@ import {
   ThreadRowTrailingStatus,
   ThreadSearchPullRequestNumber,
 } from "./ThreadStatusIndicators";
+
 function useProviderEntryByEnvironmentAndInstanceId() {
   const { environments } = useEnvironments();
   const primaryEnvironmentId = usePrimaryEnvironmentId();
@@ -110,7 +104,7 @@ function useConnectedThreadSearch(query: string) {
   return useThreadSearch(
     environmentIds,
     query,
-    environmentLabels === undefined ? { spotlight: true } : { environmentLabels, spotlight: true },
+    environmentLabels === undefined ? {} : { environmentLabels },
   );
 }
 
@@ -197,8 +191,6 @@ export function useCommandPaletteThreadItems(input: {
   readonly threadSearchQuery: string;
 }) {
   const { activeThread, threadSearchQuery } = input;
-  const threads = useVisibleThreadShells();
-  const { projectByKey } = useProjectLookups();
   const messages = useMessages();
   const navigate = useNavigate();
   const messageSearch = useConnectedThreadSearch(threadSearchQuery);
@@ -288,100 +280,11 @@ export function useCommandPaletteThreadItems(input: {
   const threadMessageItems = order.keys
     .slice(0, order.shown)
     .flatMap((value) => messageItemByValue.get(value) ?? []);
-  const spotlightItems: CommandPaletteActionItem[] = messageSearch.matches.map((match) => {
-    const local = threadItems.find(
-      (item) => item.value === `thread:${match.environmentId}:${match.threadId}`,
-    );
-    const target = scopeThreadRef(match.environmentId, match.threadId);
-    const subtitle = [
-      projectByKey.get(`${match.environmentId}:${match.projectId}`)?.title,
-      match.archivedAt ? uiText("Archived") : "",
-      match.isSubagent ? uiText("Subtask") : "",
-      match.matchedQuery && match.matchedQuery !== messageSearch.query
-        ? uiText("Approximate match")
-        : "",
-    ]
-      .filter(Boolean)
-      .join(" \u00B7 ");
-    return {
-      kind: "action",
-      value: `thread:${match.environmentId}:${match.threadId}`,
-      title: match.title ?? local?.title ?? match.threadId,
-      searchTerms: [messageSearch.query, match.title ?? "", match.snippet],
-      icon: <MessageSquareIcon className={ITEM_ICON_CLASS} />,
-      description: subtitle,
-      ...(match.archivedAt && match.messageId
-        ? {
-            titleTrailingContent: (
-              <span className="shrink-0 text-xs text-muted-foreground">{uiText("Archived")}</span>
-            ),
-          }
-        : {}),
-      ...(match.score !== undefined ? { searchScore: match.score } : {}),
-      ...(match.familyKey
-        ? {
-            searchFamilyKey: `${match.environmentId}:${match.familyKey}`,
-            ...(match.familyTitle ? { searchFamilyTitle: match.familyTitle } : {}),
-          }
-        : {}),
-      ...(match.isSubagent !== undefined ? { searchSubagent: match.isSubagent } : {}),
-      searchRelatedItems: (match.familyThreads ?? []).map((member) => ({
-        kind: "action",
-        value: `thread:${match.environmentId}:${member.threadId}`,
-        title: member.title,
-        description: member.archivedAt ? uiText("Archived") : "",
-        searchTerms: [member.title],
-        searchRecency: Date.parse(member.updatedAt),
-        icon: <MessageSquareIcon className={ITEM_ICON_CLASS} />,
-        run: async () => {
-          await navigate({
-            to: "/$environmentId/$threadId",
-            params: buildThreadRouteParams(scopeThreadRef(match.environmentId, member.threadId)),
-          });
-        },
-      })),
-      ...(local?.timestamp ? { timestamp: local.timestamp } : {}),
-      ...(match.messageId
-        ? {
-            threadContentMatch: {
-              source: match.source,
-              snippet: match.snippet,
-              query: match.matchedQuery ?? messageSearch.query,
-            },
-          }
-        : {}),
-      run: async () => {
-        if (match.messageId)
-          requestSpotlightMatch({
-            thread: target,
-            query: match.matchedQuery ?? messageSearch.query,
-            messageId: match.messageId,
-          });
-        await navigate({ to: "/$environmentId/$threadId", params: buildThreadRouteParams(target) });
-      },
-    };
-  });
-  const serverItemIds = new Set(
-    messageSearch.matches.map((match) => `thread:${match.environmentId}:${match.threadId}`),
-  );
-  const threadItemsForSearch = [
-    ...spotlightItems,
-    ...threadItems.filter((item) => !serverItemIds.has(item.value)),
-  ];
-  const mainThreadIds = new Set(
-    threads
-      .filter((thread) => thread.lineage.relationshipToParent !== "subagent")
-      .map((thread) => `thread:${thread.environmentId}:${thread.id}`),
-  );
-  const recentThreadItems = threadItems
-    .filter((item) => mainThreadIds.has(item.value))
-    .slice(0, RECENT_THREAD_LIMIT);
+
   return {
     threadItems,
     threadMessageItems,
     now,
-    threadItemsForSearch,
-    recentThreadItems,
     isSearchPending: messageSearch.isPending,
     isSearchFailed: messageSearch.failed,
   };

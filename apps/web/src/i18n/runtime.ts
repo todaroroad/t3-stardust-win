@@ -1,4 +1,3 @@
-import { isChineseLocale, syncCustomLocale } from "./customLocale";
 import { getTranslationsSnapshot } from "gt-react";
 
 import {
@@ -59,7 +58,6 @@ function activateLocale(locale: string): void {
   ) {
     return;
   }
-  syncCustomLocale(locale);
   snapshot = { locale, formattingLocale, translations: { ...loadedTranslations } };
   setActiveLocale(locale);
   document.documentElement.lang = locale;
@@ -68,11 +66,7 @@ function activateLocale(locale: string): void {
 
 function applyLanguageSetting(): void {
   // Not desktopBridge.getSystemLocale(): that is the regional/time locale, not the UI language.
-  const rawLanguage = getClientSettings().language;
-  requestedLocale = resolveWebLocaleSelection(
-    isChineseLocale(rawLanguage) ? "zh" : rawLanguage,
-    navigator.languages,
-  );
+  requestedLocale = resolveWebLocaleSelection(getClientSettings().language, navigator.languages);
   void whenLocaleReady();
 }
 

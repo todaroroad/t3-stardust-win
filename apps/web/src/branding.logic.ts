@@ -28,35 +28,14 @@ export function resolveWebAppStageLabel(input: {
   );
 }
 
-/**
- * Whether this client was built as the stable release (`VITE_RELEASE_CHANNEL=stable`). The Stardust
- * stable build is stamped with the upstream base version string, which still matches the Nightly
- * pattern, so the version alone cannot tell a stable build from a nightly one.
- */
-export function isStableReleaseChannel(releaseChannel: string | null | undefined): boolean {
-  return releaseChannel?.trim().toLowerCase() === "stable";
-}
-
-/** Stable builds never show the "Nightly" stage; Dev and other labels are left alone. */
-export function resolveReleaseStageLabel(input: {
-  readonly stageLabel: string;
-  readonly releaseChannel: string | null | undefined;
-}): string {
-  return isStableReleaseChannel(input.releaseChannel) &&
-    input.stageLabel.trim().toLowerCase() === "nightly"
-    ? "Latest"
-    : input.stageLabel;
-}
-
 export function resolveServerBackedAppStageLabel(input: {
   readonly primaryServerVersion: string | null | undefined;
   readonly fallbackStageLabel: string;
-  readonly releaseChannel?: string | null | undefined;
 }): string {
   return input.primaryServerVersion &&
-    NIGHTLY_SERVER_VERSION_PATTERN.test(input.primaryServerVersion) &&
-    !isStableReleaseChannel(input.releaseChannel)
-    ? "Nightly"
+    NIGHTLY_SERVER_VERSION_PATTERN.test(input.primaryServerVersion)
+    ? // oxlint-disable-next-line t3code/no-untranslated-copy -- release channel name, part of the product name
+      "Nightly"
     : input.fallbackStageLabel;
 }
 
@@ -65,12 +44,10 @@ export function resolveServerBackedAppDisplayName(input: {
   readonly fallbackDisplayName: string;
   readonly fallbackStageLabel: string;
   readonly primaryServerVersion: string | null | undefined;
-  readonly releaseChannel?: string | null | undefined;
 }): string {
   const stageLabel = resolveServerBackedAppStageLabel({
     primaryServerVersion: input.primaryServerVersion,
     fallbackStageLabel: input.fallbackStageLabel,
-    releaseChannel: input.releaseChannel,
   });
 
   return stageLabel === input.fallbackStageLabel

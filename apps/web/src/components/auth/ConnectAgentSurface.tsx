@@ -10,7 +10,7 @@ import {
 import { managedRuntimeModeCeilingMessage } from "@t3tools/client-runtime/contract-labels";
 import { Radio as RadioPrimitive } from "@base-ui/react/radio";
 import { isLoopbackHost } from "@t3tools/shared/preview";
-import { EyeIcon } from "lucide-react";
+import { EyeIcon, type LucideIcon } from "lucide-react";
 import type * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
@@ -27,7 +27,7 @@ import {
   resolveApprovalDecision,
   resolveMcpAccess,
 } from "./ConnectAgentSurface.logic";
-import { runtimeModeConfig, type RuntimeModeIconComponent } from "../chat/runtimeModeConfig";
+import { runtimeModeConfig } from "../chat/runtimeModeConfig";
 import { Alert, AlertDescription } from "../ui/alert";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -37,7 +37,7 @@ import { StandalonePage, StandalonePageHeader } from "../ui/standalone-page";
 
 export const accessConfig: Record<
   AuthMcpClientAccess,
-  { readonly label: string; readonly description: string; readonly icon: RuntimeModeIconComponent }
+  { readonly label: string; readonly description: string; readonly icon: LucideIcon }
 > = {
   "read-only": {
     label: msg("Read only"),

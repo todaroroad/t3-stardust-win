@@ -1,6 +1,4 @@
 import {
-  OrchestratorMcpUsageLimitsInput,
-  OrchestratorMcpUsageLimitsResult,
   OrchestratorMcpCapabilitiesInput,
   OrchestratorMcpCapabilitiesResult,
   OrchestrationV2StopWorkflowInput,
@@ -44,7 +42,6 @@ import { McpSchema, Tool, Toolkit } from "effect/ai";
 import * as Schema from "effect/Schema";
 import * as Struct from "effect/Struct";
 
-import * as UsageLimitSources from "../../../usage/UsageLimitSources.ts";
 import * as ThreadManagementService from "../../../orchestration-v2/ThreadManagementService.ts";
 import * as PeerForwarding from "../../../peer/PeerForwarding.ts";
 import * as PeerLinkRequests from "../../../peer/PeerLinkRequests.ts";
@@ -74,20 +71,6 @@ const threadMetadataDependencies = [
   ThreadManagementService.ThreadManagementService,
   ThreadMetadataMcpService.ThreadMetadataMcpService,
 ];
-
-const UsageLimitsTool = Tool.make("usage_limits", {
-  description:
-    "Read-only snapshot of provider quota windows as shown in T3's quota popover; never refreshes credentials or spends reset credits.",
-  parameters: OrchestratorMcpUsageLimitsInput,
-  success: OrchestratorMcpUsageLimitsResult,
-  failure: OrchestratorMcpFailure,
-  failureMode: "return",
-  dependencies: [...dependencies, UsageLimitSources.UsageLimitSources],
-})
-  .annotate(Tool.Title, "Read provider usage limits")
-  .annotate(Tool.Readonly, true)
-  .annotate(Tool.Destructive, false)
-  .annotate(Tool.Idempotent, true);
 
 const OrchestratorCapabilitiesTool = Tool.make("orchestrator_capabilities", {
   description:
@@ -381,7 +364,6 @@ const EnvironmentUnlinkTool = Tool.make("t3_environment_unlink", {
 
 export const OrchestratorToolkit = Toolkit.make(
   OrchestratorCapabilitiesTool,
-  UsageLimitsTool,
   DelegateTaskTool,
   TaskStatusTool,
   TaskCancelTool,

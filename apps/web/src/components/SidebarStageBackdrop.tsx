@@ -2,7 +2,7 @@ import { useAtomValue } from "@effect/atom-react";
 import type { EnvironmentIdentificationMode } from "@t3tools/contracts";
 import { useId } from "react";
 
-import { APP_STAGE_LABEL, RELEASE_CHANNEL } from "../branding";
+import { APP_STAGE_LABEL } from "../branding";
 import { resolveServerBackedAppStageLabel } from "../branding.logic";
 import { primaryServerConfigAtom } from "../state/server";
 
@@ -42,7 +42,6 @@ export function useEnvironmentStageLabel(): string {
   return resolveServerBackedAppStageLabel({
     primaryServerVersion,
     fallbackStageLabel: APP_STAGE_LABEL,
-    releaseChannel: RELEASE_CHANNEL,
   });
 }
 

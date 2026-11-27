@@ -1,6 +1,3 @@
-import * as DateTime from "effect/DateTime";
-import * as SecureRandom from "effect/crypto/SecureRandom";
-import { applyMemoryMutation, type MemoryMutation } from "./memory/memory.ts";
 import {
   DEFAULT_SERVER_SETTINGS,
   ModelSelection,
@@ -271,25 +268,6 @@ function ensureProviderInstanceMutationAllowed(
   return Effect.void;
 }
 
-const withMemoryMutation = Effect.fn("serverSettings.withMemoryMutation")(function* (
-  settings: ServerSettings,
-  mutation: MemoryMutation | undefined,
-  settingsPath: string,
-) {
-  if (mutation === undefined) return settings;
-  const id = yield* Effect.sync(() => SecureRandom.uuidV4Unsafe({ format: "string" }));
-  const now = DateTime.formatIso(yield* DateTime.now);
-  const memory = yield* Effect.try({
-    try: () =>
-      applyMemoryMutation(settings.memory, mutation, {
-        id,
-        now,
-      }),
-    catch: (cause) => new ServerSettingsError({ settingsPath, operation: "write-file", cause }),
-  });
-  return { ...settings, memory };
-});
-
 export class ServerSettingsService extends Context.Service<
   ServerSettingsService,
   {
@@ -304,7 +282,6 @@ export class ServerSettingsService extends Context.Service<
 
     readonly updateSettings: (
       patch: ServerSettingsPatch,
-      memoryMutation?: MemoryMutation,
     ) => Effect.Effect<ServerSettings, ServerSettingsError>;
 
     readonly updateProviderInstance: (
@@ -365,13 +342,9 @@ const makeTest = Effect.fn("serverSettings.makeTest")(function* (
     start: Effect.void,
     ready: Effect.void,
     getSettings,
-    updateSettings: (patch, memoryMutation) =>
+    updateSettings: (patch) =>
       updateTestSettings((currentSettings) =>
-        withMemoryMutation(
-          applyServerSettingsPatch(currentSettings, patch),
-          memoryMutation,
-          "<memory>",
-        ),
+        Effect.succeed(applyServerSettingsPatch(currentSettings, patch)),
       ),
     updateProviderInstance: (mutation, patch = {}) =>
       updateTestSettings((currentSettings) =>
@@ -1477,16 +1450,10 @@ const make = Effect.gen(function* () {
     start,
     ready: Deferred.await(startedDeferred),
     getSettings: getMaterializedSettings,
-    updateSettings: (patch, memoryMutation) =>
+    updateSettings: (patch) =>
       updateAndPersistSettings(patch, (current) =>
         ensureSecretProviderWritesAllowed(patch, settingsPath).pipe(
-          Effect.andThen(
-            withMemoryMutation(
-              applyServerSettingsPatch(current, patch),
-              memoryMutation,
-              settingsPath,
-            ),
-          ),
+          Effect.as(applyServerSettingsPatch(current, patch)),
         ),
       ),
     updateProviderInstance: (mutation, patch = {}) =>

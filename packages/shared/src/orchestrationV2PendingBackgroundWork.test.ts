@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 import { ProviderInstanceId, ProviderThreadId } from "@t3tools/contracts";
 import {
-  backgroundWorkDefersThreadCompletion,
   backgroundWorkHoldsCompletion,
   derivePendingBackgroundWork,
   monitorHoldsWakeCompletion,
@@ -15,31 +14,6 @@ describe("backgroundWorkHoldsCompletion", () => {
     ["a subagent", true, [{ taskId: "review", kind: "subagent" }]],
   ] as const)("with %s pending, holds completion: %s", (_case, holds, tasks) => {
     expect(backgroundWorkHoldsCompletion(tasks)).toBe(holds);
-  });
-});
-
-describe("backgroundWorkDefersThreadCompletion", () => {
-  it.each([
-    ["nothing pending", false, false, []],
-    ["a delegated subagent", false, true, [{ taskId: "delegate", kind: "subagent" }]],
-    ["a background task", false, true, [{ taskId: "job", kind: "background_task" }]],
-    ["an awaited command", false, true, [{ taskId: "t", kind: "command", awaited: true }]],
-    ["a monitor behind an ordinary turn", false, false, [{ taskId: "watch", kind: "monitor" }]],
-    ["a monitor behind its progress wake", true, true, [{ taskId: "watch", kind: "monitor" }]],
-    ["a dev server command", false, false, [{ taskId: "dev", kind: "command" }]],
-    [
-      "an idle pull request watch behind a wake",
-      true,
-      false,
-      [{ taskId: "pull-request-watch:github.com/a/b#1", kind: "monitor" }],
-    ],
-  ] as const)("with %s pending, defers completion: %s", (_case, wake, defers, tasks) => {
-    expect(
-      backgroundWorkDefersThreadCompletion({
-        latestRunBackgroundWake: wake,
-        pendingBackgroundTasks: tasks,
-      }),
-    ).toBe(defers);
   });
 });
 

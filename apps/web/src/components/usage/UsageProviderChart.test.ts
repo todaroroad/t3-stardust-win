@@ -37,8 +37,11 @@ describe("buildPeriodColumns", () => {
       { provider: "codex", value: 10 },
       { provider: "claude", value: 20 },
       { provider: "grok", value: 0 },
+      { provider: "cursor", value: 0 },
+      { provider: "opencode", value: 0 },
       { provider: "antigravity", value: 0 },
-      { provider: "cursor", value: 12 },
+      { provider: "pi", value: 5 },
+      { provider: "muse", value: 7 },
     ]);
   });
 });

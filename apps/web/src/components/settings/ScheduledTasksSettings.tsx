@@ -1,4 +1,3 @@
-import { uiText } from "~/i18n";
 import { thrownErrorMessage } from "@t3tools/client-runtime/errors";
 import { managedCapabilityDenial } from "@t3tools/client-runtime/contract-labels";
 import { useAtomValue } from "@effect/atom-react";
@@ -827,13 +826,13 @@ function ScheduledTaskRow({
   const [deliveriesOpen, setDeliveriesOpen] = useState(false);
   const isWebhook = task.schedule.type === "webhook";
   const toggle = useAtomCommand(serverEnvironment.setScheduledTaskEnabled, {
-    label: uiText("scheduled task enabled"),
+    label: "scheduled task enabled",
   });
   const run = useAtomCommand(serverEnvironment.runScheduledTaskNow, {
-    label: uiText("scheduled task run now"),
+    label: "scheduled task run now",
   });
   const remove = useAtomCommand(serverEnvironment.deleteScheduledTask, {
-    label: uiText("scheduled task delete"),
+    label: "scheduled task delete",
   });
   const act = async (action: "toggle" | "run" | "delete") => {
     if (busy || !readEnvironmentScope(environmentId, AuthOrchestrationOperateScope)) return;
@@ -943,7 +942,7 @@ function ScheduledTaskRow({
               <MenuSeparator />
               <MenuItem onClick={() => void act("delete")}>
                 <Trash2Icon />
-                {uiText("Delete")}
+                Delete
               </MenuItem>
             </MenuPopup>
           </Menu>
@@ -1166,6 +1165,7 @@ function WebhookDeliveriesDialog({
     </Dialog>
   );
 }
+
 function DeliveryBlock({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div className="space-y-1">
@@ -1198,7 +1198,7 @@ function WebhookEndpointField({
     },
   });
   const rotate = useAtomCommand(serverEnvironment.rotateScheduledTaskWebhookToken, {
-    label: uiText("scheduled task rotate webhook token"),
+    label: "scheduled task rotate webhook token",
   });
   const [rotating, setRotating] = useState(false);
   const endpoint = task?.webhook;
@@ -1266,6 +1266,7 @@ function WebhookEndpointField({
     </div>
   );
 }
+
 function WebhookDeliveryMode({ environmentId }: { readonly environmentId: EnvironmentId }) {
   const gt = useGT();
   const cloudLink = usePrimaryCloudLinkState();
@@ -1281,6 +1282,7 @@ function WebhookDeliveryMode({ environmentId }: { readonly environmentId: Enviro
     </p>
   );
 }
+
 function ScheduledTaskEditorDialog({
   initialEnvironmentId,
   task,
@@ -1532,7 +1534,7 @@ function ScheduledTaskEditorForm({
     serverEnvironment.upsertScheduledTask.permissionAtom(environmentId),
   );
   const upsertTask = useAtomCommand(serverEnvironment.upsertScheduledTask, {
-    label: uiText("scheduled task upsert"),
+    label: "scheduled task upsert",
   });
   const webhookDenial = managedCapabilityDenial(
     useManagedPolicy(environmentId),
@@ -1735,6 +1737,7 @@ function ScheduledTaskEditorForm({
     }
     onClose();
   };
+
   return (
     <>
       <DialogHeader>
@@ -1746,6 +1749,7 @@ function ScheduledTaskEditorForm({
           </T>
         </DialogDescription>
       </DialogHeader>
+
       <DialogPanel>
         {/* Fieldsets default to min-width: min-content, which lets one wide control widen the form past the dialog. */}
         <fieldset disabled={saving} className="min-w-0 space-y-5">
@@ -1917,6 +1921,7 @@ function ScheduledTaskEditorForm({
               </Select>
             </Field>
           </div>
+
           {draft.workspaceMode === "worktree" ? (
             <Field label={gt("Base branch")} htmlFor="scheduled-task-base-ref">
               <WorktreeBaseBranchPicker
@@ -2007,6 +2012,7 @@ function ScheduledTaskEditorForm({
               ) : null}
             </div>
           </Field>
+
           <div className="space-y-3">
             {task?.schedule.type === "interval" &&
             task.schedule.everyMs < MIN_SCHEDULED_TASK_INTERVAL_MS ? (
@@ -2245,8 +2251,8 @@ function ScheduledTaskEditorForm({
                           <SelectValue>{draft.signatureEncoding}</SelectValue>
                         </SelectTrigger>
                         <SelectPopup>
-                          <SelectItem value="hex">{uiText("hex")}</SelectItem>
-                          <SelectItem value="base64">{uiText("base64")}</SelectItem>
+                          <SelectItem value="hex">hex</SelectItem>
+                          <SelectItem value="base64">base64</SelectItem>
                         </SelectPopup>
                       </Select>
                     </Field>
@@ -2360,10 +2366,11 @@ function ScheduledTaskEditorForm({
                     setDraft((current) => ({ ...current, intervalMinutes: event.target.value }))
                   }
                 />
-                <span className="text-xs text-muted-foreground">{uiText("minutes")}</span>
+                <span className="text-xs text-muted-foreground">minutes</span>
               </div>
             )}
           </div>
+
           <div className="flex items-center justify-between gap-4">
             <div className="min-w-0 space-y-1">
               <Label htmlFor="scheduled-task-enabled">
@@ -2382,6 +2389,7 @@ function ScheduledTaskEditorForm({
           </div>
         </fieldset>
       </DialogPanel>
+
       <DialogFooter>
         <DialogClose render={<Button variant="outline" size="sm" disabled={saving} />}>
           <T>Cancel</T>

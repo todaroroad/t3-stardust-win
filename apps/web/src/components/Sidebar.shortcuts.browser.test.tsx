@@ -51,7 +51,6 @@ it("leaves thread shortcuts and their hints to the preview when their rules excl
   using _platform = vi.spyOn(navigator, "platform", "get").mockReturnValue("Linux x86_64");
   __setClientSettingsForTests({
     ...DEFAULT_CLIENT_SETTINGS,
-    legacySidebarEnabled: false,
     onboardingCompletedAt: "2026-01-01T00:00:00.000Z",
   });
   await page.viewport(1400, 900);

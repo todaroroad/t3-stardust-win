@@ -111,12 +111,7 @@ export function SidebarDragBoundary(props: {
 }
 
 export function SidebarSectionHeader(props: {
-  marker:
-    | "pinned-header"
-    | "pinned-divider"
-    | "working-header"
-    | "snoozed-header"
-    | "settled-header";
+  marker: "working-header" | "snoozed-header" | "settled-header";
   label: string;
   /** A muted trailing count. */
   count: number;
@@ -126,33 +121,27 @@ export function SidebarSectionHeader(props: {
   toggle: { expanded: boolean; onToggle: () => void };
 }) {
   const shelf =
-    props.marker === "pinned-header"
-      ? "pinned"
-      : props.marker === "pinned-divider"
-        ? "active"
-        : props.marker === "working-header"
-          ? "working"
-          : props.marker === "snoozed-header"
-            ? "snoozed"
-            : "settled";
+    props.marker === "working-header"
+      ? "working"
+      : props.marker === "snoozed-header"
+        ? "snoozed"
+        : "settled";
   return (
     <SortableSidebarMarker
       marker={props.marker}
       data-testid={`sidebar-${props.marker}`}
       className={cn("relative mx-0.5 h-8", props.className)}
     >
-      <div className={props.marker === "pinned-divider" ? "sidebar-drag-boundary-label" : "contents"}>
-        <CollapsibleSectionHeader
-          data-sidebar-row={`shelf:${shelf}`}
-          onClick={props.toggle.onToggle}
-          expanded={props.toggle.expanded}
-          tone={props.isDropTarget ? "accent" : props.dragging ? "emphasized" : "muted"}
-          data-testid={`sidebar-${shelf}-shelf-toggle`}
-          accessory={<span className="font-normal tabular-nums">{props.count}</span>}
-        >
-          {props.label}
-        </CollapsibleSectionHeader>
-      </div>
+      <CollapsibleSectionHeader
+        data-sidebar-row={`shelf:${shelf}`}
+        onClick={props.toggle.onToggle}
+        expanded={props.toggle.expanded}
+        tone={props.isDropTarget ? "accent" : props.dragging ? "emphasized" : "muted"}
+        data-testid={`sidebar-${shelf}-shelf-toggle`}
+        accessory={<span className="font-normal tabular-nums">{props.count}</span>}
+      >
+        {props.label}
+      </CollapsibleSectionHeader>
     </SortableSidebarMarker>
   );
 }

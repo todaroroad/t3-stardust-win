@@ -28,29 +28,6 @@ export interface ComposerBannerStackItem {
 
 const GROUPS = ["environment", "attention"] as const;
 
-/**
- * Where floating content hangs above the composer. It sits at the top of the whole stack of
- * notices, so the order from the top is: the plan (which includes anything waiting on you),
- * then environment notices, then attention notices joined to the composer. It takes no space,
- * so a notice or a taller composer moves the anchor up instead of being covered.
- */
-export function ComposerFloatAnchor({
-  children,
-  scrollToEnd,
-}: {
-  readonly children?: ReactNode;
-  readonly scrollToEnd?: ReactNode;
-}) {
-  return (
-    <div className="plan-anchor" data-composer-float-anchor="true">
-      <div className="plan-anchor-slot">
-        {children}
-        {scrollToEnd}
-      </div>
-    </div>
-  );
-}
-
 const FADE_IN =
   "transition-opacity duration-150 ease-out starting:opacity-0 motion-reduce:transition-none";
 

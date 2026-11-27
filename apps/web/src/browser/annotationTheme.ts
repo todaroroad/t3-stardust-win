@@ -7,7 +7,6 @@ export function readPreviewAnnotationTheme(): DesktopPreviewAnnotationTheme {
   const root = document.documentElement;
   const styles = getComputedStyle(root);
   return {
-    locale: root.lang.toLowerCase().startsWith("zh") ? "zh-CN" : "en",
     colorScheme: root.classList.contains("dark") ? "dark" : "light",
     radius: readVariable(styles, "--radius", "0.625rem"),
     background: readVariable(styles, "--background", "white"),

@@ -3,7 +3,7 @@ import {
   type ThreadSnoozeShell,
 } from "@t3tools/client-runtime/state/thread-settled";
 
-export type ThreadNotificationKind = "input" | "completion" | "waiting";
+export type ThreadNotificationKind = "input" | "completion";
 
 export interface ThreadNotificationObservation {
   /** Status and request key, or status and run without a request, while the thread needs attention. */
@@ -16,8 +16,6 @@ export interface ThreadNotificationObservation {
   readonly completedAt: number | null;
   /** The latest run answers a background-work progress wake, like a Monitor line. */
   readonly backgroundWake: boolean;
-  /** The completed run whose background work is still running; the thread is not done yet. */
-  readonly waitingRun?: string | null;
 }
 
 /** Matches the push relay's completion confirmation: a final wake can start right after a progress wake. */
@@ -63,8 +61,6 @@ export function createThreadNotificationGate<Key>(
     clearTimeout(releases.get(key)?.timer);
     releases.delete(key);
   };
-  // The run already hinted as waiting on background work, so one run hints once.
-  const hinted = new Map<Key, string>();
   // Attention keys with a request id seen since the thread last stopped needing attention.
   const attended = new Map<Key, Set<string>>();
   const attend = (
@@ -101,16 +97,9 @@ export function createThreadNotificationGate<Key>(
       // The first sighting, archived or snoozed threads, and stopped or silent runs never notify completion.
       if (!prior || silenced) skip(key, next.completedAt);
       const fresh = attend(key, prior, next);
-      const waiting = next.waitingRun ?? null;
-      const hint = waiting !== null && waiting !== hinted.get(key);
-      if (waiting !== null) hinted.set(key, waiting);
       if (!prior || options.archived) return;
       if (fresh) {
         notify(key, "input");
-        return;
-      }
-      if (hint && !silenced) {
-        notify(key, "waiting");
         return;
       }
       const at = next.completedAt;
@@ -134,13 +123,11 @@ export function createThreadNotificationGate<Key>(
       for (const key of handled.keys()) if (!keys.has(key)) handled.delete(key);
       for (const key of releases.keys()) if (!keys.has(key)) cancel(key);
       for (const key of attended.keys()) if (!keys.has(key)) attended.delete(key);
-      for (const key of hinted.keys()) if (!keys.has(key)) hinted.delete(key);
     },
     clear(): void {
       for (const key of releases.keys()) cancel(key);
       handled.clear();
       attended.clear();
-      hinted.clear();
     },
   };
 }

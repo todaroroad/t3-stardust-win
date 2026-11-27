@@ -1,5 +1,3 @@
-
-import { uiText } from "~/i18n";
 import type { DeviceHubAccess } from "@t3tools/client-runtime/state/deviceHubAccess";
 import type { DevicePermission, DeviceSummary, DeviceTextSize } from "@t3tools/contracts";
 import { ChevronDown, X } from "lucide-react";
@@ -23,212 +21,54 @@ import { Toggle, ToggleGroup } from "~/components/ui/toggle-group";
 import { cn } from "~/lib/utils";
 import type { DeviceControls } from "./useDeviceControls";
 import { deviceEventLogAtom } from "./deviceHubAtoms";
-const TEXT_SIZES: ReadonlyArray<{
-  value: DeviceTextSize;
-  label: string;
-}> = [
-  {
-    value: "small",
-    get label() {
-      return uiText("Small");
-    },
-  },
-  {
-    value: "default",
-    get label() {
-      return uiText("Default");
-    },
-  },
-  {
-    value: "large",
-    get label() {
-      return uiText("Large");
-    },
-  },
-  {
-    value: "extra-large",
-    get label() {
-      return uiText("Extra large");
-    },
-  },
+
+const TEXT_SIZES: ReadonlyArray<{ value: DeviceTextSize; label: string }> = [
+  { value: "small", label: msg("Small") },
+  { value: "default", label: msg("Default") },
+  { value: "large", label: msg("Large") },
+  { value: "extra-large", label: msg("Extra large") },
 ];
+
 const COLOR_FILTERS = [
-  {
-    value: "none",
-    get label() {
-      return uiText("None");
-    },
-  },
-  {
-    value: "grayscale",
-    get label() {
-      return uiText("Grayscale");
-    },
-  },
-  {
-    value: "red-green",
-    get label() {
-      return uiText("Red / green (protanopia)");
-    },
-  },
-  {
-    value: "green-red",
-    get label() {
-      return uiText("Green / red (deuteranopia)");
-    },
-  },
-  {
-    value: "blue-yellow",
-    get label() {
-      return uiText("Blue / yellow (tritanopia)");
-    },
-  },
+  { value: "none", label: msg("None") },
+  { value: "grayscale", label: msg("Grayscale") },
+  { value: "red-green", label: msg("Red / green (protanopia)") },
+  { value: "green-red", label: msg("Green / red (deuteranopia)") },
+  { value: "blue-yellow", label: msg("Blue / yellow (tritanopia)") },
 ] as const;
+
 const ORIENTATIONS = [
-  {
-    value: "portrait",
-    get label() {
-      return uiText("Portrait");
-    },
-  },
-  {
-    value: "landscape_left",
-    get label() {
-      return uiText("Landscape left");
-    },
-  },
-  {
-    value: "portrait_upside_down",
-    get label() {
-      return uiText("Upside down");
-    },
-  },
-  {
-    value: "landscape_right",
-    get label() {
-      return uiText("Landscape right");
-    },
-  },
+  { value: "portrait", label: msg("Portrait") },
+  { value: "landscape_left", label: msg("Landscape left") },
+  { value: "portrait_upside_down", label: msg("Upside down") },
+  { value: "landscape_right", label: msg("Landscape right") },
 ] as const;
-const IOS_PERMISSIONS: ReadonlyArray<{
-  value: DevicePermission;
-  label: string;
-}> = [
-  {
-    value: "camera",
-    get label() {
-      return uiText("Camera");
-    },
-  },
-  {
-    value: "microphone",
-    get label() {
-      return uiText("Microphone");
-    },
-  },
-  {
-    value: "photos",
-    get label() {
-      return uiText("Photos");
-    },
-  },
-  {
-    value: "contacts",
-    get label() {
-      return uiText("Contacts");
-    },
-  },
-  {
-    value: "calendar",
-    get label() {
-      return uiText("Calendar");
-    },
-  },
-  {
-    value: "reminders",
-    get label() {
-      return uiText("Reminders");
-    },
-  },
-  {
-    value: "location",
-    get label() {
-      return uiText("Location");
-    },
-  },
-  {
-    value: "notifications",
-    get label() {
-      return uiText("Notifications");
-    },
-  },
-  {
-    value: "motion",
-    get label() {
-      return uiText("Motion");
-    },
-  },
-  {
-    value: "media-library",
-    get label() {
-      return uiText("Media library");
-    },
-  },
-  { value: "faceid", label: "Face ID" },
+
+const IOS_PERMISSIONS: ReadonlyArray<{ value: DevicePermission; label: string }> = [
+  { value: "camera", label: msg("Camera") },
+  { value: "microphone", label: msg("Microphone") },
+  { value: "photos", label: msg("Photos") },
+  { value: "contacts", label: msg("Contacts") },
+  { value: "calendar", label: msg("Calendar") },
+  { value: "reminders", label: msg("Reminders") },
+  { value: "location", label: msg("Location") },
+  { value: "notifications", label: msg("Notifications") },
+  { value: "motion", label: msg("Motion") },
+  { value: "media-library", label: msg("Media library") },
+  { value: "faceid", label: msg("Face ID") },
 ];
-const ANDROID_PERMISSIONS: ReadonlyArray<{
-  value: DevicePermission;
-  label: string;
-}> = [
-  {
-    value: "camera",
-    get label() {
-      return uiText("Camera");
-    },
-  },
-  {
-    value: "microphone",
-    get label() {
-      return uiText("Microphone");
-    },
-  },
-  {
-    value: "photos",
-    get label() {
-      return uiText("Photos");
-    },
-  },
-  {
-    value: "contacts",
-    get label() {
-      return uiText("Contacts");
-    },
-  },
-  {
-    value: "calendar",
-    get label() {
-      return uiText("Calendar");
-    },
-  },
-  {
-    value: "location",
-    get label() {
-      return uiText("Location");
-    },
-  },
-  {
-    value: "notifications",
-    get label() {
-      return uiText("Notifications");
-    },
-  },
-  {
-    value: "motion",
-    get label() {
-      return uiText("Physical activity");
-    },
-  },
+
+const ANDROID_PERMISSIONS: ReadonlyArray<{ value: DevicePermission; label: string }> = [
+  { value: "camera", label: msg("Camera") },
+  { value: "microphone", label: msg("Microphone") },
+  { value: "photos", label: msg("Photos") },
+  { value: "contacts", label: msg("Contacts") },
+  { value: "calendar", label: msg("Calendar") },
+  { value: "location", label: msg("Location") },
+  { value: "notifications", label: msg("Notifications") },
+  { value: "motion", label: msg("Physical activity") },
 ];
+
 const LOCATION_PRESETS = [
   {
     label: msg("San Francisco", { $context: "city name" }),
@@ -240,6 +80,7 @@ const LOCATION_PRESETS = [
   { label: msg("Stockholm", { $context: "city name" }), latitude: 59.3293, longitude: 18.0686 },
   { label: msg("Tokyo", { $context: "city name" }), latitude: 35.6762, longitude: 139.6503 },
 ] as const;
+
 export function DeviceToolsPanel(props: {
   readonly controls: DeviceControls;
   readonly hostDiagnostics: string | undefined;
@@ -477,6 +318,7 @@ export function DeviceToolsPanel(props: {
             act({ type: "setPermission", appId, permission, decision })
           }
         />
+
         {isIos ? (
           <Section title={gt("Push notification")}>
             <SubmitRow
@@ -496,11 +338,13 @@ export function DeviceToolsPanel(props: {
             ) : null}
           </Section>
         ) : null}
+
         {isIos && props.access ? <EventLogSection access={props.access} device={device} /> : null}
       </div>
     </div>
   );
 }
+
 function Section(props: { readonly title: string; readonly children: React.ReactNode }) {
   return (
     <section className="flex flex-col gap-2 border-b px-3 py-2.5 last:border-b-0">
@@ -713,11 +557,9 @@ function LocationSection(props: {
     </Section>
   );
 }
+
 function PermissionsSection(props: {
-  readonly permissions: ReadonlyArray<{
-    value: DevicePermission;
-    label: string;
-  }>;
+  readonly permissions: ReadonlyArray<{ value: DevicePermission; label: string }>;
   readonly canReset: boolean;
   readonly defaultAppId: string;
   readonly disabled: boolean;
@@ -784,11 +626,13 @@ function PermissionsSection(props: {
     </Section>
   );
 }
+
 function EventLogSection(props: {
   readonly access: DeviceHubAccess;
   readonly device: DeviceSummary;
 }) {
   const [open, setOpen] = useState(false);
+
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
       <CollapsibleTrigger className="flex w-full items-center gap-1.5 border-b px-3 py-2.5 text-left text-xs font-medium text-muted-foreground">

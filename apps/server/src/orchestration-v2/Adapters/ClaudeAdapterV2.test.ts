@@ -1,4 +1,3 @@
-import * as PtyAdapter from "@t3tools/shared/PtyAdapter";
 // @effect-diagnostics nodeBuiltinImport:off -- workflow fixtures use files and the fake Claude CLI uses Node streams
 import * as NodeEvents from "node:events";
 import * as NodeFS from "node:fs";
@@ -99,7 +98,6 @@ import { MessageToolkit } from "../../mcp/toolkits/message/tools.ts";
 import { EnvironmentToolkit } from "../../mcp/toolkits/environment/tools.ts";
 import { ThemeToolkit } from "../../mcp/toolkits/theme/tools.ts";
 import { ProjectToolkit } from "../../mcp/toolkits/project/tools.ts";
-import { ArtifactToolkit } from "../../mcp/toolkits/artifact/tools.ts";
 import { WorktreeToolkit } from "../../mcp/toolkits/worktree/tools.ts";
 import { ThreadToolkit } from "../../mcp/toolkits/thread/tools.ts";
 import { OrchestratorToolkit } from "../../mcp/toolkits/orchestrator/tools.ts";
@@ -828,7 +826,6 @@ describe("ClaudeAdapterV2 MCP query overrides", () => {
       ...Object.values(ThreadToolkit.tools),
       ...Object.values(WorktreeToolkit.tools),
       ...Object.values(ProjectToolkit.tools),
-      ...Object.values(ArtifactToolkit.tools),
       ...Object.values(EnvironmentToolkit.tools),
       ...Object.values(ThemeToolkit.tools),
       ...Object.values(PreviewControlsToolkit.tools),
@@ -3401,7 +3398,6 @@ describe("ClaudeAdapterV2 MCP credential channel", () => {
   const openWith = (
     cli: ReturnType<typeof makeFakeClaudeCli>,
     native?: ProviderEventLoggers.EventNdjsonLogger,
-    interactiveCli = false,
   ) =>
     Effect.gen(function* () {
       const runner = yield* ClaudeAdapterV2.ClaudeAgentSdkQueryRunner;
@@ -3410,7 +3406,6 @@ describe("ClaudeAdapterV2 MCP credential channel", () => {
         providerSessionId: ProviderSessionId.make("provider-session-claude-mcp-channel"),
         options: {
           ...ClaudeAdapterV2.makeClaudeQueryOptions({
-            settings: { ...DEFAULT_CLAUDE_SETTINGS, interactiveCli },
             modelSelection: CLAUDE_TEST_MODEL_SELECTION,
             nativeThreadId: "native-thread-claude-mcp-channel",
             title: "Existing T3 title",
@@ -3431,56 +3426,6 @@ describe("ClaudeAdapterV2 MCP credential channel", () => {
       }),
       Effect.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer)),
     );
-
-  it.effect("keeps SDK selected when TUI is off, even on a TUI test server", () =>
-    Effect.gen(function* () {
-      const cli = makeFakeClaudeCli();
-      const session = yield* openWith(cli).pipe(
-        Effect.provideService(HostProcess.Environment, {
-          T3_CLAUDE_TUI_SANDBOX: "/unused-sandbox",
-        }),
-      );
-      assert.equal(cli.spawns.length, 1);
-      yield* session.close;
-      assert.isTrue(cli.closed());
-    }),
-  );
-  it.effect("reports an unavailable TUI without starting the SDK", () =>
-    Effect.gen(function* () {
-      const cli = makeFakeClaudeCli();
-      const exit = yield* openWith(cli, undefined, true).pipe(
-        Effect.provideService(HostProcess.Environment, {}),
-        Effect.exit,
-      );
-      assert.isTrue(Exit.isFailure(exit));
-      if (Exit.isFailure(exit))
-        assert.include(Cause.pretty(exit.cause), "Claude TUI requires a PTY adapter");
-      assert.equal(cli.spawns.length, 0);
-    }),
-  );
-
-  it.effect("rejects a TUI sandbox mismatch without starting the SDK", () =>
-    Effect.gen(function* () {
-      const cli = makeFakeClaudeCli();
-      let terminalSpawns = 0;
-      const exit = yield* openWith(cli, undefined, true).pipe(
-        Effect.provideService(HostProcess.Environment, {
-          T3_CLAUDE_TUI_SANDBOX: "/deliberately-missing-t3-sandbox",
-        }),
-        Effect.provideService(PtyAdapter.PtyAdapter, {
-          spawn: () =>
-            Effect.sync(() => {
-              terminalSpawns++;
-              throw new Error("Unexpected PTY spawn");
-            }),
-        }),
-        Effect.exit,
-      );
-      assert.isTrue(Exit.isFailure(exit));
-      assert.equal(cli.spawns.length, 0);
-      assert.equal(terminalSpawns, 0);
-    }),
-  );
 
   it.effect("commits queued delivery before interruptible protocol logging", () =>
     Effect.gen(function* () {
@@ -3528,42 +3473,6 @@ describe("ClaudeAdapterV2 MCP credential channel", () => {
       assert.notInclude(spawned, "dummy-mcp-credential");
     }),
   );
-
-  // Claude Code leaves TaskCreate/TaskUpdate/TaskList out for models it does not know unless
-  // CLAUDE_CODE_ENABLE_TODO_TOOLS is on, and the step capsule is fed by those tools.
-  it.effect("launches the SDK process with the task-list tools on and none disabled", () =>
-    Effect.gen(function* () {
-      const cli = makeFakeClaudeCli();
-      const session = yield* openWith(cli);
-      yield* session.close;
-
-      const spawn = cli.spawns[0]!;
-      assert.equal(spawn.env.CLAUDE_CODE_ENABLE_TODO_TOOLS, "1");
-      assert.include(spawn.args, "--tools=default");
-      const flags = spawn.args.join(" ");
-      for (const name of ["TaskCreate", "TaskUpdate", "TaskList", "TodoWrite"]) {
-        assert.notInclude(flags, name);
-      }
-    }),
-  );
-
-  it("keeps an explicit value from the instance environment", () => {
-    const build = (environment: NodeJS.ProcessEnv) =>
-      ClaudeAdapterV2.makeClaudeQueryOptions({
-        settings: DEFAULT_CLAUDE_SETTINGS,
-        modelSelection: CLAUDE_TEST_MODEL_SELECTION,
-        nativeThreadId: "native-thread-claude-task-tools",
-        resume: false,
-        cwd: null,
-        environment,
-      }).env;
-    assert.equal(build({ PATH: "/usr/bin" })?.CLAUDE_CODE_ENABLE_TODO_TOOLS, "1");
-    assert.equal(
-      build({ PATH: "/usr/bin", CLAUDE_CODE_ENABLE_TODO_TOOLS: "0" })
-        ?.CLAUDE_CODE_ENABLE_TODO_TOOLS,
-      "0",
-    );
-  });
 });
 
 describe("ClaudeAdapterV2 native session identity", () => {

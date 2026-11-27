@@ -1,5 +1,4 @@
 import * as Brand from "effect/Brand";
-import * as Clock from "effect/Clock";
 import * as Cause from "effect/Cause";
 import * as Deferred from "effect/Deferred";
 import * as Duration from "effect/Duration";
@@ -42,8 +41,7 @@ import * as DesktopWslEnvironment from "../wsl/DesktopWslEnvironment.ts";
 const INITIAL_RESTART_DELAY = Duration.millis(500);
 const MAX_RESTART_DELAY = Duration.seconds(10);
 const MAX_PREFLIGHT_FAILURE_ATTEMPTS = 5;
-const MAX_BACKEND_RESTART_ATTEMPTS = 5;
-const BACKEND_STABLE_RUNTIME_MS = 60000;
+// Large state databases can take over a minute to become ready.
 const DEFAULT_BACKEND_READINESS_TIMEOUT = Duration.minutes(3);
 const DEFAULT_BACKEND_READINESS_INTERVAL = Duration.millis(100);
 const DEFAULT_BACKEND_READINESS_REQUEST_TIMEOUT = Duration.seconds(1);
@@ -276,7 +274,6 @@ export interface BackendInstanceSpec {
   readonly onReady?: (httpBaseUrl: URL, pid: number) => Effect.Effect<void>;
   readonly onShutdown?: () => Effect.Effect<void>;
   readonly onPreflightFailed?: (failure: PreflightFailure) => Effect.Effect<boolean>;
-  readonly onRestartExhausted?: () => Effect.Effect<void>;
   readonly onStateDirOwned?: () => Effect.Effect<void>;
   /** Fires on each repeated crash or readiness timeout until the backend becomes ready. */
   readonly onStartupFailure?: (failure: BackendStartupFailure) => Effect.Effect<void>;
@@ -300,10 +297,6 @@ interface BackendManagerState {
   readonly config: Option.Option<DesktopBackendStartConfig>;
   readonly active: Option.Option<ActiveBackendRun>;
   readonly restartAttempt: number;
-  readonly readyAt: number | null;
-  readonly runtimeFailureAttempt: number;
-  // Consecutive bounded/fatal preflight failures, reset on a clean or
-  // unbounded-transient preflight. restartAttempt counts all restarts.
   readonly preflightFailureAttempt: number;
   readonly restartFiber: Option.Option<Fiber.Fiber<void, never>>;
   readonly nextRunId: number;
@@ -315,8 +308,6 @@ const initialState: BackendManagerState = {
   config: Option.none(),
   active: Option.none(),
   restartAttempt: 0,
-  readyAt: null,
-  runtimeFailureAttempt: 0,
   preflightFailureAttempt: 0,
   restartFiber: Option.none(),
   nextRunId: 1,
@@ -841,9 +832,6 @@ export const makeBackendInstance = Effect.fn("makeBackendInstance")(function* (
           ...latest,
           desiredRunning: true,
           ready: false,
-          restartAttempt: current.desiredRunning ? latest.restartAttempt : 0,
-          readyAt: null,
-          runtimeFailureAttempt: current.desiredRunning ? latest.runtimeFailureAttempt : 0,
           config: Option.some(config.value),
           preflightFailureAttempt: resetFatalPreflightCounter ? 0 : latest.preflightFailureAttempt,
         }));
@@ -932,12 +920,6 @@ export const makeBackendInstance = Effect.fn("makeBackendInstance")(function* (
           const stateDirOwned = exitCode === SERVER_EXIT_CODE_STATE_DIR_OWNED;
           yield* mutex.withPermits(1)(
             Effect.gen(function* () {
-              const now = yield* Clock.currentTimeMillis;
-              yield* SubscriptionRef.update(state, (latest) =>
-                latest.readyAt !== null && now - latest.readyAt >= BACKEND_STABLE_RUNTIME_MS
-                  ? { ...latest, restartAttempt: 0, runtimeFailureAttempt: 0 }
-                  : latest,
-              );
               const { isCurrentRun, nextState, pid, exitObserved, stopRequested, wasReady } =
                 yield* SubscriptionRef.modify(
                   state,
@@ -973,9 +955,6 @@ export const makeBackendInstance = Effect.fn("makeBackendInstance")(function* (
                       ...latest,
                       active: Option.none<ActiveBackendRun>(),
                       ready: false,
-                      runtimeFailureAttempt: currentRun.stopRequested
-                        ? latest.runtimeFailureAttempt
-                        : latest.runtimeFailureAttempt + 1,
                     };
                     return [
                       {
@@ -1051,7 +1030,6 @@ export const makeBackendInstance = Effect.fn("makeBackendInstance")(function* (
               exitObserved: true,
             })),
           onReady: Effect.fn("desktop.backendInstance.onReady")(function* (pid) {
-            const now = yield* Clock.currentTimeMillis;
             const isCurrentRun = yield* SubscriptionRef.modify(state, (latest) => {
               const activeRun = Option.getOrUndefined(latest.active);
               if (activeRun?.id !== runId) {
@@ -1062,7 +1040,7 @@ export const makeBackendInstance = Effect.fn("makeBackendInstance")(function* (
                 true,
                 {
                   ...latest,
-                  readyAt: now,
+                  restartAttempt: 0,
                   ready: true,
                 },
               ] as const;
@@ -1155,13 +1133,6 @@ export const makeBackendInstance = Effect.fn("makeBackendInstance")(function* (
     reason: string,
     exitCode?: number,
   ) {
-    const current = yield* SubscriptionRef.get(state);
-    if (current.desiredRunning && current.runtimeFailureAttempt > MAX_BACKEND_RESTART_ATTEMPTS) {
-      yield* SubscriptionRef.update(state, (latest) => ({ ...latest, desiredRunning: false }));
-      yield* logInstanceError("backend restart budget exhausted", { reason });
-      yield* spec.onRestartExhausted?.() ?? Effect.void;
-      return;
-    }
     const scheduled = yield* SubscriptionRef.modify(state, (latest) => {
       if (!latest.desiredRunning || Option.isSome(latest.restartFiber)) {
         return [Option.none<{ delay: Duration.Duration; attempt: number }>(), latest] as const;

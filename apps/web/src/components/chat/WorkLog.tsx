@@ -1,6 +1,3 @@
-
-
-import { Tooltip, TooltipTrigger, TooltipPopup } from "../ui/tooltip";
 import {
   createContext,
   use,
@@ -60,7 +57,6 @@ const focusRingClassName =
 type LineProps = Omit<ComponentProps<"div">, "className" | "style" | "children">;
 
 function WorkLogLine({ icon, label, trailing, wrapLabel, ...lineProps }: RowContent & LineProps) {
-  const localized = label;
   return (
     <div
       {...lineProps}
@@ -84,16 +80,7 @@ function WorkLogLine({ icon, label, trailing, wrapLabel, ...lineProps }: RowCont
             !wrapLabel && "truncate [&_*]:whitespace-nowrap",
           )}
         >
-          {typeof label === "string" &&
-          /MCP server requires OAuth/.test(label) &&
-          localized !== label ? (
-            <Tooltip>
-              <TooltipTrigger render={<span />}>{localized}</TooltipTrigger>
-              <TooltipPopup>{label}</TooltipPopup>
-            </Tooltip>
-          ) : (
-            localized
-          )}
+          {label}
         </div>
       </div>
       {trailing}

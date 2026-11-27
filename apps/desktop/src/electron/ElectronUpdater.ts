@@ -28,13 +28,6 @@ const relaunchWithoutInheritedDescriptors = (updater: AppImageUpdater) => {
   };
 };
 
-export interface StardustUpdateFeed {
-  /** The public release the running build corresponds to, e.g. `1.2.1`. */
-  readonly runningVersion: string;
-  /** Local build label from stardust-build.json `customBuild`, e.g. `C109-stardust`. */
-  readonly customBuild: string | null;
-}
-
 export type ElectronUpdaterFeedUrl = Parameters<AutoUpdater["setFeedURL"]>[0];
 
 export class ElectronUpdaterCheckForUpdatesError extends Schema.TaggedError<ElectronUpdaterCheckForUpdatesError>()(
@@ -104,11 +97,6 @@ export class ElectronUpdater extends Context.Service<
       eventName: string,
       listener: (...args: Args) => void,
     ) => Effect.Effect<void, never, Scope.Scope>;
-    /**
-     * Set by StardustMacUpdater: the fork's own GitHub feed, compared against the running
-     * community version instead of the Electron app version. Absent for electron-updater.
-     */
-    readonly stardustFeed?: StardustUpdateFeed;
   }
 >()("@t3tools/desktop/electron/ElectronUpdater") {}
 

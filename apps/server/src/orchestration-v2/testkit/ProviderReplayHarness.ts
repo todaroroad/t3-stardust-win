@@ -1,4 +1,3 @@
-import * as ClaudeUsageProtection from "../ClaudeUsageProtection.ts";
 import * as OtelEnvironment from "@t3tools/shared/otelEnvironment";
 import { DEFAULT_SIGNAL_EXPORT } from "@t3tools/shared/observability";
 import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
@@ -211,8 +210,6 @@ export function runOrchestratorV2ProviderReplayScenario<
       MigrationError | PlatformError.PlatformError | SqlError
     >;
     readonly runEffectWorker?: boolean;
-    readonly usageProtection?: ClaudeUsageProtection.ClaudeUsageProtection["Service"];
-    readonly settingsOverrides?: Parameters<typeof ServerSettings.layerTest>[0];
     readonly runContinuationWorker?: boolean;
     readonly recoverOnStartup?: boolean;
     readonly continueThreadsAfterServerUpdate?: boolean;
@@ -259,8 +256,6 @@ export function layerProviderReplay<Transcript extends ProviderReplayTranscript,
       MigrationError | PlatformError.PlatformError | SqlError
     >;
     readonly runEffectWorker?: boolean;
-    readonly usageProtection?: ClaudeUsageProtection.ClaudeUsageProtection["Service"];
-    readonly settingsOverrides?: Parameters<typeof ServerSettings.layerTest>[0];
     readonly runContinuationWorker?: boolean;
     readonly recoverOnStartup?: boolean;
     readonly continueThreadsAfterServerUpdate?: boolean;
@@ -298,8 +293,6 @@ export function layerWithRegistry<Error>(
       MigrationError | PlatformError.PlatformError | SqlError
     >;
     readonly runEffectWorker?: boolean;
-    readonly usageProtection?: ClaudeUsageProtection.ClaudeUsageProtection["Service"];
-    readonly settingsOverrides?: Parameters<typeof ServerSettings.layerTest>[0];
     readonly runContinuationWorker?: boolean;
     readonly recoverOnStartup?: boolean;
     readonly continueThreadsAfterServerUpdate?: boolean;
@@ -363,7 +356,6 @@ export function layerWithRegistry<Error>(
       ServerSettings.layerTest(
         {
           responseStreamingMode: "turn",
-          ...options.settingsOverrides,
           ...(options.continueThreadsAfterServerUpdate === undefined
             ? {}
             : { continueThreadsAfterServerUpdate: options.continueThreadsAfterServerUpdate }),
@@ -556,11 +548,6 @@ export function layerWithRegistry<Error>(
     }),
   );
   const layerOrchestratorProvided = Orchestrator.layer.pipe(
-    Layer.provide(
-      options.usageProtection
-        ? Layer.succeed(ClaudeUsageProtection.ClaudeUsageProtection, options.usageProtection)
-        : Layer.empty,
-    ),
     Layer.provide(
       Layer.mergeAll(
         layerCheckpointServiceProvided,

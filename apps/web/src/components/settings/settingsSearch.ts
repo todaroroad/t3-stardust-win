@@ -1,4 +1,3 @@
-import { uiText } from "~/i18n";
 import { HOSTED_APP_CHANNEL } from "~/branding";
 import { isElectron } from "~/env";
 import { isMacPlatform, isWindowsPlatform, normalizeSearchText } from "~/lib/utils";
@@ -17,6 +16,7 @@ import { writeLocalStorageValue } from "../../hooks/useLocalStorage";
 import type { MessageResolver } from "../../i18n/messages";
 import { commandLabel } from "./KeybindingsSettings.logic";
 import type { ResolvedSettingsScope } from "./settingsScope";
+
 export type SettingsPath =
   | "/settings/projects"
   | "/settings/general"
@@ -28,7 +28,6 @@ export type SettingsPath =
   | "/settings/keybindings"
   | "/settings/snap-shot"
   | "/settings/providers"
-  | "/settings/memory"
   | "/settings/threads"
   | "/settings/browser"
   | "/settings/devices"
@@ -39,10 +38,10 @@ export type SettingsPath =
   | "/settings/access"
   | "/settings/secrets"
   | "/settings/maintenance"
-  | "/settings/storage"
   | "/settings/labs"
   | "/settings/about"
   | "/settings/archived";
+
 export type SettingsSearchScope =
   | "environment"
   | "environment-defaults"
@@ -50,6 +49,7 @@ export type SettingsSearchScope =
   | "project"
   | "checkout"
   | "connections";
+
 export interface SettingsSearchItem {
   readonly id: string;
   readonly title: string;
@@ -77,6 +77,7 @@ export interface SettingsSearchItem {
   readonly secondary?: boolean;
   readonly requiresThreadAutoSettlement?: boolean;
 }
+
 export interface SettingsSearchAvailability {
   readonly localEnvironmentDisabled?: boolean;
   readonly hasCloudPublicConfig: boolean;
@@ -98,9 +99,6 @@ export interface SettingsSearchAvailability {
 export const SETTINGS_SECTION_LABELS: Readonly<Record<SettingsPath, string>> = {
   "/settings/diagnostics": msg("Diagnostics"),
   "/settings/projects": msg("Projects"),
-  get "/settings/memory"() {
-    return uiText("Memory.");
-  },
   "/settings/general": msg("General"),
   "/settings/appearance": msg("Appearance"),
   "/settings/chat": msg("Chat"),
@@ -118,7 +116,6 @@ export const SETTINGS_SECTION_LABELS: Readonly<Record<SettingsPath, string>> = {
   "/settings/access": msg("Sharing & access"),
   "/settings/secrets": msg("Secrets"),
   "/settings/maintenance": msg("Maintenance"),
-  "/settings/storage": msg("Storage & cleanup"),
   "/settings/labs": msg("Labs"),
   "/settings/about": msg("About"),
   "/settings/voice": msg("Voice"),
@@ -176,13 +173,7 @@ const ALL_SETTINGS_NAV_GROUPS: ReadonlyArray<SettingsNavGroup> = [
   {
     heading: msg("More"),
     headingHidden: true,
-    paths: [
-      "/settings/maintenance",
-      "/settings/storage",
-      "/settings/labs",
-      "/settings/about",
-      "/settings/archived",
-    ],
+    paths: ["/settings/maintenance", "/settings/labs", "/settings/about", "/settings/archived"],
   },
 ];
 
@@ -219,16 +210,16 @@ const KEYBINDING_SEARCH_ITEMS = STATIC_KEYBINDING_COMMANDS.toSorted((left, right
     ...(defaultKeys.length === 0 ? { targetId: "keybindings" } : {}),
   };
 });
+
 export function sourceControlHostSettingsSearchId(kind: string) {
   return `source-control-host-${kind}` as const;
 }
+
 /** Each host's own settings: its accounts and token, or the fields of its settings form. */
 export function sourceControlHostSearchItems(
   definitions: ReadonlyArray<SourceControlDefinition>,
 ): ReadonlyArray<
-  SettingsSearchItem & {
-    readonly id: ReturnType<typeof sourceControlHostSettingsSearchId>;
-  }
+  SettingsSearchItem & { readonly id: ReturnType<typeof sourceControlHostSettingsSearchId> }
 > {
   return definitions.flatMap((definition) => {
     if (!definition.settings) return [];
@@ -252,6 +243,7 @@ export function sourceControlHostSearchItems(
     ];
   });
 }
+
 /** For settings that apply to every host. */
 const SOURCE_CONTROL_HOST_LABELS = sourceControlClients.definitions
   .map((definition) => definition.label)
@@ -259,51 +251,8 @@ const SOURCE_CONTROL_HOST_LABELS = sourceControlClients.definitions
 const SOURCE_CONTROL_HOST_TERMS = sourceControlClients.definitions
   .flatMap((definition) => [definition.label, ...(definition.searchKeywords ?? [])])
   .join(" ");
+
 export const SETTINGS_SEARCH_ITEMS = [
-  {
-    id: "sidebar-categories",
-    title: "Sidebar categories",
-    to: "/settings/threads",
-    searchTerms: ["category", "preset", "keyword", "classification", "分类", "预设", "关键词"],
-    targetId: "sidebar-categories",
-  },
-  {
-    id: "memory",
-    get title() {
-      return uiText("Memory.");
-    },
-    to: "/settings/memory",
-    searchTerms: ["memory", "long-term", "记忆", "待确认", "批准"],
-    targetId: "memory",
-  },
-  {
-    id: "workbench-change-history",
-    title: "Change history",
-    to: "/settings/general",
-    searchTerms: [
-      "\u4FEE\u6539\u8BB0\u5F55 \u5DE5\u4F5C\u65B9\u5F0F \u9884\u8BBE \u64A4\u9500 preset undo history",
-    ],
-  },
-  {
-    id: "storage-tidy",
-    title: msg("Storage & cleanup"),
-    to: "/settings/storage",
-    scope: "environment-defaults",
-    searchTerms: [
-      msg(
-        "disk space free scan clean up cleanup caches mole worktrees session transcripts tmp rollback backups builds trash safe review",
-      ),
-    ],
-  },
-  {
-    id: "storage-tidy-settings",
-    title: msg("Cleanup preferences"),
-    to: "/settings/storage",
-    scope: "environment-defaults",
-    searchTerms: [
-      msg("rescue first build folder keep newest rollback copies bak orig"),
-    ],
-  },
   {
     id: "storage-worktree-keep-when",
     targetId: "storage-worktrees",
@@ -404,12 +353,6 @@ export const SETTINGS_SEARCH_ITEMS = [
     targetId: "appearance",
   },
   {
-    id: "interface-style",
-    title: "Interface style",
-    to: "/settings/appearance",
-    searchTerms: ["macOS Mac Apple current standard appearance 界面 风格 苹果 毛玻璃"],
-  },
-  {
     // Prefixed because the slider control already owns the `appearance-contrast` id.
     id: "setting-appearance-contrast",
     title: msg("Contrast"),
@@ -482,14 +425,6 @@ export const SETTINGS_SEARCH_ITEMS = [
     title: msg("Interface font"),
     to: "/settings/appearance",
     searchTerms: [msg("typography family size system sans")],
-  },
-  {
-    id: "sidebar-font",
-    get title() {
-      return uiText("Sidebar.");
-    },
-    to: "/settings/appearance",
-    searchTerms: ["sidebar font family size color 侧边栏 字体 字号 颜色"],
   },
   {
     id: "prompt-font",
@@ -823,9 +758,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "thread-notifications",
-    get title() {
-      return uiText("Thread notifications");
-    },
+    title: msg("Thread notifications"),
     to: "/settings/general",
     searchTerms: [msg("notification sound alert completion input approval desktop")],
   },
@@ -841,7 +774,6 @@ export const SETTINGS_SEARCH_ITEMS = [
     to: "/settings/general",
     searchTerms: [
       msg(
-      // oxlint-disable-next-line t3code/no-hardcoded-ui-han -- search keywords in every supported language
         "locale translation english deutsch german español spanish français french português portuguese brasil brazilian chinese 中文 japanese 日本語 korean 한국어 russian русский swedish svenska sprache idioma langue 语言 言語 언어 язык",
       ),
     ],
@@ -858,12 +790,6 @@ export const SETTINGS_SEARCH_ITEMS = [
     to: "/settings/threads",
     scope: "project-defaults",
     searchTerms: [msg("output token paragraph buffered wait turn legacy")],
-  },
-  {
-    id: "keep-awake",
-    title: "Keep awake while working",
-    to: "/settings/general",
-    searchTerms: ["sleep screen display caffeinate prevent idle running task macos"],
   },
   {
     id: "hide-whitespace-changes",
@@ -896,12 +822,6 @@ export const SETTINGS_SEARCH_ITEMS = [
     title: msg("Show skills in slash menu"),
     to: "/settings/chat",
     searchTerms: [msg("command menu dollar $ slash /")],
-  },
-  {
-    id: "artifact-revision",
-    title: "Image revision comments",
-    to: "/settings/chat",
-    searchTerms: ["图片 产物 修改意见 修正 返工 批注 image artifact revision feedback notes"],
   },
   {
     id: "composer-rich-text",
@@ -1081,13 +1001,6 @@ export const SETTINGS_SEARCH_ITEMS = [
     to: "/settings/about",
     primaryEnvironmentOnly: true,
     searchTerms: [msg("onboarding setup first run getting started agents import projects")],
-  },
-  {
-    id: "telemetry-opt-in",
-    title: "Share anonymous usage data",
-    to: "/settings/about",
-    scope: "environment",
-    searchTerms: ["telemetry analytics usage statistics tracking privacy opt in off default"],
   },
   {
     id: "privacy-policy",
@@ -1613,8 +1526,11 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: [msg("restore reopen deleted history projects")],
   },
 ] as const satisfies ReadonlyArray<SettingsSearchItem>;
+
 export type SettingsSearchItemId = (typeof SETTINGS_SEARCH_ITEMS)[number]["id"];
+
 const SEARCH_ITEMS_BY_ID = new Map(SETTINGS_SEARCH_ITEMS.map((item) => [item.id, item] as const));
+
 const SETTINGS_CATEGORY_SCOPES: Readonly<Record<SettingsPath, SettingsSearchScope | null>> = {
   "/settings/diagnostics": "environment",
   "/settings/projects": "project",
@@ -1626,7 +1542,6 @@ const SETTINGS_CATEGORY_SCOPES: Readonly<Record<SettingsPath, SettingsSearchScop
   "/settings/snap-shot": null,
   "/settings/keybindings": null,
   "/settings/providers": null,
-  "/settings/memory": null,
   "/settings/threads": null,
   "/settings/browser": null,
   "/settings/devices": null,
@@ -1637,13 +1552,14 @@ const SETTINGS_CATEGORY_SCOPES: Readonly<Record<SettingsPath, SettingsSearchScop
   "/settings/secrets": null,
   "/settings/scheduled-tasks": null,
   "/settings/maintenance": null,
-  "/settings/storage": null,
   "/settings/labs": null,
   "/settings/about": null,
   "/settings/archived": "project-defaults",
 };
+
 const RENAMED_SETTINGS_PATHS: Readonly<Record<string, SettingsPath>> = {
   "/settings/integrations": "/settings/browser",
+  "/settings/storage": "/settings/maintenance",
   "/settings/beta": "/settings/labs",
 };
 const SPLIT_SETTINGS_PATHS: ReadonlySet<string> = new Set([
@@ -1651,8 +1567,6 @@ const SPLIT_SETTINGS_PATHS: ReadonlySet<string> = new Set([
   "/settings/appearance",
   "/settings/source-control",
   "/settings/connections",
-  // Storage is a page of its own again; only anchors of rows that moved away still redirect.
-  "/settings/storage",
   ...Object.keys(RENAMED_SETTINGS_PATHS),
 ]);
 // Section anchors that moved but are not search results themselves.
@@ -1661,6 +1575,7 @@ const MOVED_SECTION_ANCHORS: Readonly<Record<string, SettingsPath>> = {
   "text-generation": "/settings/threads",
   about: "/settings/about",
 };
+
 /** Where an old settings link now lives. Its anchor finds the page its row moved to. */
 export function movedSettingsPath(pathname: string, hash: string): SettingsPath | null {
   if (!SPLIT_SETTINGS_PATHS.has(pathname)) return null;
@@ -1672,6 +1587,7 @@ export function movedSettingsPath(pathname: string, hash: string): SettingsPath 
     anchored?.to ?? MOVED_SECTION_ANCHORS[hash] ?? RENAMED_SETTINGS_PATHS[pathname] ?? null;
   return to === pathname ? null : to;
 }
+
 export function getSettingsSearchTargetScope(targetId: string) {
   const items: readonly SettingsSearchItem[] = SETTINGS_SEARCH_ITEMS;
   const item =
@@ -1686,11 +1602,13 @@ export function getSettingsSearchTargetScope(targetId: string) {
       }
     : null;
 }
+
 interface AutoSettlementSearchEnvironment {
   readonly environmentId: EnvironmentId;
   readonly connection: { readonly phase: EnvironmentConnectionPhase };
   readonly serverConfig: object | null;
 }
+
 export function getThreadAutoSettlementSearchAvailability(
   environments: readonly AutoSettlementSearchEnvironment[],
   scope?: Pick<ResolvedSettingsScope, "kind" | "environmentIds">,
@@ -1712,6 +1630,7 @@ export function getThreadAutoSettlementSearchAvailability(
       selected.every((environment) => eligibleEnvironmentIds.includes(environment.environmentId)),
   };
 }
+
 export function isSettingsSearchScopeAvailable(
   requiredScope: SettingsSearchScope | null,
   scopeKind: ResolvedSettingsScope["kind"],
@@ -1736,12 +1655,13 @@ export function isSettingsSearchScopeAvailable(
       );
   }
 }
-export function searchableSetting(id: SettingsSearchItemId): {
+
+function searchableSetting(id: SettingsSearchItemId): {
   readonly id: string;
   readonly title: string;
 } {
   const { id: anchorId, title } = SEARCH_ITEMS_BY_ID.get(id)!;
-  return { id: anchorId, title: uiText(title) };
+  return { id: anchorId, title };
 }
 
 /** `searchableSetting` with its title in the active language, for spreading onto a row. */
@@ -1790,6 +1710,7 @@ export function settingsForThisPlatform(
       (!item.windowsOnly || isWindowsPlatform(platform)),
   );
 }
+
 export function searchSettings(
   query: string,
   items: ReadonlyArray<SettingsSearchItem> = SETTINGS_SEARCH_ITEMS,
@@ -1836,14 +1757,17 @@ export function searchSettings(
     )
     .map(({ item }) => item);
 }
+
 // These rows only exist with separate fonts on, so a search jump to one turns them on.
 const ADVANCED_TYPOGRAPHY_TARGET_IDS: ReadonlySet<string> = new Set([
   "prompt-font",
   "terminal-font",
 ]);
+
 export function isAdvancedTypographyTarget(targetId: string): boolean {
   return ADVANCED_TYPOGRAPHY_TARGET_IDS.has(targetId);
 }
+
 /**
  * Opens the persisted section a search result lives in before jumping to it, so
  * its row is mounted to scroll to. The terminal reads the same flag, so it must

@@ -44,39 +44,6 @@ import {
 } from "./orchestrationV2.ts";
 import { ProviderOptionSelection, ProviderOptionSelectionValue } from "./model.ts";
 import { ProviderDriverKind, ProviderInstanceId } from "./providerInstance.ts";
-import { ServerProviderUsageWindow } from "./providerUsageLimits.ts";
-
-export const OrchestratorMcpUsageLimitsInput = Schema.Struct({
-  refresh: Schema.optional(Schema.Boolean),
-});
-export type OrchestratorMcpUsageLimitsInput = typeof OrchestratorMcpUsageLimitsInput.Type;
-
-export const OrchestratorMcpUsageLimitsResult = Schema.Struct({
-  /** Newest available reading; null before any account has been checked. */
-  checkedAt: Schema.NullOr(IsoDateTime),
-  accounts: Schema.Array(
-    Schema.Struct({
-      id: TrimmedNonEmptyString,
-      provider: ProviderDriverKind,
-      label: TrimmedNonEmptyString,
-      alias: Schema.String,
-      connected: Schema.Boolean,
-      stale: Schema.Boolean,
-      remainingPercent: Schema.NullOr(Schema.Number),
-      windows: Schema.Array(
-        Schema.Struct({
-          label: TrimmedNonEmptyString,
-          kind: ServerProviderUsageWindow.fields.kind,
-          windowDurationMins: Schema.optional(NonNegativeInt),
-          remainingPercent: Schema.Number,
-          resetsAt: Schema.NullOr(IsoDateTime),
-        }),
-      ),
-      unavailable: Schema.optional(Schema.Struct({ reason: TrimmedNonEmptyString })),
-    }),
-  ),
-});
-export type OrchestratorMcpUsageLimitsResult = typeof OrchestratorMcpUsageLimitsResult.Type;
 
 const OrchestratorMcpPrompt = TrimmedNonEmptyString.check(Schema.isMaxLength(120_000));
 const OrchestratorMcpTitle = TrimmedNonEmptyString.check(Schema.isMaxLength(512));

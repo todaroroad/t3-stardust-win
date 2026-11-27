@@ -167,32 +167,12 @@ describe("ExpandedImageDialog", () => {
     const zoomedWidth = image.getBoundingClientRect().width;
     expect(zoomedWidth).toBeCloseTo(fitWidth * Math.E, 0);
 
-    // Native wheel scrolling is asynchronous; wait for a stable origin before each gesture.
-    const settleScroll = async () => {
-      let previous = [viewport.scrollLeft, viewport.scrollTop];
-      let stable = 0;
-      await vi.waitFor(
-        () => {
-          const current = [viewport.scrollLeft, viewport.scrollTop];
-          stable = current.every((value, index) => value === previous[index]) ? stable + 1 : 0;
-          previous = current;
-          expect(stable).toBeGreaterThanOrEqual(3);
-        },
-        { interval: 40 },
-      );
-    };
     const pan = async (delta: { x: number; y: number }) => {
-      // The browser driver hovers (and may scroll into view) before dispatching a wheel.
-      await userEvent.hover(viewportLocator);
-      await settleScroll();
       const { scrollLeft, scrollTop } = viewport;
       await userEvent.wheel(viewportLocator, { delta });
       await vi.waitFor(() => {
         expect(Math.sign(viewport.scrollLeft - scrollLeft)).toBe(Math.sign(delta.x));
-        expect(
-          Math.sign(viewport.scrollTop - scrollTop),
-          JSON.stringify({ delta, before: scrollTop, after: viewport.scrollTop }),
-        ).toBe(Math.sign(delta.y));
+        expect(Math.sign(viewport.scrollTop - scrollTop)).toBe(Math.sign(delta.y));
       });
     };
     await pan({ x: 60, y: 0 });

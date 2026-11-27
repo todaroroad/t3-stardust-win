@@ -187,9 +187,3 @@ it.each(["save", "copy-image", "open-file"])(
     expect(state.openFile).not.toHaveBeenCalled();
   },
 );
-
-// These permission tests invoke hooks with a stubbed React runtime.
-vi.mock("~/i18n/useUiText", async () => {
-  const { uiText } = await import("~/i18n");
-  return { useUiText: () => uiText };
-});

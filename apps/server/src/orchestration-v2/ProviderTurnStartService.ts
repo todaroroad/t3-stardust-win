@@ -1,4 +1,3 @@
-import { formatMemoryContext } from "../memory/memory.ts";
 import { classifyCodexManagedError } from "../provider/CodexManagedErrors.ts";
 import { modelSelectionsEqual } from "@t3tools/shared/model";
 import { projectComposerContextForProvider } from "@t3tools/shared/composerContextReferences";
@@ -362,7 +361,6 @@ export const layer: Layer.Layer<
     const fileSystem = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
     const projects = yield* ProjectService.ProjectService;
-    const serverSettings = yield* ServerSettings.ServerSettingsService;
     const setupScripts = yield* ProjectSetupScriptRunner.ProjectSetupScriptRunner;
     const providerAuth = yield* ProviderAuthService.ProviderAuthService;
     const projectionStore = yield* ProjectionStore.ProjectionStoreV2;
@@ -2284,10 +2282,6 @@ export const layer: Layer.Layer<
           ],
         });
       });
-      const approvedMemoryContext = formatMemoryContext(
-        (yield* serverSettings.getSettings).memory,
-        projection.thread.projectId,
-      );
       let inlineDeliveredHandoffs: ReadonlyArray<OrchestrationV2ContextHandoff> = [];
       let promptDroppedOnTerminal = false;
       const inlineDeliveryLock = yield* Semaphore.make(1);
@@ -2318,9 +2312,6 @@ export const layer: Layer.Layer<
             sideChatHandoff === undefined || compact || slashCommand
               ? ""
               : sideChatHandoff.summaryText;
-          // Native resume must not become an extra prompted turn just to repeat approved memory.
-          const memoryContext =
-            compact || goalCommand || turnInput.resume ? "" : approvedMemoryContext;
           // Record inline handoffs before startTurn so an immediate dropped terminal can restore them.
           inlineDeliveredHandoffs = [
             ...delivery.inlineHandoffs.map((handoff) =>
@@ -2330,7 +2321,7 @@ export const layer: Layer.Layer<
             ),
             ...(sideChatContext === "" || sideChatHandoff === undefined ? [] : [sideChatHandoff]),
           ];
-          const context = [memoryContext, delivery.context, sideChatContext, restartNote]
+          const context = [delivery.context, sideChatContext, restartNote]
             .filter((part) => part !== "")
             .join("\n\n");
           const { restartContinuationOfRunId: _resumedRunId, ...promptedInput } = turnInput;
@@ -2433,10 +2424,9 @@ export const layer: Layer.Layer<
               }),
         ),
       );
-      const deliverySession =
-        carriesPendingContext || approvedMemoryContext !== ""
-          ? makeDeliverySession(session, startWithHandoffs)
-          : session;
+      const deliverySession = carriesPendingContext
+        ? makeDeliverySession(session, startWithHandoffs)
+        : session;
       return runExecution.startRootRun({
         commandId: CommandId.make(`command:effect:provider-turn.start:${run.id}`),
         appThread: projection.thread,

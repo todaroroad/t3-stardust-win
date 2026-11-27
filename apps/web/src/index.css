@@ -1,14 +1,6 @@
 /* Clerk injects its component styles into the clerk layer (clerkAppearance.cssLayerName). */
 @layer theme, base, clerk, components, utilities;
 @import "tailwindcss";
-@import "./windowsProfile.css";
-@import "./liquidGlass.css";
-@import "./skins.css";
-@import "./components/chat/taskPlanCapsule.css";
-@import "./components/chat/cosmicEffortSlider.css";
-@import "./components/chat/taskCommandActivities.css";
-@import "./themes/apple.css";
-@import "./components/usage/usagePresentation.css";
 
 @custom-variant dark (&:is(.dark, .dark *));
 @custom-variant light (&:not(.dark, .dark *));
@@ -109,7 +101,6 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
    * tooltip, and toolbar controls cannot quietly drift apart.
    */
   --control-radius: 0.5rem;
-  --composer-control-font-size: 0.8125rem;
   --sidebar-content-inset: 0.5rem;
   --sidebar-control-gap: 0.5rem;
   --sidebar-icon-color: color-mix(
@@ -124,7 +115,7 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
   /* App layer order: the bottom terminal drawer (45, above the timeline minimap),
      docked sheets, then the floating preview player (47–49, see
      previewMiniPlayerLayout.ts), then dialogs and popovers (50 and up). */
-  --z-sheet: 500;
+  --z-sheet: 46;
   --glass-blur: 12px;
   --glass-opacity: 80%;
   --glass-saturation: 1.14;
@@ -186,15 +177,6 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
 }
 
 @theme inline {
-  --text-stardust-title: 1.75rem;
-  --text-stardust-title--line-height: 1.2;
-  --text-stardust-section: 1.0625rem;
-  --text-stardust-section--line-height: 1.4;
-  --text-stardust-card: 0.9375rem;
-  --text-stardust-card--line-height: 1.4;
-  --text-stardust-body: 0.8125rem;
-  --text-stardust-body--line-height: 1.5;
-  --radius-composer-control: 0.4375rem;
   /* Two steps below Tailwind's text-xs (12px) for dense UI: metadata rows,
      badges, counters, keyboard hints and diagnostics tables. 2xs is 11px,
      3xs is 10px. Provider icon overlays use 4xs (8px) and 5xs (7px) to fit
@@ -243,8 +225,7 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
   --animate-skeleton: skeleton 2.4s infinite;
   /* Duty-cycled indicator animations: long holds with stepped ramps, so the
      compositor updates discrete frames instead of every vsync. */
-  /* Running dots stay lit without pulsing: the pulse repainted for as long as a thread ran (~4% CPU). */
-  --animate-status-pulse: none;
+  --animate-status-pulse: status-pulse 2s infinite;
   --animate-status-ping: status-ping 2s infinite;
   /* Stash pulses hold a highlight for 1.2s; the row then eases back over 200ms, the count snaps.
      The row alternates two identical keyframes so each stash restarts it without a remount. */
@@ -272,7 +253,6 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
   --color-diff-deletion-foreground: var(--diff-deletion-foreground);
   --color-info-foreground: var(--info-foreground);
   --color-info: var(--info);
-  --color-annotation: #0a7cff;
   --color-guest: var(--guest);
   --color-guest-foreground: var(--guest-foreground);
   --color-guest-surface: var(--guest-surface);
@@ -552,61 +532,6 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
     var(--app-scrollbar-width) 100%;
 }
 
-/* Smooth 48px alpha fade above the floating composer so scrolled content never hard-clips. */
-.messages-timeline-scroll.composer-bottom-fade {
-  --composer-bottom-mask: linear-gradient(
-    to top,
-    transparent 0,
-    transparent max(0px, calc(var(--composer-fade-d, 0px) - 8px)),
-    rgb(0 0 0 / 16%) calc(var(--composer-fade-d, 0px) + 4px),
-    rgb(0 0 0 / 50%) calc(var(--composer-fade-d, 0px) + 16px),
-    rgb(0 0 0 / 84%) calc(var(--composer-fade-d, 0px) + 28px),
-    black calc(var(--composer-fade-d, 0px) + 40px)
-  );
-  -webkit-mask-image: var(--composer-bottom-mask), linear-gradient(black, black);
-  -webkit-mask-position: left, right;
-  -webkit-mask-repeat: no-repeat;
-  -webkit-mask-size:
-    calc(100% - var(--app-scrollbar-width)) 100%,
-    var(--app-scrollbar-width) 100%;
-  mask-image: var(--composer-bottom-mask), linear-gradient(black, black);
-  mask-position: left, right;
-  mask-repeat: no-repeat;
-  mask-size:
-    calc(100% - var(--app-scrollbar-width)) 100%,
-    var(--app-scrollbar-width) 100%;
-}
-.messages-timeline-scroll.topbar-scroll-fade.composer-bottom-fade {
-  --composer-top-bottom-mask: linear-gradient(
-    to bottom,
-    transparent 0%,
-    rgb(0 0 0 / 10%) calc(var(--workspace-titlebar-scroll-fade-height) * 0.1),
-    rgb(0 0 0 / 30%) calc(var(--workspace-titlebar-scroll-fade-height) * 0.24),
-    rgb(0 0 0 / 58%) calc(var(--workspace-titlebar-scroll-fade-height) * 0.42),
-    rgb(0 0 0 / 82%) calc(var(--workspace-titlebar-scroll-fade-height) * 0.62),
-    rgb(0 0 0 / 96%) calc(var(--workspace-titlebar-scroll-fade-height) * 0.82),
-    black var(--workspace-titlebar-scroll-fade-height),
-    black calc(100% - var(--composer-fade-d, 0px) - 40px),
-    rgb(0 0 0 / 84%) calc(100% - var(--composer-fade-d, 0px) - 28px),
-    rgb(0 0 0 / 50%) calc(100% - var(--composer-fade-d, 0px) - 16px),
-    rgb(0 0 0 / 16%) calc(100% - var(--composer-fade-d, 0px) - 4px),
-    transparent calc(100% - max(0px, calc(var(--composer-fade-d, 0px) - 8px))),
-    transparent 100%
-  );
-  -webkit-mask-image: var(--composer-top-bottom-mask), linear-gradient(black, black);
-  -webkit-mask-position: left, right;
-  -webkit-mask-repeat: no-repeat;
-  -webkit-mask-size:
-    calc(100% - var(--app-scrollbar-width)) 100%,
-    var(--app-scrollbar-width) 100%;
-  mask-image: var(--composer-top-bottom-mask), linear-gradient(black, black);
-  mask-position: left, right;
-  mask-repeat: no-repeat;
-  mask-size:
-    calc(100% - var(--app-scrollbar-width)) 100%,
-    var(--app-scrollbar-width) 100%;
-}
-
 /* Virtualizers own their native scroll element, so they cannot use ScrollArea's
    viewport fade. Keep the scrollbar lane opaque while sharing the same fade
    contract across those lists. */
@@ -647,6 +572,35 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
       color-mix(in srgb, var(--stage-fade) 96%, transparent) 85%,
       var(--stage-fade) 93%
     );
+  }
+}
+
+@keyframes live-tool-shine {
+  from {
+    background-position:
+      -4.5rem 0,
+      0 0;
+  }
+  to {
+    background-position:
+      calc(100% + 4.5rem) 0,
+      0 0;
+  }
+}
+
+@utility live-tool-shine {
+  @media (prefers-reduced-motion: no-preference) and (forced-colors: none) {
+    color: transparent;
+    background-image:
+      linear-gradient(to right, transparent, var(--contrast-foreground), transparent),
+      linear-gradient(var(--contrast-secondary-label), var(--contrast-secondary-label));
+    background-size:
+      4.5rem 100%,
+      100% 100%;
+    background-repeat: no-repeat;
+    background-clip: text;
+    animation: live-tool-shine 2.2s steps(30) infinite;
+    animation-play-state: var(--visible-animation-state, paused);
   }
 }
 
@@ -977,77 +931,7 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
     --stage-night-line: color-mix(in oklch, var(--stage-art-line) 82%, oklch(1 0 0));
   }
 
-  html[data-theme-id="harbor"] {
-    --stage-art-top: #5b7fb8;
-    --stage-art-mid: #36578f;
-    --stage-art-bottom: #1d3460;
-    --stage-art-highlight: #fff1d6;
-    --stage-art-secondary: #8fb0de;
-    --stage-art-tertiary: #ffbe5a;
-    --stage-art-line: #ffe7b8;
-    --stage-night-top: #2a4a7f;
-    --stage-night-mid: #1d3a6b;
-    --stage-night-bottom: #0f1f3d;
-    --stage-night-highlight: #ffd38a;
-    --stage-night-secondary: #6f8fc6;
-    --stage-night-tertiary: #ffbe5a;
-    --stage-night-line: #ffe2a8;
-
-    @variant dark {
-      --stage-art-top: #2a4a7f;
-      --stage-art-mid: #1d3a6b;
-      --stage-art-bottom: #0f1f3d;
-      --stage-art-highlight: #ffd38a;
-      --stage-art-secondary: #6f8fc6;
-      --stage-art-tertiary: #ffbe5a;
-      --stage-art-line: #ffe2a8;
-      --stage-night-top: #1b3159;
-      --stage-night-mid: #132648;
-      --stage-night-bottom: #0a1529;
-      --stage-night-highlight: #ffcf7a;
-      --stage-night-secondary: #56739f;
-      --stage-night-tertiary: #f0a93f;
-      --stage-night-line: #ffd99a;
-    }
-  }
-
-  html[data-theme-id="mist"] {
-    --stage-art-top: #dbe8f5;
-    --stage-art-mid: #a9c4e4;
-    --stage-art-bottom: #6f95c9;
-    --stage-art-highlight: #ffffff;
-    --stage-art-secondary: #c2d6ee;
-    --stage-art-tertiary: #eadcbc;
-    --stage-art-line: #f6f9fc;
-    --stage-night-top: #8faed6;
-    --stage-night-mid: #6a8dbd;
-    --stage-night-bottom: #46689a;
-    --stage-night-highlight: #eef4fb;
-    --stage-night-secondary: #a9c4e4;
-    --stage-night-tertiary: #d9c9a3;
-    --stage-night-line: #e6eef8;
-
-    @variant dark {
-      --stage-art-top: #4a6588;
-      --stage-art-mid: #33496a;
-      --stage-art-bottom: #1c2a40;
-      --stage-art-highlight: #dce8f7;
-      --stage-art-secondary: #6b8fbf;
-      --stage-art-tertiary: #c9b48a;
-      --stage-art-line: #e6eef8;
-      --stage-night-top: #33496a;
-      --stage-night-mid: #24364f;
-      --stage-night-bottom: #141f30;
-      --stage-night-highlight: #c8d9ef;
-      --stage-night-secondary: #55759f;
-      --stage-night-tertiary: #b39f75;
-      --stage-night-line: #d6e2f2;
-    }
-  }
-
   :is(
-    html[data-theme-id="harbor"],
-    html[data-theme-id="mist"],
     html[data-theme-id="t3-chat"],
     html[data-theme-id="grove"],
     html[data-theme-id="ocean"],
@@ -1281,7 +1165,7 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
   --secondary: var(--color-zinc-50);
   --secondary-foreground: var(--color-zinc-800);
   --muted: var(--color-zinc-50);
-  --muted-foreground: var(--color-zinc-600);
+  --muted-foreground: var(--color-zinc-500);
   --placeholder: var(--muted-foreground);
   --secondary-label: var(--muted-foreground);
   --icon-muted: var(--muted-foreground);
@@ -1388,12 +1272,12 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
   --accent: var(--color-zinc-100);
   --accent-foreground: var(--color-zinc-900);
   --muted: var(--color-zinc-50);
-  --muted-foreground: var(--color-zinc-600);
+  --muted-foreground: var(--color-zinc-500);
   --border: var(--color-zinc-200);
   --input: var(--color-zinc-300);
   --sidebar: var(--color-zinc-50);
   --sidebar-foreground: var(--color-zinc-900);
-  --sidebar-muted-foreground: var(--color-zinc-600);
+  --sidebar-muted-foreground: var(--color-zinc-500);
   --sidebar-control-surface: var(--color-zinc-100);
   --sidebar-row-hover: var(--color-zinc-25);
   --sidebar-row-active: var(--color-white);
@@ -2827,304 +2711,6 @@ code {
   outline-offset: -2px;
 }
 
-/*
- * Phone touch targets: only on touch screens (a narrow desktop window keeps its density),
- * inside a layer with zero-specificity selectors so explicit Tailwind sizes still win.
- * Switches keep their track shape and inline chips stay inline with the text.
- */
-@layer components {
-  @media (max-width: 767px) and (pointer: coarse) {
-    :where(
-      button,
-      [role="button"],
-      [role="combobox"],
-      [role="tab"],
-      [data-slot="sidebar-menu-button"]
-    ):not(:where([role="switch"], [data-slot="switch"], [data-slot^="context-chip"])) {
-      min-height: 40px;
-      min-width: 40px;
-    }
-  }
-}
-
-/* Menu items set their own min-height utility, so this one rule must sit outside the layer. */
-@media (max-width: 767px) and (pointer: coarse) {
-  [data-slot="menu-item"] {
-    min-height: 40px;
-  }
-}
-
-/* The web phone surface reuses the existing md sidebar breakpoint. */
-@media (max-width: 767px) {
-  [data-context-handoff] {
-    min-width: 0;
-    overflow-wrap: anywhere;
-  }
-  [data-context-handoff] > span {
-    flex-basis: 100%;
-  }
-  /* Full-screen details cover workspace controls but stay below dialogs. */
-  body:has([data-thread-details-panel="mobile"]) [data-workspace-titlebar-controls],
-  body:has([data-thread-details-panel="mobile"]) [data-sidebar-control] {
-    z-index: 45;
-  }
-  [data-thread-details-panel="mobile"] {
-    min-width: 0;
-    padding-bottom: env(safe-area-inset-bottom);
-  }
-  [data-thread-details-panel="mobile"] pre {
-    overflow-wrap: anywhere;
-  }
-  [data-artifact-id] .opacity-0 {
-    opacity: 1;
-  }
-  [data-artifact-wall] [data-artifact-scroll] {
-    max-height: 45dvh;
-  }
-}
-
-/* Sidebar overrides stay local; absent size/color choices preserve the existing tokens. */
-[data-app-sidebar] {
-  font-family: var(--font-sidebar, var(--font-sans));
-}
-html[data-sidebar-font-size] [data-app-sidebar] {
-  font-size: var(--font-size-sidebar);
-  --text-3xs: calc(var(--font-size-sidebar) * 0.625);
-  --text-2xs: calc(var(--font-size-sidebar) * 0.6875);
-  --text-xs: calc(var(--font-size-sidebar) * 0.75);
-  --text-sm: calc(var(--font-size-sidebar) * 0.875);
-  --text-base: var(--font-size-sidebar);
-  --text-lg: calc(var(--font-size-sidebar) * 1.125);
-  --text-xl: calc(var(--font-size-sidebar) * 1.25);
-}
-html[data-sidebar-text-light="high-contrast"]:not(.dark) [data-app-sidebar] {
-  --sidebar-preset-title: #0f172a;
-  --sidebar-preset-secondary: #334155;
-}
-html.dark[data-sidebar-text-dark="high-contrast"] [data-app-sidebar] {
-  --sidebar-preset-title: #ffffff;
-  --sidebar-preset-secondary: #cbd5e1;
-}
-html[data-sidebar-text-light="high-contrast"]:not(.dark) [data-app-sidebar],
-html.dark[data-sidebar-text-dark="high-contrast"] [data-app-sidebar] {
-  /* Use the current theme's light/dark surfaces; keep contrast independent of the global slider. */
-  --contrast-sidebar-foreground: var(--sidebar-preset-title);
-  --contrast-sidebar-muted-foreground: var(--sidebar-preset-secondary);
-  --contrast-foreground: var(--sidebar-preset-title);
-  --contrast-muted-foreground: var(--sidebar-preset-secondary);
-  color: var(--sidebar-preset-title);
-  & [class*="text-sidebar-muted-foreground"],
-  & [class*="text-muted-foreground"] {
-    color: var(--sidebar-preset-secondary);
-  }
-  & [class*="text-sidebar-foreground"],
-  & [class*="text-foreground"] {
-    color: var(--sidebar-preset-title);
-  }
-}
-
-/* These custom Tailwind steps are inlined, so override their utilities as well. */
-html[data-sidebar-font-size] [data-app-sidebar] .text-3xs {
-  font-size: calc(var(--font-size-sidebar) * 0.625);
-}
-html[data-sidebar-font-size] [data-app-sidebar] .text-2xs {
-  font-size: calc(var(--font-size-sidebar) * 0.6875);
-}
-
 .messages-timeline-scroll:focus-visible {
   outline: none;
-}
-
-.stardust-nebula {
-  background:
-    radial-gradient(ellipse at 35% 40%, rgba(91, 140, 255, 0.1), transparent 48%),
-    radial-gradient(ellipse at 65% 45%, rgba(155, 123, 255, 0.09), transparent 48%);
-}
-.stardust-star {
-  opacity: 0.3;
-  animation: stardust-arrival 1.3s cubic-bezier(0.3, 0.7, 0.2, 1) both;
-}
-@keyframes stardust-arrival {
-  0% {
-    opacity: 0;
-    transform: scale(0.2);
-  }
-  40% {
-    opacity: 0.9;
-    transform: scale(1.5);
-  }
-  100% {
-    opacity: 0.3;
-    transform: scale(1);
-  }
-}
-.stardust-project-name {
-  background: linear-gradient(90deg, #4d7dff, #8b6bff, #d86fb4);
-  background-clip: text;
-  color: transparent;
-}
-.stardust-project-name [data-draft-project-trigger] {
-  color: inherit;
-  border: 0;
-}
-[data-stardust-newchat] [data-testid="composer-editor"] {
-  min-height: 64px;
-}
-[data-stardust-heading] svg {
-  stroke-width: 1.6;
-}
-.stardust-resume-tile {
-  transition: transform 0.2s cubic-bezier(0.3, 0.7, 0.2, 1);
-}
-.stardust-resume-tile:hover {
-  transform: translateY(-2px);
-}
-[data-theme-id="apple"] .stardust-resume-tile {
-  box-shadow: var(--apple-card-shadow);
-}
-@media (prefers-reduced-motion: reduce) {
-  .stardust-star {
-    animation: none;
-  }
-  .stardust-resume-tile {
-    transition: none;
-  }
-}
-
-@utility usage-grow {
-  transform-origin: left;
-}
-@utility usage-motion {
-  min-width: 0;
-}
-
-/* C72 composer attention strip. */
-.inbox-strip-wrap {
-  overflow: clip;
-  max-height: 220px;
-  opacity: 1;
-  transform: translateY(0);
-  transition:
-    opacity 0.28s cubic-bezier(0.3, 0.7, 0.2, 1),
-    transform 0.28s cubic-bezier(0.3, 0.7, 0.2, 1),
-    max-height 0.28s cubic-bezier(0.3, 0.7, 0.2, 1);
-  border-bottom: 1px solid var(--border);
-}
-.inbox-strip-leaving {
-  opacity: 0;
-  transform: translateY(6px);
-  max-height: 0;
-  pointer-events: none;
-}
-@utility inbox-strip-line {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 36px;
-  padding: 5px 10px;
-  font-size: 12.5px;
-  color: var(--muted-foreground);
-}
-.inbox-strip-line strong {
-  font-weight: 600;
-  white-space: nowrap;
-  color: var(--foreground);
-}
-@utility inbox-strip-dot {
-  width: 5px;
-  height: 5px;
-  flex: none;
-  border-radius: 50%;
-  background: #d99844;
-}
-.inbox-strip-dot-new {
-  background: var(--primary);
-}
-@utility inbox-strip-sentence {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-@utility inbox-strip-link {
-  color: var(--primary);
-  white-space: nowrap;
-  cursor: pointer;
-}
-@utility inbox-strip-primary {
-  border: 1px solid transparent;
-  border-radius: 6px;
-  padding: 3px 8px;
-  color: #fff;
-  background: #007aff;
-  white-space: nowrap;
-  cursor: pointer;
-}
-@utility inbox-strip-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  border-radius: 5px;
-  flex: none;
-  cursor: pointer;
-}
-.inbox-strip-icon svg {
-  width: 14px;
-  height: 14px;
-  stroke-width: 1.5;
-}
-.inbox-strip-icon:hover {
-  background: var(--muted);
-}
-.inbox-strip-primary:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-.inbox-strip-line button:focus-visible {
-  outline: 2px solid var(--ring);
-  outline-offset: 2px;
-}
-@utility inbox-strip-hint {
-  display: flex;
-  gap: 5px;
-  align-items: center;
-  padding: 0 12px 6px;
-  font-size: 10px;
-  color: var(--muted-foreground);
-}
-.inbox-strip-hint svg {
-  width: 12px;
-  height: 12px;
-  color: var(--primary);
-}
-@utility inbox-strip-details {
-  padding: 4px 12px 9px;
-  font-size: 11px;
-  line-height: 1.65;
-  color: var(--muted-foreground);
-}
-.inbox-strip-error {
-  padding: 4px 12px;
-  color: var(--destructive);
-  font-size: 11px;
-}
-@media (max-width: 540px) {
-  .inbox-strip-line {
-    gap: 5px;
-  }
-  .inbox-strip-sentence {
-    max-width: 18vw;
-  }
-  .inbox-strip-primary {
-    padding: 3px 5px;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .inbox-strip-wrap {
-    transition: none;
-    transform: none;
-  }
 }

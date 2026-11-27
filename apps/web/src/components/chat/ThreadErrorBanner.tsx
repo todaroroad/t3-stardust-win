@@ -1,8 +1,3 @@
-
-import { uiText } from "~/i18n";
-import { conversationLabel } from "~/i18n/conversationLabel";
-import { Tooltip, TooltipTrigger, TooltipPopup } from "../ui/tooltip";
-
 import type { OrchestrationV2ProviderFailureClass } from "@t3tools/contracts";
 import {
   CHATGPT_USAGE_LIMIT_CODE,
@@ -97,8 +92,6 @@ export const ThreadErrorBanner = memo(function ThreadErrorBanner({
 }) {
   const gt = useGT();
   if (!error) return null;
-  const message = getThreadErrorBannerMessage(error);
-  const localized = conversationLabel(message, uiText);
   const workspaceLimit = errorCode === CHATGPT_WORKSPACE_USAGE_LIMIT_CODE;
   const chatGptLimit = workspaceLimit || errorCode === CHATGPT_USAGE_LIMIT_CODE;
   const variant = errorClass === "usage_limit" || chatGptLimit ? "warning" : "error";
@@ -124,17 +117,8 @@ export const ThreadErrorBanner = memo(function ThreadErrorBanner({
                 </p>
               ) : null}
             </div>
-          ) : localized !== message && /MCP server requires OAuth/.test(message) ? (
-            <Tooltip>
-              <TooltipTrigger render={<span />}>{localized}</TooltipTrigger>
-              <TooltipPopup>{message}</TooltipPopup>
-            </Tooltip>
           ) : (
-            <ExpandableText
-              text={error}
-              collapsedText={localized}
-              expandLabel={uiText("Show full error")}
-            />
+            <ExpandableText text={error} collapsedText={getThreadErrorBannerMessage(error)} />
           )}
         </AlertDescription>
         {(chatGptLimit || onDismiss) && (

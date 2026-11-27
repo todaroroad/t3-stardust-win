@@ -17,13 +17,9 @@ import {
   ShieldOffIcon,
 } from "lucide-react";
 
-import type { ComponentType, SVGProps } from "react";
-
-export type RuntimeModeIconComponent = LucideIcon | ComponentType<SVGProps<SVGSVGElement>>;
-
 export const runtimeModeConfig: Record<
   RuntimeMode,
-  { label: string; description: string; icon: RuntimeModeIconComponent }
+  { label: string; description: string; icon: LucideIcon }
 > = {
   "approval-required": {
     label: msg("Supervised", { $context: "permission mode, agent asks before acting" }),
@@ -109,7 +105,7 @@ export function resolveRuntimeModeOption(
   mode: RuntimeMode;
   label: string;
   description: string;
-  icon: RuntimeModeIconComponent;
+  icon: LucideIcon;
   disabledReason?: string;
 } {
   const config = runtimeModeConfig[mode];

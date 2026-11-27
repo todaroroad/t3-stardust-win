@@ -1,5 +1,3 @@
-import { GTProvider } from "gt-react";
-import { readUiLocale } from "../src/i18n";
 import {
   createMemoryHistory,
   createRootRoute,
@@ -78,19 +76,8 @@ export async function render(
   const router = path === false ? undefined : createTestRouter(path);
   // The router element is created once so a rerender updates the tree instead of remounting it.
   const routerElement = router && <RouterProvider router={router} />;
-  const chinese =
-    readUiLocale() === "zh-CN" ? (await import("../src/i18n/translations/zh.json")).default : null;
-  const wrap = (node: ReactNode) => {
-    const content = routerElement ? <RoutedUi value={node}>{routerElement}</RoutedUi> : node;
-    return (
-      <GTProvider
-        locale={chinese ? "zh" : "en"}
-        translations={(chinese ? { zh: chinese, en: {} } : { en: {} }) as never}
-      >
-        {content}
-      </GTProvider>
-    );
-  };
+  const wrap = (node: ReactNode) =>
+    routerElement ? <RoutedUi value={node}>{routerElement}</RoutedUi> : node;
 
   let mounted = true;
   const unmount = async () => {

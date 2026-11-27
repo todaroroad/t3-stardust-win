@@ -109,7 +109,6 @@ import { readLocalApi } from "../localApi";
 import { configuredHostedAppUrl } from "../hostedPairing";
 import { useSidebarPendingFileDropStore } from "../sidebarPendingFileDropStore";
 import { SidebarFolderDrop } from "./sidebar/SidebarFolderDrop";
-import { SidebarProjectRail } from "./sidebar/SidebarProjectRail";
 import {
   pickableProjectGroups,
   selectProjectGroupingSettings,
@@ -346,8 +345,6 @@ const EMPTY_DRAFT_IDS: readonly DraftId[] = [];
 
 const SETTLED_TAIL_INITIAL_COUNT = 10;
 const SETTLED_TAIL_PAGE_COUNT = 25;
-const PINNED_SHELF_EXPANDED_KEY = "t3code:sidebar:pinned-expanded";
-const ACTIVE_SHELF_EXPANDED_KEY = "t3code:sidebar:active-expanded";
 const SETTLED_SHELF_EXPANDED_KEY = "t3code:sidebar:settled-expanded";
 const SNOOZED_SHELF_EXPANDED_KEY = "t3code:sidebar:snoozed-expanded";
 const WORKING_SHELF_EXPANDED_KEY = "t3code:sidebar:working-expanded";
@@ -471,16 +468,6 @@ function useSidebarThreads(input: {
   const nowMinute = useNowMinute();
   // Minute-quantized clocks would delay second-precise snooze wakes by up to a minute.
   const snoozeWakeClock = useSnoozeWakeClock(threads);
-  const [pinnedShelfExpanded, setPinnedShelfExpanded] = useLocalStorage(
-    PINNED_SHELF_EXPANDED_KEY,
-    true,
-    Schema.Boolean,
-  );
-  const [activeShelfExpanded, setActiveShelfExpanded] = useLocalStorage(
-    ACTIVE_SHELF_EXPANDED_KEY,
-    true,
-    Schema.Boolean,
-  );
   const [settledShelfExpanded, setSettledShelfExpanded] = useLocalStorage(
     SETTLED_SHELF_EXPANDED_KEY,
     false,
@@ -555,12 +542,6 @@ function useSidebarThreads(input: {
   const visibleWorkingThreads = workingShelfExpanded
     ? workingThreads
     : routeThreadOnly(workingThreads, routeRowThreadKey);
-  const visiblePinnedThreads = pinnedShelfExpanded
-    ? pinnedThreads
-    : routeThreadOnly(pinnedThreads, routeRowThreadKey);
-  const visibleActiveThreads = activeShelfExpanded
-    ? activeThreads
-    : routeThreadOnly(activeThreads, routeRowThreadKey);
   const projectFolders =
     folderGroups === null
       ? null
@@ -582,9 +563,9 @@ function useSidebarThreads(input: {
           };
         });
   const orderedThreads = [
-    ...visiblePinnedThreads,
+    ...pinnedThreads,
     ...(projectFolders === null
-      ? visibleActiveThreads
+      ? activeThreads
       : projectFolders.flatMap((folder) => folder.threads)),
     ...visibleWorkingThreads,
     ...visibleSnoozedThreads,
@@ -620,10 +601,6 @@ function useSidebarThreads(input: {
         scopeKey: current.scopeKey,
         count: current.count + SETTLED_TAIL_PAGE_COUNT,
       })),
-    pinnedShelfExpanded,
-    togglePinnedShelf: () => setPinnedShelfExpanded((value) => !value),
-    activeShelfExpanded,
-    toggleActiveShelf: () => setActiveShelfExpanded((value) => !value),
     settledShelfExpanded,
     toggleSettledShelf: () => setSettledShelfExpanded((value) => !value),
     snoozedShelfExpanded,
@@ -635,8 +612,6 @@ function useSidebarThreads(input: {
       const keys = sidebarFolderExpansionKeys(group);
       setProjectExpanded(keys, !resolveProjectExpanded(projectExpandedById, keys));
     },
-    visiblePinnedThreads,
-    visibleActiveThreads,
     renderedSettledThreads,
     visibleSnoozedThreads,
     visibleWorkingThreads,
@@ -990,9 +965,6 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     deleteThread,
   } = useThreadActions();
   const updateThreadMetadata = useOrchestrationCommand(threadEnvironment.updateMetadata, {
-    reportFailure: false,
-  });
-  const interruptThreadTurn = useOrchestrationCommand(threadEnvironment.interruptTurn, {
     reportFailure: false,
   });
   const regenerateThreadTitle = useOrchestrationCommand(threadEnvironment.regenerateTitle, {
@@ -1376,10 +1348,6 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     olderSettledShelf,
     hiddenSettledCount,
     showMoreSettled,
-    pinnedShelfExpanded,
-    togglePinnedShelf,
-    activeShelfExpanded,
-    toggleActiveShelf,
     settledShelfExpanded,
     toggleSettledShelf,
     snoozedShelfExpanded,
@@ -1388,8 +1356,6 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     toggleWorkingShelf,
     projectFolders,
     toggleProjectFolder,
-    visiblePinnedThreads,
-    visibleActiveThreads,
     renderedSettledThreads,
     visibleSnoozedThreads,
     visibleWorkingThreads,
@@ -1981,61 +1947,6 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
       }
     })();
   };
-  // V12: the hover row actions and the context menu share one archive path (confirm setting included).
-  const archiveSidebarThread = useStableCallback(async (threadRef: ScopedThreadRef) => {
-    const thread = threadByKeyRef.current.get(scopedThreadKey(threadRef));
-    if (!thread) return;
-    if (confirmThreadArchive) {
-      const api = readLocalApi();
-      if (!api) return;
-      const confirmed = await settlePromise(() =>
-        api.dialogs.confirm(`Archive thread "${thread.title}"?`),
-      );
-      if (confirmed._tag === "Failure" || !confirmed.value) return;
-    }
-    let didArchive = false;
-    const result = await archiveThread(threadRef, {
-      onArchived: () => {
-        didArchive = true;
-      },
-    });
-    if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
-      const error = squashAtomCommandFailure(result);
-      toastManager.add(
-        stackedThreadToast({
-          type: "error",
-          title: didArchive ? "Thread archived, but navigation failed" : "Failed to archive thread",
-          description: error instanceof Error ? error.message : "An error occurred.",
-        }),
-      );
-    }
-  });
-  const attemptArchive = (threadRef: ScopedThreadRef) => {
-    const thread = threadByKeyRef.current.get(scopedThreadKey(threadRef));
-    if (!thread || !checkThreadOperations([thread])) return;
-    void archiveSidebarThread(threadRef);
-  };
-  // V12: stop a running thread straight from its sidebar row.
-  const attemptStop = (threadRef: ScopedThreadRef) => {
-    const thread = threadByKeyRef.current.get(scopedThreadKey(threadRef));
-    if (!thread || !checkThreadOperations([thread])) return;
-    void (async () => {
-      const result = await interruptThreadTurn({
-        environmentId: threadRef.environmentId,
-        input: { threadId: threadRef.threadId },
-      });
-      if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
-        const error = squashAtomCommandFailure(result);
-        toastManager.add(
-          stackedThreadToast({
-            type: "error",
-            title: "Failed to stop thread",
-            description: error instanceof Error ? error.message : "An error occurred.",
-          }),
-        );
-      }
-    })();
-  };
   const attemptUnpin = (threadRef: ScopedThreadRef) => {
     void (async () => {
       const result = await confirmAndUnpinThread(threadRef);
@@ -2065,11 +1976,8 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     if (list && header) {
       const listRect = list.getBoundingClientRect();
       const scale = list.offsetWidth > 0 ? listRect.width / list.offsetWidth : 1;
-      const headerRect = header.getBoundingClientRect();
       dragLabelOffsetRef.current =
-        headerRect.top -
-        listRect.top +
-        (headerRect.height > 0 ? headerRect.height : SIDEBAR_DRAG_LABEL_HEIGHT * scale);
+        header.getBoundingClientRect().top - listRect.top + SIDEBAR_DRAG_LABEL_HEIGHT * scale;
     } else {
       dragLabelOffsetRef.current = 0;
     }
@@ -2106,10 +2014,10 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
       return [];
     }
     const items: SidebarListItem[] = [{ kind: "marker", marker: "pinned-header" }];
-    const pinnedRows = rowsOf(visiblePinnedThreads, "pinned");
+    const pinnedRows = rowsOf(pinnedThreads, "pinned");
     items.push(...pinnedRows);
     items.push({ kind: "marker", marker: "pinned-divider" });
-    const activeRows = rowsOf(projectFolders === null ? visibleActiveThreads : activeThreads, "active");
+    const activeRows = rowsOf(activeThreads, "active");
     items.push({ kind: "marker", marker: "active-placeholder" });
     items.push(...activeRows);
     if (workingThreads.length > 0) {
@@ -2161,13 +2069,9 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     dragState === null && sidebarListItems.length + visibleDraftSessionCount > 0;
   // Cache on both fields so layout-key changes trigger the effect even when animate is unchanged.
   const listMotionPass = { layoutKey: listMotionLayoutKey, animate: listMotionAnimate };
-  const shelfExpansionKey = [
-    pinnedShelfExpanded,
-    activeShelfExpanded,
-    workingShelfExpanded,
-    snoozedShelfExpanded,
-    settledShelfExpanded,
-  ].join(":");
+  const shelfExpansionKey = [workingShelfExpanded, snoozedShelfExpanded, settledShelfExpanded].join(
+    ":",
+  );
   const previousShelfExpansionKeyRef = useRef(shelfExpansionKey);
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- records moved rows and updates list motion after each layout-affecting commit
   useLayoutEffect(() => {
@@ -3013,9 +2917,34 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
           case "copy-thread-id":
             copyThreadIdToClipboard(thread.id, { threadId: thread.id });
             return;
-          case "archive":
-            await archiveSidebarThread(threadRef);
+          case "archive": {
+            if (confirmThreadArchive) {
+              const confirmed = await settlePromise(() =>
+                api.dialogs.confirm(gt('Archive thread "{title}"?', { title: thread.title })),
+              );
+              if (confirmed._tag === "Failure" || !confirmed.value) return;
+            }
+            let didArchive = false;
+            const result = await archiveThread(threadRef, {
+              onArchived: () => {
+                didArchive = true;
+              },
+            });
+            if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
+              const error = squashAtomCommandFailure(result);
+              toastManager.add(
+                stackedThreadToast({
+                  type: "error",
+                  title: didArchive
+                    ? gt("Thread archived, but navigation failed")
+                    : gt("Failed to archive thread"),
+                  description: thrownErrorMessage(error, m) ?? gt("An error occurred."),
+                }),
+              );
+              return;
+            }
             return;
+          }
           case "delete": {
             if (confirmThreadDelete) {
               const confirmed = await settlePromise(() =>
@@ -3158,31 +3087,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
   return (
     <SidebarFolderDrop>
       <SidebarChromeHeader isElectron={isElectron} />
-      <div className="flex min-h-0 flex-1 flex-row overflow-hidden">
-        {scopeGroups.length > 0 ? (
-          <SidebarProjectRail
-            projects={scopeGroups}
-            threads={listedThreads}
-            delegatedUnderParent={delegatedUnderParent}
-            serverConfigs={serverConfigs}
-            selectedProjectKeys={projectScopeKeys}
-            onSelectAll={() => setProjectScopeKeys([])}
-            onSelectProject={(projectKey, additive) => {
-              if (additive) {
-                toggleProjectScopeKey(projectKey);
-              } else {
-                setProjectScopeKeys([projectKey]);
-              }
-            }}
-            onStartThreadInProject={startThreadInProjectFolder}
-            onOpenProjectSettings={openProjectSettings}
-            onAddProject={openAddProjectCommandPalette}
-            canPinProject={canPinProject}
-            onTogglePinProject={toggleProjectGroupPin}
-          />
-        ) : null}
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-          <SidebarContent
+      <SidebarContent
         ref={sidebarContentRef}
         className="min-h-full"
         fixedHeader={
@@ -3627,11 +3532,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                           variant={rowVariant}
                           navigationParent={
                             folderRow ??
-                            (section === "pinned" ||
-                            section === "active" ||
-                            section === "working" ||
-                            section === "snoozed" ||
-                            section === "settled"
+                            (section === "working" || section === "snoozed" || section === "settled"
                               ? `shelf:${section}`
                               : undefined)
                           }
@@ -3702,9 +3603,6 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                           onSnooze={attemptSnooze}
                           onUnsnooze={attemptUnsnooze}
                           onUnpin={attemptUnpin}
-                          onPin={attemptPin}
-                          onArchive={attemptArchive}
-                          onStop={attemptStop}
                           onAcknowledgeWoke={acknowledgeWoke}
                           onFileDropThreads={handleThreadFileDrop}
                         />
@@ -3760,55 +3658,24 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                       switch (item.marker) {
                         case "pinned-header":
                           items.push(
-                            pinnedThreads.length > 0 ? (
-                              <SidebarSectionHeader
-                                key="pinned-shelf-header"
-                                marker="pinned-header"
-                                label={gt("Pinned", { $context: "sidebar section" })}
-                                count={pinnedThreads.length}
-                                dragging={from !== null}
-                                isDropTarget={dragTargetSection === "pinned"}
-                                toggle={{
-                                  expanded: pinnedShelfExpanded,
-                                  onToggle: togglePinnedShelf,
-                                }}
-                              />
-                            ) : (
-                              <SidebarDragBoundary
-                                key="pinned-header"
-                                marker="pinned-header"
-                                label={gt("Pinned", { $context: "sidebar section" })}
-                                visible={from !== null}
-                                isDropTarget={dragTargetSection === "pinned"}
-                              />
-                            ),
+                            <SidebarDragBoundary
+                              key="pinned-header"
+                              marker="pinned-header"
+                              label={gt("Pinned", { $context: "sidebar section" })}
+                              visible={from !== null}
+                              isDropTarget={dragTargetSection === "pinned"}
+                            />,
                           );
                           break;
                         case "pinned-divider":
                           items.push(
-                            projectFolders === null && activeThreads.length > 0 ? (
-                              <SidebarSectionHeader
-                                key="active-shelf-header"
-                                marker="pinned-divider"
-                                className={cn(pinnedThreads.length > 0 && "mt-1")}
-                                label={gt("Active", { $context: "sidebar section" })}
-                                count={activeThreads.length}
-                                dragging={from !== null}
-                                isDropTarget={dragTargetSection === "active"}
-                                toggle={{
-                                  expanded: activeShelfExpanded,
-                                  onToggle: toggleActiveShelf,
-                                }}
-                              />
-                            ) : (
-                              <SidebarDragBoundary
-                                key="pinned-divider"
-                                marker="pinned-divider"
-                                label={gt("Active", { $context: "sidebar section" })}
-                                visible={from !== null}
-                                isDropTarget={dragTargetSection === "active"}
-                              />
-                            ),
+                            <SidebarDragBoundary
+                              key="pinned-divider"
+                              marker="pinned-divider"
+                              label={gt("Active", { $context: "sidebar section" })}
+                              visible={from !== null}
+                              isDropTarget={dragTargetSection === "active"}
+                            />,
                           );
                           break;
                         case "active-placeholder":
@@ -3934,10 +3801,8 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
             </DndContext>
           ) : null}
         </SidebarGroup>
-          </SidebarContent>
-          <SidebarChromeFooter />
-        </div>
-      </div>
+      </SidebarContent>
+      <SidebarChromeFooter />
     </SidebarFolderDrop>
   );
 }

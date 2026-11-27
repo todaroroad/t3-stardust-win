@@ -1,5 +1,3 @@
-
-
 import type {
   EnvironmentId,
   PullRequestAction,
@@ -201,6 +199,7 @@ export function PullRequestResolveConflictsButton({
     />
   );
 }
+
 /** The header's one prominent control, which depends on where the pull request stands. */
 export function PullRequestPrimaryAction({
   pullRequestKey,

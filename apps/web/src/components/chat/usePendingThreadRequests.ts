@@ -1,5 +1,3 @@
-import { acknowledgeInboxMessage } from "../../inboxStrip";
-import { scopedThreadKey, scopeThreadRef } from "@t3tools/client-runtime/environment";
 import { msg } from "gt-react";
 import { thrownErrorMessage } from "@t3tools/client-runtime/errors";
 import { m } from "~/i18n/messages";
@@ -305,7 +303,6 @@ export function usePendingThreadRequests(input: {
   const dismissThreadUserInput = useAtomCommand(threadEnvironment.dismissUserInput, {
     reportFailure: false,
   });
-  const approvalResponsesInFlight = useRef(new Set<string>());
   const userInputResponsesInFlight = useRef(new Set<string>());
   // In the order the text went into the thread draft, which is how a copy is found again.
   const displacedAnswers = useRef<
@@ -367,9 +364,6 @@ export function usePendingThreadRequests(input: {
     )
       return;
 
-    const responseKey = `${environmentId}:${activeThreadId}:${requestId}`;
-    if (approvalResponsesInFlight.current.has(responseKey)) return;
-    approvalResponsesInFlight.current.add(responseKey);
     setRespondingRequestIds((existing) =>
       existing.includes(requestId) ? existing : [...existing, requestId],
     );
@@ -381,9 +375,6 @@ export function usePendingThreadRequests(input: {
         decision,
         ...(feedback === undefined ? {} : { feedback }),
       },
-    }).finally(() => {
-      approvalResponsesInFlight.current.delete(responseKey);
-      setRespondingRequestIds((existing) => existing.filter((id) => id !== requestId));
     });
     if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
       const error = squashAtomCommandFailure(result);
@@ -392,11 +383,7 @@ export function usePendingThreadRequests(input: {
         thrownErrorMessage(error, m) ?? m(msg("Failed to submit approval decision.")),
       );
     }
-    if (result._tag === "Success" && feedback)
-      acknowledgeInboxMessage(
-        scopedThreadKey(scopeThreadRef(environmentId, activeThreadId)),
-        feedback,
-      );
+    setRespondingRequestIds((existing) => existing.filter((id) => id !== requestId));
     return result;
   };
   const onRespondToApprovalStable = useStableCallback(onRespondToApproval);
@@ -504,11 +491,6 @@ export function usePendingThreadRequests(input: {
           thrownErrorMessage(error, m) ?? m(msg("Failed to submit user input.")),
         );
       }
-      if (result._tag === "Success")
-        acknowledgeInboxMessage(
-          scopedThreadKey(scopeThreadRef(environmentId, activeThreadId)),
-          JSON.stringify(providerAnswers),
-        );
       return result;
     };
     return prepareAndRespond().finally(() => {

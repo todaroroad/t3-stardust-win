@@ -100,16 +100,6 @@ describe("searchSettings", () => {
     }
   });
 
-  it("gives Storage & cleanup its own page next to Maintenance, found by search in both languages", () => {
-    const paths = settingsNavGroups(false).flatMap((group) => group.paths);
-    expect(paths[paths.indexOf("/settings/maintenance") + 1]).toBe("/settings/storage");
-    for (const query of ["storage", "cleanup", "disk space", "mole"]) {
-      expect(searchSettings(query)[0], query).toMatchObject({ to: "/settings/storage" });
-    }
-    expect(searchSettings("storage")[0]).toMatchObject({ id: "storage-tidy" });
-    expect(searchSettings("rescue first")[0]).toMatchObject({ to: "/settings/storage" });
-  });
-
   it("finds the Scheduled tasks page", () => {
     expect(searchSettings("scheduled tasks")[0]).toMatchObject({
       id: "scheduled-tasks",
@@ -413,8 +403,7 @@ describe("movedSettingsPath", () => {
     expect(movedSettingsPath("/settings/appearance", "diff-color-scheme")).toBe("/settings/diffs");
     expect(movedSettingsPath("/settings/connections", "network-access")).toBe("/settings/access");
     expect(movedSettingsPath("/settings/storage", "storage-worktrees")).toBe("/settings/worktrees");
-    expect(movedSettingsPath("/settings/storage", "")).toBeNull();
-    expect(movedSettingsPath("/settings/storage", "storage-tidy")).toBeNull();
+    expect(movedSettingsPath("/settings/storage", "")).toBe("/settings/maintenance");
     expect(movedSettingsPath("/settings/integrations", "devices")).toBe("/settings/devices");
     expect(movedSettingsPath("/settings/beta", "")).toBe("/settings/labs");
   });

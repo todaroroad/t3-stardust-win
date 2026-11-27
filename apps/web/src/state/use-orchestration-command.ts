@@ -17,7 +17,7 @@ import { m } from "../i18n/messages";
 import { readEnvironmentScope, readEnvironmentScopeDenied } from "./session";
 import { useAtomCommand } from "./use-atom-command";
 
-export const ORCHESTRATION_OPERATE_DENIED_MESSAGE = msg(
+const ORCHESTRATION_OPERATE_DENIED_MESSAGE = msg(
   "This connection cannot change threads or projects.",
 );
 

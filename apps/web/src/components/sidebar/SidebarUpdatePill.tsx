@@ -242,7 +242,9 @@ function SidebarUpdateControl() {
   const everything = useUpdateEverything(localUpdateVersion);
   const checkProviderUpdates = useCheckProviderUpdates();
   const runsEverything = everything.hasUpdates && !isDownloading;
-  const run = useUpdateEverythingRun();
+  // stardust: suppress remote server update capsule
+  void useUpdateEverythingRun;
+  const run = null as UpdateEverythingRun | null;
   const isRunningEverything = run !== null;
   const showCheckIcon = shouldShowDesktopUpdateCheckIcon({
     isAnimationLatched: isCheckAnimationLatched,

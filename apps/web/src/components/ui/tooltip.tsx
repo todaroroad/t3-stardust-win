@@ -115,7 +115,7 @@ function TooltipPositioner(props: TooltipPrimitive.Positioner.Props) {
   return (
     <TooltipPrimitive.Positioner
       className={cn(
-        "pointer-events-none z-[1000] max-w-(--available-width) transition-[top,left,right,bottom,transform] data-instant:transition-none",
+        "pointer-events-none z-[140] max-w-(--available-width) transition-[top,left,right,bottom,transform] data-instant:transition-none",
         // Defer repositioning until the popup's fade finishes when its trigger scrolls away.
         holdPositionOnExit && "data-closed:delay-(--default-transition-duration)",
       )}

@@ -21,7 +21,6 @@ import type { ThreadPanelPresentation } from "./rightPanelLayout";
 import type { ChatFileAttachment } from "./types";
 
 const RIGHT_PANEL_KINDS = [
-  "tasks",
   "diff",
   "files",
   "file",
@@ -46,7 +45,6 @@ export interface DeviceTabTarget {
 }
 
 export type RightPanelSurface =
-  | { id: "tasks"; kind: "tasks" }
   | { id: `browser:${string}`; kind: "preview"; resourceId: string }
   | { id: "browser:new"; kind: "preview"; resourceId: null }
   | { id: "device" | `device:${string}`; kind: "device"; target?: DeviceTabTarget; title?: string }
@@ -293,8 +291,6 @@ const singletonSurface = (
   >,
 ): RightPanelSurface => {
   switch (kind) {
-    case "tasks":
-      return { id: "tasks", kind };
     case "diff":
       return { id: "diff", kind };
     case "files":
@@ -1409,10 +1405,6 @@ export const useRightPanelStore = create<RightPanelStoreState>()(
         ),
       }),
       migrate: migratePersistedRightPanelState,
-      merge: (persisted, current) => ({
-        ...current,
-        ...migratePersistedRightPanelState(persisted),
-      }),
     },
   ),
 );

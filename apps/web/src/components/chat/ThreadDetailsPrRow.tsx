@@ -1,5 +1,3 @@
-
-
 import { resolvePullRequestDetailChecks } from "@t3tools/client-runtime/pull-request-checks";
 import { sourceControlClients } from "@t3tools/client-runtime/source-control-clients";
 import { changeRequestTermKind } from "../pullRequest/changeRequestTerm";
@@ -499,6 +497,7 @@ export function ThreadDetailsPrRow({
         />
       </SharedTooltipTrigger>
     ) : null;
+
   // The title row wraps to two lines; a conventional-commit prefix eats most of one line.
   const openRow = (text: string, part: "row" | "primary", wrap = false) => (
     <Tooltip>

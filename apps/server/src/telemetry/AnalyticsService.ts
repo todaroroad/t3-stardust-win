@@ -1,6 +1,4 @@
-// T3 ingest retains events and forwards to PostHog; UUIDs deduplicate retries there.
-// This build is opt-in: nothing is recorded, buffered or sent until the user turns on the
-// `telemetryEnabled` setting. While it is off, this service makes no network request at all.
+// T3 ingest retains events and deduplicates retries by UUID.
 import * as HostProcess from "@t3tools/shared/HostProcess";
 import { isCiEnvironment, isDoNotTrackSet } from "@t3tools/shared/otelEnvironment";
 import type { ClientOs } from "@t3tools/contracts";
@@ -25,7 +23,6 @@ import * as HttpClientResponse from "effect/http/HttpClientResponse";
 import packageJson from "../../package.json" with { type: "json" };
 import * as ServerConfig from "../config.ts";
 import * as ManagedPolicy from "../policy/ManagedPolicy.ts";
-import * as ServerSettings from "../serverSettings.ts";
 import { getTelemetryIdentity, type TelemetryOwner } from "./Identify.ts";
 
 interface BufferedAnalyticsEvent {
@@ -160,14 +157,8 @@ export const make = Effect.gen(function* () {
   // A managed policy can switch analytics off over the environment, never on.
   const policyAllows =
     ManagedPolicy.deniedBy(yield* ManagedPolicy.ManagedPolicy, "telemetry") === undefined;
-  const settings = yield* ServerSettings.ServerSettingsService;
-  // Unreadable settings count as "not opted in".
-  const userOptedIn = settings.getSettings.pipe(
-    Effect.map((current) => current.telemetryEnabled === true),
-    Effect.orElseSucceed(() => false),
-  );
   // A cached PATH does not establish consent from the current login shell.
-  const environmentAllows = Effect.suspend(() => {
+  const telemetryEnabled = Effect.suspend(() => {
     if (!enabledAtStartup || !policyAllows || isDoNotTrackSet(hostEnvironment))
       return Effect.succeed(false);
     if (!awaitingShellConsent) return Effect.succeed(true);
@@ -185,10 +176,6 @@ export const make = Effect.gen(function* () {
       Effect.orElseSucceed(() => false),
     );
   });
-  // The environment and policy can only switch telemetry off; only the user's opt-in turns it on.
-  const telemetryEnabled = Effect.flatMap(environmentAllows, (allowed) =>
-    allowed ? userOptedIn : Effect.succeed(false),
-  );
   const httpClient = yield* HttpClient.HttpClient;
   const serverConfig = yield* ServerConfig.ServerConfig;
   const { distinctId, installId } = yield* getTelemetryIdentity;

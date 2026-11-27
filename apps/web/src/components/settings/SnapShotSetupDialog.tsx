@@ -1,5 +1,3 @@
-
-import { uiText } from "~/i18n";
 import { PermissionChecklist, PermissionContinueButton } from "../permissions/PermissionChecklist";
 import { usePermissionStatus } from "../permissions/usePermissionStatus";
 import {
@@ -31,70 +29,38 @@ const SETUP_STEPS = [
 
 const GNOME_ACCESS_COPY = {
   "not-installed": {
-    get title() {
-      return uiText("Install the extension");
-    },
-    get description() {
-      return uiText(
-        "The T3 Code GNOME extension lets you capture other windows and bring them into your draft. Sign out once after installing.",
-      );
-    },
+    title: msg("Install the extension"),
+    description: msg(
+      "The T3 Code GNOME extension lets you capture other windows and bring them into your draft. Sign out once after installing.",
+    ),
   },
   "restart-required": {
-    get title() {
-      return uiText("Extension installed");
-    },
-    get description() {
-      return uiText("Save your work, then sign out and back in. Your setup will be waiting here.");
-    },
+    title: msg("Extension installed"),
+    description: msg("Save your work, then sign out and back in. Your setup will be waiting here."),
   },
   "update-required": {
-    get title() {
-      return uiText("Update the extension");
-    },
-    get description() {
-      return uiText("Install the update, then sign out and back in.");
-    },
+    title: msg("Update the extension"),
+    description: msg("Install the update, then sign out and back in."),
   },
   "extensions-disabled": {
-    get title() {
-      return uiText("Allow GNOME extensions");
-    },
-    get description() {
-      return uiText("Open GNOME Extensions and turn on extensions, then check again.");
-    },
+    title: msg("Allow GNOME extensions"),
+    description: msg("Open GNOME Extensions and turn on extensions, then check again."),
   },
   disabled: {
-    get title() {
-      return uiText("Enable the extension");
-    },
-    get description() {
-      return uiText("Enable T3 Code SnapShots to start capturing windows.");
-    },
+    title: msg("Enable the extension"),
+    description: msg("Enable T3 Code SnapShots to start capturing windows."),
   },
   enabled: {
-    get title() {
-      return uiText("Capture is ready");
-    },
-    get description() {
-      return uiText("Next, choose your shortcut.");
-    },
+    title: msg("Capture is ready"),
+    description: msg("Next, choose your shortcut."),
   },
   unsupported: {
-    get title() {
-      return uiText("Automatic capture isn't available");
-    },
-    get description() {
-      return uiText("Use Take snapshot from the command palette to choose a window.");
-    },
+    title: msg("Automatic capture isn't available"),
+    description: msg("Use Take snapshot from the command palette to choose a window."),
   },
   error: {
-    get title() {
-      return uiText("Couldn't set up the extension");
-    },
-    get description() {
-      return uiText("Check T3 Code SnapShots in GNOME Extensions, then try again.");
-    },
+    title: msg("Couldn't set up the extension"),
+    description: msg("Check T3 Code SnapShots in GNOME Extensions, then try again."),
   },
 };
 

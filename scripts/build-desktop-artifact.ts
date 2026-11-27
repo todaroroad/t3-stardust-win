@@ -2744,9 +2744,6 @@ export const resolveGitHubPublishConfig = Effect.fn("resolveGitHubPublishConfig"
 
   const [owner, repo, ...rest] = rawRepo.split("/");
   if (!owner || !repo || rest.length > 0) return undefined;
-  // This fork must never bake the upstream project's feed into an app: that app would offer
-  // upstream builds as updates. No feed is the safe default; the installed app then has no updater.
-  if (owner.toLowerCase() === "pingdotgg") return undefined;
 
   return {
     provider: "github",
@@ -3826,11 +3823,7 @@ const buildDesktopArtifactUnlocked = Effect.fn("buildDesktopArtifactUnlocked")(f
     });
   }
 
-  // Stardust: keep the production web brand under the nightly-named native shell.
-  const webAssetBrand: WebAssetBrand =
-    process.env.T3CODE_DESKTOP_WEB_ASSET_BRAND === "production"
-      ? "production"
-      : resolveDesktopWebAssetBrand(appVersion);
+  const webAssetBrand = resolveDesktopWebAssetBrand(appVersion);
   yield* applyWebBrandAssets(webAssetBrand, "apps/server/dist/client");
   yield* Effect.log(`[desktop-artifact] Applied ${webAssetBrand} web client branding.`);
   yield* validateBundledClientAssets(path.dirname(bundledClientEntry));
@@ -3979,7 +3972,7 @@ const buildDesktopArtifactUnlocked = Effect.fn("buildDesktopArtifactUnlocked")(f
     description:
       "T3 Code is an open-source desktop app for coding agents. Work with your existing agent subscriptions, review code changes, and run commands in your projects. Connect from desktop, web, or mobile to continue working remotely.",
     license: "MIT",
-    homepage: "https://github.com/todaroroad/t3-stardust-win",
+    homepage: "https://t3.codes",
     author: "T3 Tools",
     main: "apps/desktop/dist-electron/boot.cjs",
     build: yield* createBuildConfig(

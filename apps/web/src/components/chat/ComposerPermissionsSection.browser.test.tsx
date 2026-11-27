@@ -119,7 +119,7 @@ function PickerWithPermissions() {
   );
 }
 
-it("on a touch tablet, picking a permission in the picker footer leaves the editor unfocused", async () => {
+it("on a touch tablet, tapping outside the Permissions menu leaves the editor unfocused", async () => {
   const realMatchMedia = window.matchMedia.bind(window);
   using _touch = vi
     .spyOn(window, "matchMedia")
@@ -127,14 +127,15 @@ it("on a touch tablet, picking a permission in the picker footer leaves the edit
   const { handle, ui } = withComposer(<PickerWithPermissions />);
   await using screen = await render(ui, { router: false }); // no routes involved
   await userEvent.click(screen.getByRole("button", { name: "Model" }));
-  // V9: permissions are an inline segment in the picker footer, not a nested menu.
-  const segment = page.getByRole("radiogroup", { name: "Permissions" });
-  await expect.element(segment.getByRole("radio", { name: "Full access" })).toBeChecked();
-  await userEvent.click(segment.getByRole("radio", { name: "Supervised" }));
-  await expect.element(segment.getByRole("radio", { name: "Supervised" })).toBeChecked();
-  // The picker stays open after a pick; one outside tap closes it.
+  await userEvent.click(page.getByRole("button", { name: "Permissions: Full access" }));
+  const fullAccess = page.getByRole("menuitemradio", { name: "Full access" });
+  await expect.element(fullAccess).toBeInTheDocument();
+  const permissionsTrigger = page.getByRole("button", { name: "Permissions: Full access" });
+  // The first outside tap closes the Permissions menu, the second the picker around it.
+  await userEvent.click(document.body, { position: { x: 1, y: 1 } });
+  await expect.element(fullAccess).not.toBeInTheDocument();
   await userEvent.click(screen.getByText("Timeline"));
-  await expect.element(segment).not.toBeInTheDocument();
+  await expect.element(permissionsTrigger).not.toBeInTheDocument();
   // Focusing the editor after a tap opens the on-screen keyboard on Android tablets.
   expect(handle.focusAtEnd).not.toHaveBeenCalled();
 });

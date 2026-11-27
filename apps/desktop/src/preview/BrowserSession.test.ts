@@ -399,16 +399,10 @@ describe("BrowserSession", () => {
         sessions.get(partition)?.setPermissionRequestHandler.mock.calls[0]?.[0];
       assert.isFunction(requestHandler);
 
-      const guest = {
-        isDestroyed: () => false,
-        isFocused: () => true,
-        getURL: () => "https://example.com/launch",
-        executeJavaScript: vi.fn(() => Promise.resolve(true)),
-      };
       const request = (externalURL: string) =>
         Effect.callback<boolean>((resume) => {
           requestHandler(
-            guest,
+            null,
             "openExternal",
             (granted: boolean) => resume(Effect.succeed(granted)),
             { externalURL },
@@ -1045,36 +1039,5 @@ describe("BrowserSession", () => {
       yield* browserSessions.clearCookies([partition]);
       assert.isFalse(yield* fileSystem.exists(file));
     }).pipe(Effect.scoped, Effect.provide(Layer.merge(layer, NodeServices.layer))),
-  );
-  it.effect.each([
-    ["timer", false, true, 0],
-    ["background", true, false, 0],
-    ["cancel", true, true, 1],
-  ] as const)(
-    "suppresses repeated %s requests despite changing deep-link queries",
-    ([scenario, activated, focused, expectedDialogs]) =>
-      Effect.gen(function* () {
-        const browserSessions = yield* BrowserSession.BrowserSession;
-        const partition = yield* browserSessions.getPartition(scenario);
-        yield* browserSessions.getSession(scenario);
-        const handler = sessions.get(partition)!.setPermissionRequestHandler.mock.calls[0]![0];
-        showMessageBox.mockReset();
-        showMessageBox.mockReturnValue(1);
-        const guest = {
-          isDestroyed: () => false,
-          isFocused: () => focused,
-          getURL: () => "https://creator.douyin.com/creator-micro/content/manage",
-          executeJavaScript: vi.fn(() => Promise.resolve(activated)),
-        };
-        for (let i = 0; i < 10; i++) {
-          const granted = yield* Effect.callback<boolean>((resume) =>
-            handler(guest, "openExternal", (value: boolean) => resume(Effect.succeed(value)), {
-              externalURL: `bytedance://dispatch_message/?attempt=${i}`,
-            }),
-          );
-          assert.isFalse(granted);
-        }
-        assert.strictEqual(showMessageBox.mock.calls.length, expectedDialogs);
-      }).pipe(Effect.provide(layer)),
   );
 });

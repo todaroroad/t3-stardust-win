@@ -1,10 +1,3 @@
-import { m } from "~/i18n/messages";
-import { resumeRequestHidden } from "../../resumeCard";
-import { useUiText } from "~/i18n/useUiText";
-import { DraftPersistenceNotice } from "./DraftPersistenceNotice";
-import { InboxStrip } from "./InboxStrip";
-import { useResumeCardStore } from "../../resumeCardStore";
-import { inboxStripCopy, inboxStripState } from "../../inboxStrip";
 import { copySnapshot } from "./copySnapshot";
 import { VoiceInputSetup } from "./VoiceInputSetup";
 import { useComposerTypingGuard } from "./useComposerTypingGuard";
@@ -70,7 +63,6 @@ import { splitTransferredFiles } from "./workspaceFileDrop";
 import { createModelSelection, normalizeModelSlug } from "@t3tools/shared/model";
 import { USAGE_LIMITS_COMMAND } from "@t3tools/shared/usageLimits";
 import {
-  type ReactNode,
   memo,
   use,
   useEffect,
@@ -81,7 +73,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { msg, T, useGT, Var } from "gt-react";
+import { msg, T, useGT, useMessages, Var } from "gt-react";
 import { flushSync } from "react-dom";
 import {
   clampCollapsedComposerCursor,
@@ -138,11 +130,7 @@ import {
 import { ComposerBanner } from "./ComposerBanner";
 import { ComposerSurface } from "./ComposerSurface";
 import { CollapsedComposerPromptPreview } from "./CollapsedComposerPromptPreview";
-import {
-  ComposerBannerStack,
-  ComposerFloatAnchor,
-  type ComposerBannerStackItem,
-} from "./ComposerBannerStack";
+import { ComposerBannerStack, type ComposerBannerStackItem } from "./ComposerBannerStack";
 import {
   attachmentsToReleaseOnUploadCapabilityLoss,
   composerOtherFilesForPresentation,
@@ -228,8 +216,8 @@ import {
   ComposerCommandMenu,
   composerSuggestionOptionId,
 } from "./ComposerCommandMenu";
-import { ComposerAttachButton } from "./ComposerAttachButton";
 import {
+  ComposerAttachButton,
   ComposerAttachInput,
   ComposerAttachmentFileList,
   ComposerAttachmentMediaRow,
@@ -237,7 +225,6 @@ import {
   ComposerQueuedAttachmentRow,
   ComposerRestingImagePreviews,
 } from "./ComposerAttachmentStrip";
-import "./composerV9.css";
 import { CollapsedComposerStopAction, ComposerPrimaryActions } from "./ComposerPrimaryActions";
 import { ComposerFooterPrimaryActions } from "./ComposerFooterControls";
 import { ComposerPendingUserInputPanel } from "./ComposerPendingUserInputPanel";
@@ -392,11 +379,6 @@ export interface ChatComposerHandle {
 }
 
 export interface ChatComposerProps {
-  /** Floating plan capsule, hung above the composer and its notices. */
-  floatingPlan?: ReactNode;
-  /** Circular scroll-to-end button sharing the float-anchor coordinate frame with floatingPlan. */
-  scrollToEnd?: ReactNode;
-  footerLeading?: ReactNode;
   composerDraftTarget: ScopedThreadRef | DraftId;
   environmentId: EnvironmentId;
   canOperateThread: boolean;
@@ -515,7 +497,6 @@ export interface ChatComposerProps {
     },
   ) => void;
   onResume: () => void;
-  onInboxContinue?: () => Promise<void>;
   onInterrupt: () => void;
   onSelectActivePendingUserInputOption: (questionId: string, optionValue: string) => void;
   onAdvanceActivePendingUserInput: () => void;
@@ -550,14 +531,7 @@ const NO_PROVIDER_SLASH_COMMANDS: ServerProvider["slashCommands"] = [];
 
 export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps) {
   const gt = useGT();
-  const uiText = useUiText();
-  const inboxRequest = useResumeCardStore((state) => {
-    const request = state.selected[scopedThreadKey(props.routeThreadRef)];
-    return request &&
-      !resumeRequestHidden(request.key, request.token, state.hidden, state.hiddenUntil, Date.now())
-      ? request
-      : undefined;
-  });
+  const m = useMessages();
   const {
     composerDraftTarget,
     environmentId,
@@ -1319,9 +1293,10 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
   const showComposerTopDrawer = pendingUserInputs.length > 0;
   const showCollapsedMobilePromptRow = isComposerCollapsedMobile;
   const showComposerAttachAction =
-    !activePendingProgress ||
-    (supportsQuestionAttachments &&
-      activePendingProgress.activeQuestion?.allowCustomAnswer !== false);
+    fileStagingLimit !== null &&
+    (!activePendingProgress ||
+      (supportsQuestionAttachments &&
+        activePendingProgress.activeQuestion?.allowCustomAnswer !== false));
   const composerFooterHasWideActions = activePendingProgress !== null;
 
   const editPromptFromTraits = (edit: (prompt: string) => string) => {
@@ -3667,11 +3642,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       />
     ) : null;
   const composerAttachButton = showComposerAttachAction ? (
-    <ComposerAttachButton
-      addComposerAttachments={addComposerAttachments}
-      focusComposer={focusComposer}
-      disabled={!activeThreadId || isRevertingCheckpoint}
-    />
+    <ComposerAttachButton onOpenPicker={() => composerAttachInputRef.current?.click()} />
   ) : null;
   return (
     <form
@@ -3737,25 +3708,6 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       data-chat-composer-form="true"
       {...threadContextDropTargetProps()}
     >
-      {props.floatingPlan || props.scrollToEnd ? (
-        <ComposerFloatAnchor scrollToEnd={props.scrollToEnd}>
-          {props.floatingPlan}
-        </ComposerFloatAnchor>
-      ) : null}
-      {activeThreadId ? (
-        <InboxStrip
-          threadRef={routeThreadRef}
-          prompt={prompt}
-          disabled={
-            !canOperateThread ||
-            Boolean(environmentUnavailable) ||
-            isSendBusy ||
-            isRevertingCheckpoint
-          }
-          onContinue={props.onInboxContinue ?? onResume}
-        />
-      ) : null}
-      <DraftPersistenceNotice />
       <ComposerBanner.Dock>
         <ComposerBanner.Column>
           <ComposerBannerStack items={shelfItems} />
@@ -4036,13 +3988,8 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                           : projectSelectionRequired
                             ? gt("Choose a project above to start a thread")
                             : showProviderUnavailable
-                              ? uiText("Enable a provider in Settings to send a message")
-                              : inboxRequest
-                                ? uiText(
-                                    inboxStripCopy[inboxStripState(inboxRequest.reason)]
-                                      .placeholder,
-                                  )
-                                : (offeredPromptSuggestion ?? uiText(DEFAULT_COMPOSER_PLACEHOLDER))
+                              ? gt("Enable a provider in Settings to send a message")
+                              : (offeredPromptSuggestion ?? m(DEFAULT_COMPOSER_PLACEHOLDER))
                     }
                     placeholderSuffix={
                       offeredPromptSuggestion !== null ? (
@@ -4119,7 +4066,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
               <div
                 data-chat-composer-footer="true"
                 className={cn(
-                  "flex min-w-0 flex-nowrap items-center gap-1 overflow-hidden px-2 pb-2",
+                  "flex min-w-0 flex-nowrap items-center overflow-visible px-2 pb-2",
                   pendingUserInputs.length > 0 && "pt-2",
                   showMobilePendingAnswerActions &&
                     speechInput.state.phase === "idle" &&
@@ -4127,17 +4074,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                 )}
               >
                 {composerAttachButton && !dictationTakesFooter ? (
-                  <div data-composer-attach-slot="true" className="shrink-0">
-                    {composerAttachButton}
-                  </div>
-                ) : null}
-                {!dictationTakesFooter ? (
-                  <div
-                    data-composer-leading
-                    className="flex min-w-0 shrink items-center gap-1 overflow-hidden"
-                  >
-                    {props.footerLeading}
-                  </div>
+                  <div className="me-2">{composerAttachButton}</div>
                 ) : null}
                 <div
                   data-chat-composer-actions="right"
@@ -4145,7 +4082,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                   data-chat-composer-primary-actions-compact={
                     isComposerPrimaryActionsCompact ? "true" : "false"
                   }
-                  className="flex min-w-0 flex-1 flex-nowrap items-center justify-end gap-1.5"
+                  className="flex min-w-0 flex-1 flex-nowrap items-center justify-end gap-2"
                 >
                   <div
                     ref={attachExpandedComposerControls}

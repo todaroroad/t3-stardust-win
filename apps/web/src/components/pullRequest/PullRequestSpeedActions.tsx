@@ -1,4 +1,3 @@
-
 import { useAtomValue } from "@effect/atom-react";
 import type { PullRequestAction, PullRequestSummary } from "@t3tools/contracts";
 import { msg, useGT, useMessages } from "gt-react";
@@ -177,6 +176,7 @@ function SpeedModeGroup({
     </div>
   );
 }
+
 const ACTIONS = {
   close: {
     label: msg("Close", { $context: "verb, close a pull request" }),

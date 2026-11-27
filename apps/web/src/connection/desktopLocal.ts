@@ -100,7 +100,3 @@ export function readDesktopSecondaryBootstrapsResult(): DesktopSecondaryBootstra
 export function readDesktopSecondaryBootstraps(): ReadonlyArray<DesktopEnvironmentBootstrap> {
   return desktopSecondaryBootstrapsReader.readSnapshot();
 }
-
-export function isWslConnectionTarget(target: ConnectionTarget): boolean {
-  return desktopLocalBackendId(target)?.startsWith("wsl:") === true;
-}

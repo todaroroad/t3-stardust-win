@@ -67,7 +67,7 @@ function PopoverPopup({
       {touchBackdrop ? (
         // On touch, the backdrop consumes outside taps so closing cannot also activate the control beneath.
         <PopoverPrimitive.Backdrop
-          className="fixed inset-0 z-[100] hidden pointer-coarse:block"
+          className="fixed inset-0 z-[130] hidden pointer-coarse:block"
           data-slot="popover-backdrop"
         />
       ) : null}
@@ -83,7 +83,7 @@ function PopoverPopup({
           !keepMounted && "transition-transform data-instant:transition-none",
           variant === "panel"
             ? "z-(--z-sheet) w-[min(calc(var(--thread-details-panel-width)+--spacing(4)),calc(var(--anchor-width)---spacing(2)))] transition-[top] duration-150 ease-out data-instant:transition-[top] motion-reduce:transition-none motion-reduce:data-instant:transition-none"
-            : "z-[100]",
+            : "z-[130]",
         )}
         data-slot="popover-positioner"
         render={renderClosingPositioner}
@@ -92,7 +92,7 @@ function PopoverPopup({
       >
         <PopoverPrimitive.Popup
           className={cn(
-            "relative flex h-(--popup-height,auto) w-(--popup-width,auto) origin-(--transform-origin) rounded-lg text-popover-foreground outline-none transition-[width,height,transform,scale,opacity,filter] before:pointer-events-none before:absolute before:inset-0 before:rounded-[calc(var(--radius-lg)-1px)] before:shadow-[0_1px_--theme(--color-black/4%)] has-data-[slot=calendar]:rounded-xl has-data-[slot=calendar]:before:rounded-[calc(var(--radius-xl)-1px)] data-ending-style:scale-98 data-starting-style:scale-98 data-ending-style:opacity-0 data-starting-style:opacity-0 dark:before:shadow-[0_-1px_--theme(--color-white/6%)]",
+            "relative flex h-(--popup-height,auto) w-(--popup-width,auto) origin-(--transform-origin) rounded-lg text-popover-foreground outline-none transition-[width,height,scale,opacity] before:pointer-events-none before:absolute before:inset-0 before:rounded-[calc(var(--radius-lg)-1px)] before:shadow-[0_1px_--theme(--color-black/4%)] has-data-[slot=calendar]:rounded-xl has-data-[slot=calendar]:before:rounded-[calc(var(--radius-xl)-1px)] data-ending-style:scale-98 data-starting-style:scale-98 data-ending-style:opacity-0 data-starting-style:opacity-0 dark:before:shadow-[0_-1px_--theme(--color-white/6%)]",
             variant !== "panel" && "dropdown-glass",
             // Without it, Chromium re-snaps text after the scale-in at fractional zoom, so hovered rows jump a pixel.
             "will-change-[scale]",

@@ -13,11 +13,6 @@ export type ProviderUsageLimitsReport = ProviderUsageLimitsUpdate & {
   readonly authLabel?: string;
   /** A full reading replaces sparse windows and clears a previous probe failure. */
   readonly complete?: boolean;
-  /**
-   * The windows come straight from the provider's own response (Claude's unified rate-limit
-   * headers), so they are authoritative even when the account's usage probe keeps failing.
-   */
-  readonly verified?: boolean;
 };
 
 export interface ManagedServerProvider {

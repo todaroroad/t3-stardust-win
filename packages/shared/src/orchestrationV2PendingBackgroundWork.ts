@@ -140,20 +140,6 @@ export function monitorHoldsWakeCompletion(
   );
 }
 
-/**
- * A thread's turn is only done for the user once its background work is too: a delegated task,
- * subagent or awaited task holds it, and so does a monitor when the turn is its progress wake.
- * Toasts, the inbox and proactive panels all ask this one question.
- */
-export function backgroundWorkDefersThreadCompletion(
-  thread: Pick<OrchestrationV2ThreadShell, "latestRunBackgroundWake" | "pendingBackgroundTasks">,
-): boolean {
-  return (
-    backgroundWorkHoldsCompletion(thread.pendingBackgroundTasks ?? []) ||
-    monitorHoldsWakeCompletion(thread)
-  );
-}
-
 type PendingBackgroundWorkRun = Pick<OrchestrationV2Run, "id" | "ordinal" | "status">;
 
 type PendingBackgroundWorkPullRequest = Pick<

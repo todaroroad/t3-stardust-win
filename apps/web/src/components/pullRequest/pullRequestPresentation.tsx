@@ -1,5 +1,3 @@
-
-import { uiText } from "~/i18n";
 import { Spinner } from "~/components/ui/spinner";
 import type {
   PullRequestActor,
@@ -284,35 +282,26 @@ export function PullRequestCheckStatusIcon({ status }: { status: PullRequestChec
     />
   );
 }
+
 const CHECKS_STATE_PRESENTATION = {
   passing: {
-    get label() {
-      return uiText("All checks have passed");
-    },
+    label: msg("All checks have passed"),
     Icon: CircleCheckIcon,
     toneClassName: CHECK_STATUS_PRESENTATION.success.toneClassName,
   },
   failing: {
-    get label() {
-      return uiText("Some checks were not successful");
-    },
+    label: msg("Some checks were not successful"),
     Icon: CircleXIcon,
     toneClassName: "text-destructive",
   },
   pending: {
-    get label() {
-      return uiText("Some checks haven't completed yet");
-    },
+    label: msg("Some checks haven't completed yet"),
     Icon: CircleDotIcon,
     toneClassName: "text-amber-600 dark:text-amber-400/90",
   },
 } as const satisfies Record<
   PullRequestChecksState,
-  {
-    label: string;
-    Icon: typeof CircleCheckIcon;
-    toneClassName: string;
-  }
+  { label: string; Icon: typeof CircleCheckIcon; toneClassName: string }
 >;
 
 export function pullRequestChecksStatePresentation(
@@ -322,6 +311,7 @@ export function pullRequestChecksStatePresentation(
   const presentation = CHECKS_STATE_PRESENTATION[state];
   return { ...presentation, label: resolve(presentation.label) };
 }
+
 export function pullRequestChecksState(
   checks: ReadonlyArray<PullRequestCheck>,
 ): PullRequestChecksState | null {
@@ -331,6 +321,7 @@ export function pullRequestChecksState(
   if (statuses.has("pending") || statuses.has("action-required")) return "pending";
   return statuses.has("success") ? "passing" : null;
 }
+
 const REVIEW_OUTCOME_PRESENTATION = {
   approved: {
     label: msg("Approved", { $context: "review outcome" }),
@@ -563,6 +554,7 @@ export function PullRequestActorLabel({
     </SharedTooltipTrigger>
   );
 }
+
 export function PullRequestDiffStat({
   additions,
   deletions,

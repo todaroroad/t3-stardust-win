@@ -1,7 +1,6 @@
 import {
   USAGE_MERGE_COMPATIBLE_SINCE,
   type EnvironmentId,
-  type ProjectId,
   type UsageBucket,
   type UsageProviderKind,
   type UsageSource,
@@ -9,16 +8,6 @@ import {
   type UsageSummary,
   type UsageTokenTotals,
 } from "@t3tools/contracts";
-
-export {
-  MIN_THROUGHPUT_MODEL_MS,
-  TURN_TOOL_ITEM_TYPES,
-  computeTurnModelDuration,
-  evaluateThroughputTurn,
-  unionIntervalLength,
-  type ThroughputTurnCandidate,
-  type TurnModelDuration,
-} from "./turnModelDuration.ts";
 
 export interface EnvironmentUsage {
   readonly environmentId: EnvironmentId;
@@ -69,26 +58,6 @@ export interface HourlyTotals {
   readonly byProvider: ReadonlyMap<UsageProviderKind, { costUsd: number; totalTokens: number }>;
 }
 
-export type ProjectIdentity =
-  | {
-      readonly kind: "project";
-      readonly environmentId: EnvironmentId;
-      readonly environmentLabel: string;
-      readonly projectId: ProjectId;
-      readonly title: string;
-    }
-  | { readonly kind: "unlinked" | "unreported" };
-
-export type ProjectTotals = ProjectIdentity & {
-  readonly key: string;
-  readonly costUsd: number;
-  readonly totalTokens: number;
-  readonly records: number;
-  readonly unpricedRecords: number;
-  readonly costShare: number;
-  readonly tokenShare: number;
-};
-
 export interface CostQuality {
   readonly providerReportedShare: number;
   readonly modelPricedShare: number;
@@ -117,34 +86,6 @@ export interface UsageContractMismatch {
   readonly contractVersion: number;
 }
 
-export interface ThroughputTotals {
-  readonly outputTokens: number;
-  readonly modelMs: number;
-  readonly turns: number;
-  /** Output tokens per second (`outputTokens / (modelMs / 1000)`), or null when `modelMs <= 0`. */
-  readonly tokensPerSecond: number | null;
-}
-
-export interface ProviderThroughputTotals extends ThroughputTotals {
-  readonly provider: UsageProviderKind;
-}
-
-export interface ModelThroughputTotals extends ThroughputTotals {
-  readonly provider: UsageProviderKind;
-  readonly model: string;
-}
-
-export interface MergedThroughput {
-  readonly total: ThroughputTotals;
-  readonly byProvider: readonly ProviderThroughputTotals[];
-  readonly byModel: readonly ModelThroughputTotals[];
-}
-
-export function computeTokensPerSecond(outputTokens: number, modelMs: number): number | null {
-  if (!Number.isFinite(outputTokens) || !Number.isFinite(modelMs) || modelMs <= 0) return null;
-  return outputTokens / (modelMs / 1000);
-}
-
 export interface MergedUsage {
   readonly costUsd: number;
   readonly uncachedInputTokens: number;
@@ -159,12 +100,9 @@ export interface MergedUsage {
   readonly models: readonly ModelTotals[];
   readonly daily: readonly DailyTotals[];
   readonly hourly: readonly HourlyTotals[];
-  readonly projects: readonly ProjectTotals[];
   readonly costQuality: CostQuality;
   readonly categoryCost: CategoryCost;
   readonly speedCost: SpeedCost;
-  readonly throughput: MergedThroughput;
-  readonly modelUnitPrices: Readonly<Record<string, number>>;
   readonly duplicateSources: readonly string[];
   readonly contributingEnvironments: readonly EnvironmentId[];
   readonly contractMismatches: readonly UsageContractMismatch[];
@@ -313,7 +251,6 @@ function ownedContribution(
   sourceKey: (fingerprint: UsageSourceFingerprint) => string,
 ): {
   readonly buckets: readonly UsageBucket[];
-  readonly owns: (bucket: Pick<UsageBucket, "sourcePath" | "provider">) => boolean;
   readonly sessionsByProvider: ReadonlyMap<UsageProviderKind, number>;
 } {
   const ownedProviders = new Set<UsageProviderKind>();
@@ -336,20 +273,19 @@ function ownedContribution(
       );
     }
   }
-  const owns = (bucket: Pick<UsageBucket, "sourcePath" | "provider">) =>
-    bucket.sourcePath === undefined
-      ? ownedProviders.has(bucket.provider)
-      : ownedSources.has(`${bucket.provider}\u0000${bucket.sourcePath}`);
   return {
     buckets: environment.summary.buckets.filter(
-      (bucket) => supplementalBuckets.has(bucket) || owns(bucket),
+      (bucket) =>
+        supplementalBuckets.has(bucket) ||
+        (bucket.sourcePath === undefined
+          ? ownedProviders.has(bucket.provider)
+          : ownedSources.has(`${bucket.provider}\u0000${bucket.sourcePath}`)),
     ),
-    owns,
     sessionsByProvider,
   };
 }
 
-function bucketTokens(bucket: Pick<UsageBucket, "totals">): number {
+function bucketTokens(bucket: UsageBucket): number {
   // reasoningTokens is a subset of outputTokens and must not be added again.
   return (
     bucket.totals.uncachedInputTokens +
@@ -377,7 +313,6 @@ const EMPTY_MERGED: MergedUsage = {
   models: [],
   daily: [],
   hourly: [],
-  projects: [],
   costQuality: {
     providerReportedShare: 0,
     modelPricedShare: 0,
@@ -386,12 +321,6 @@ const EMPTY_MERGED: MergedUsage = {
   },
   categoryCost: { input: 0, cacheRead: 0, cacheWrite: 0, output: 0, unsplit: 0 },
   speedCost: { standard: 0, fast: 0, ultrafast: 0, premium: 0 },
-  throughput: {
-    total: { outputTokens: 0, modelMs: 0, turns: 0, tokensPerSecond: null },
-    byProvider: [],
-    byModel: [],
-  },
-  modelUnitPrices: {},
   duplicateSources: [],
   contributingEnvironments: [],
   contractMismatches: [],
@@ -482,95 +411,10 @@ export function mergeUsage(
       byProvider: Map<UsageProviderKind, { costUsd: number; totalTokens: number }>;
     }
   >();
-  const projectAccumulator = new Map<
-    string,
-    {
-      readonly identity: ProjectIdentity;
-      costUsd: number;
-      totalTokens: number;
-      records: number;
-      unpricedRecords: number;
-    }
-  >();
-  const addProjectUsage = (
-    key: string,
-    identity: ProjectIdentity,
-    usage: Pick<UsageBucket, "costUsd" | "totals" | "records" | "unpricedRecords">,
-  ) => {
-    const project = projectAccumulator.get(key) ?? {
-      identity,
-      costUsd: 0,
-      totalTokens: 0,
-      records: 0,
-      unpricedRecords: 0,
-    };
-    project.costUsd += usage.costUsd;
-    project.totalTokens += bucketTokens(usage);
-    project.records += usage.records;
-    project.unpricedRecords += usage.unpricedRecords;
-    projectAccumulator.set(key, project);
-  };
   const contributingEnvironments: EnvironmentId[] = [];
-  let throughputOutputTokens = 0;
-  let throughputModelMs = 0;
-  let throughputTurns = 0;
-  const providerThroughputAccumulator = new Map<
-    UsageProviderKind,
-    { outputTokens: number; modelMs: number; turns: number }
-  >();
-  const modelThroughputAccumulator = new Map<
-    string,
-    { provider: UsageProviderKind; model: string; outputTokens: number; modelMs: number; turns: number }
-  >();
-  const modelUnitPrices: Record<string, number> = {};
-  const orderedByReadAt = [...current].sort(
-    (a, b) =>
-      (Date.parse(b.summary.readAt) || 0) - (Date.parse(a.summary.readAt) || 0) ||
-      a.environmentId.localeCompare(b.environmentId),
-  );
-  for (const environment of orderedByReadAt) {
-    const prices = environment.summary.pricing.modelUnitPrices;
-    if (prices === undefined) continue;
-    for (const [modelKey, price] of Object.entries(prices)) {
-      if (!Object.hasOwn(modelUnitPrices, modelKey) && Number.isFinite(price) && price >= 0) {
-        modelUnitPrices[modelKey] = price;
-      }
-    }
-  }
 
   for (const environment of current) {
-    if (environment.summary.throughput !== undefined) {
-      for (const row of environment.summary.throughput) {
-        if (row.modelMs <= 0 || row.turns <= 0) continue;
-        throughputOutputTokens += row.outputTokens;
-        throughputModelMs += row.modelMs;
-        throughputTurns += row.turns;
-
-        const providerRow = providerThroughputAccumulator.get(row.provider) ?? {
-          outputTokens: 0,
-          modelMs: 0,
-          turns: 0,
-        };
-        providerRow.outputTokens += row.outputTokens;
-        providerRow.modelMs += row.modelMs;
-        providerRow.turns += row.turns;
-        providerThroughputAccumulator.set(row.provider, providerRow);
-
-        const modelKey = `${row.provider}\u0000${row.model}`;
-        const modelRow = modelThroughputAccumulator.get(modelKey) ?? {
-          provider: row.provider,
-          model: row.model,
-          outputTokens: 0,
-          modelMs: 0,
-          turns: 0,
-        };
-        modelRow.outputTokens += row.outputTokens;
-        modelRow.modelMs += row.modelMs;
-        modelRow.turns += row.turns;
-        modelThroughputAccumulator.set(modelKey, modelRow);
-      }
-    }
-    const { buckets, owns, sessionsByProvider } = ownedContribution(
+    const { buckets, sessionsByProvider } = ownedContribution(
       environment,
       ownerScanByFingerprint,
       supplementalBucketsByEnvironment.get(environment.environmentId) ?? new Set(),
@@ -578,35 +422,6 @@ export function mergeUsage(
       sourceKey,
     );
     if (buckets.length > 0) contributingEnvironments.push(environment.environmentId);
-
-    const { projectTotals, projects = [] } = environment.summary;
-    if (projectTotals === undefined) {
-      for (const bucket of buckets) addProjectUsage("unreported", { kind: "unreported" }, bucket);
-    } else {
-      // Window-wide project totals cannot attribute cells retained from another scan.
-      for (const bucket of buckets) {
-        if (!owns(bucket)) addProjectUsage("unreported", { kind: "unreported" }, bucket);
-      }
-      const titles = new Map(projects.map((project) => [project.projectId, project.title]));
-      for (const row of projectTotals) {
-        if (!owns(row)) continue;
-        if (row.projectId === undefined) {
-          addProjectUsage("unlinked", { kind: "unlinked" }, row);
-          continue;
-        }
-        addProjectUsage(
-          JSON.stringify([environment.environmentId, row.projectId]),
-          {
-            kind: "project",
-            environmentId: environment.environmentId,
-            environmentLabel: environment.label,
-            projectId: row.projectId,
-            title: titles.get(row.projectId) ?? row.projectId,
-          },
-          row,
-        );
-      }
-    }
 
     for (const [providerKind, providerSessions] of sessionsByProvider) {
       sessions += providerSessions;
@@ -753,16 +568,6 @@ export function mergeUsage(
     }))
     .sort((a, b) => b.costUsd - a.costUsd || b.totalTokens - a.totalTokens);
 
-  const projects: ProjectTotals[] = [...projectAccumulator.entries()]
-    .map(([key, { identity, ...totals }]) => ({
-      ...identity,
-      key,
-      ...totals,
-      costShare: costUsd === 0 ? 0 : totals.costUsd / costUsd,
-      tokenShare: totalTokens === 0 ? 0 : totals.totalTokens / totalTokens,
-    }))
-    .sort((a, b) => b.costUsd - a.costUsd || b.totalTokens - a.totalTokens);
-
   const daily: DailyTotals[] = [...dailyAccumulator.entries()]
     .map(([day, totals]) => ({
       day,
@@ -788,7 +593,6 @@ export function mergeUsage(
     sessions,
     providers,
     models,
-    projects,
     daily,
     hourly,
     costQuality: {
@@ -813,34 +617,6 @@ export function mergeUsage(
       ...speedCost,
       standard: Math.max(0, costUsd - speedCost.fast - speedCost.ultrafast),
     },
-    throughput: {
-      total: {
-        outputTokens: throughputOutputTokens,
-        modelMs: throughputModelMs,
-        turns: throughputTurns,
-        tokensPerSecond: computeTokensPerSecond(throughputOutputTokens, throughputModelMs),
-      },
-      byProvider: [...providerThroughputAccumulator.entries()]
-        .map(([provider, totals]): ProviderThroughputTotals => ({
-          provider,
-          outputTokens: totals.outputTokens,
-          modelMs: totals.modelMs,
-          turns: totals.turns,
-          tokensPerSecond: computeTokensPerSecond(totals.outputTokens, totals.modelMs),
-        }))
-        .sort((a, b) => (b.tokensPerSecond ?? -1) - (a.tokensPerSecond ?? -1)),
-      byModel: [...modelThroughputAccumulator.values()]
-        .map((totals): ModelThroughputTotals => ({
-          provider: totals.provider,
-          model: totals.model,
-          outputTokens: totals.outputTokens,
-          modelMs: totals.modelMs,
-          turns: totals.turns,
-          tokensPerSecond: computeTokensPerSecond(totals.outputTokens, totals.modelMs),
-        }))
-        .sort((a, b) => (b.tokensPerSecond ?? -1) - (a.tokensPerSecond ?? -1)),
-    },
-    modelUnitPrices,
     duplicateSources: duplicates,
     contributingEnvironments,
     contractMismatches,

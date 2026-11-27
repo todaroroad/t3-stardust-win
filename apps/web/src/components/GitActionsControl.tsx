@@ -604,16 +604,19 @@ export function PublishRepositoryDialog(props: PublishRepositoryDialogProps) {
     setPublishError(null);
     setPublishResult(null);
   };
+
   const handleOpenChange = (open: boolean) => {
     props.onOpenChange(open);
     if (!open) {
       resetState();
     }
   };
+
   const openSourceControlSettings = () => {
     handleOpenChange(false);
     void navigate({ to: "/settings/source-control" });
   };
+
   return (
     <Dialog open={props.open} onOpenChange={handleOpenChange}>
       <WizardPopup>
@@ -634,6 +637,7 @@ export function PublishRepositoryDialog(props: PublishRepositoryDialogProps) {
             onStepChange={setPublishWizardStep}
           />
         </WizardHeader>
+
         <WizardPanel>
           <div className={cn("space-y-2", publishWizardStep !== 0 && "hidden")}>
             <span id="publish-provider-cards-label" className="text-xs font-medium text-foreground">
@@ -706,6 +710,7 @@ export function PublishRepositoryDialog(props: PublishRepositoryDialogProps) {
               })}
             </RadioGroup>
           </div>
+
           <div className={cn("space-y-5", publishWizardStep !== 1 && "hidden")}>
             <div className="space-y-2">
               <label
@@ -717,8 +722,7 @@ export function PublishRepositoryDialog(props: PublishRepositoryDialogProps) {
               <div className="flex items-stretch overflow-hidden rounded-md border border-input bg-background focus-within:outline-2 focus-within:-outline-offset-2 focus-within:outline-ring">
                 <span className="flex shrink-0 items-center gap-1.5 border-r border-input bg-muted/50 px-2.5 font-mono text-xs text-muted-foreground">
                   <currentPublishProvider.Icon className="size-3.5" />
-                  {publishHost}
-                  {"/"}
+                  {publishHost}/
                 </span>
                 <input
                   id="publish-repository-path"
@@ -743,6 +747,7 @@ export function PublishRepositoryDialog(props: PublishRepositoryDialogProps) {
                 />
               </div>
             </div>
+
             <div className="space-y-2">
               <span
                 id="publish-visibility-cards-label"
@@ -880,6 +885,7 @@ export function PublishRepositoryDialog(props: PublishRepositoryDialogProps) {
               </div>
             ) : null}
           </div>
+
           <div className={cn("space-y-4", publishWizardStep !== 2 && "hidden")}>
             {publishResult ? (
               <>
@@ -930,6 +936,7 @@ export function PublishRepositoryDialog(props: PublishRepositoryDialogProps) {
             )}
           </div>
         </WizardPanel>
+
         <WizardFooter>
           {publishWizardStep === 2 ? (
             <Button onClick={() => handleOpenChange(false)}>
@@ -1883,13 +1890,11 @@ function CheckoutGitActionsControl({
                                     ) : (
                                       <>
                                         <span className="text-diff-addition">
-                                          {"+"}
-                                          {formatDiffCount(file.insertions)}
+                                          +{formatDiffCount(file.insertions)}
                                         </span>
-                                        <span className="text-muted-foreground">{" / "}</span>
+                                        <span className="text-muted-foreground"> / </span>
                                         <span className="text-diff-deletion">
-                                          {"-"}
-                                          {formatDiffCount(file.deletions)}
+                                          -{formatDiffCount(file.deletions)}
                                         </span>
                                       </>
                                     )}

@@ -1,34 +1,16 @@
 import type { VoiceInputState } from "@t3tools/client-runtime/voice-input";
 import { speechModelDownloadPercent } from "@t3tools/shared/speech";
 import { msg, useGT, useMessages } from "gt-react";
-import { CheckIcon, XIcon } from "lucide-react";
+import { CheckIcon, MicIcon, XIcon } from "lucide-react";
 import { useEffect, useState, type PointerEvent, type ReactElement } from "react";
 
 import { VoiceInputErrorPill } from "./VoiceInputErrorPill";
-import { VoiceInputPill } from "./VoiceInputPill";
+import { VoiceInputPill, VoiceWaveform } from "./VoiceInputPill";
 import { m, type MessageResolver } from "~/i18n/messages";
 import { cn } from "~/lib/utils";
-import "./composerV9.css";
 import { Button } from "../ui/button";
 import { Spinner } from "../ui/spinner";
 import { SharedTooltipTrigger } from "../ui/shared-tooltip";
-
-function V9MicIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.65}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <rect x="9" y="3" width="6" height="11" rx="3" />
-      <path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3M9 21h6" />
-    </svg>
-  );
-}
 
 type DownloadProgress = { downloaded: number; total: number } | null;
 
@@ -97,23 +79,25 @@ function RecordingStatus(props: {
     return () => window.clearInterval(timer);
   }, [preparing, recordingStartedAt]);
 
-  const gain = Math.max(0.45, Math.min(1.25, 0.75 + props.level * 0.5));
-
   return (
-    <span data-v9-voice-recording-pill>
-      <span aria-hidden="true" data-v9-voice-bars style={{ transform: `scaleY(${gain.toFixed(2)})` }}>
-        <i />
-        <i />
-        <i />
-        <i />
-      </span>
-      <span className="shrink-0 text-xs font-semibold tabular-nums">
-        {formatElapsed(elapsedSeconds)}
+    <>
+      <span
+        aria-hidden
+        className={cn(
+          "size-2 shrink-0 rounded-full",
+          preparing ? "bg-muted-foreground/40" : "bg-destructive",
+        )}
+      />
+      <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
+        {formatElapsed(preparing ? 0 : elapsedSeconds)}
         {props.recordingLimitSeconds !== undefined
           ? ` / ${formatElapsed(props.recordingLimitSeconds)}`
           : ""}
       </span>
-    </span>
+      <div className="me-1.5 flex w-16 min-w-0 shrink grow">
+        <VoiceWaveform level={props.level} />
+      </div>
+    </>
   );
 }
 
@@ -155,14 +139,13 @@ export function ComposerSpeechButton(props: {
         variant="ghost"
         aria-label={label}
         disabled={props.disabled}
-        data-v9-sf-btn
         onPointerDown={keepFocus}
         onClick={() => {
           if (!props.disabled) props.onStart();
         }}
         className="shrink-0"
       >
-        <V9MicIcon />
+        <MicIcon />
       </Button>
     </ShortcutTooltip>
   );

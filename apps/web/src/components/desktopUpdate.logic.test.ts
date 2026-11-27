@@ -153,13 +153,13 @@ describe("desktop update button state", () => {
 
 describe("desktop update UI helpers", () => {
   it.each(["owner/repo/extra", "owner#notes/repo", "owner/repo?tab=notes"])(
-    "falls back to the default repository for an invalid configured repository: %s",
+    "falls back to upstream for an invalid configured repository: %s",
     (repository) => {
       expect(getDesktopUpdateReleaseHistoryUrl(repository)).toBe(
-        "https://github.com/zds-xiaoxin/xiaoxin-t3code/releases",
+        "https://github.com/todaroroad/t3-stardust-win/releases",
       );
       expect(getDesktopUpdateReleaseUrl("1.2.3", repository)).toBe(
-        "https://github.com/zds-xiaoxin/xiaoxin-t3code/releases/tag/v1.2.3",
+        "https://github.com/todaroroad/t3-stardust-win/releases/tag/v1.2.3",
       );
     },
   );

@@ -1,5 +1,5 @@
 // @effect-diagnostics nodeBuiltinImport:off
-import { describe, expect, it } from "@effect/vitest";
+import { expect, it } from "@effect/vitest";
 import * as NodeFS from "node:fs";
 import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as NodeServices from "@effect/platform-node/NodeServices";
@@ -23,7 +23,6 @@ import {
   createProviderVersionAdvisory,
   makeTargetedProviderUpdateAction,
   enrichProviderSnapshotWithVersionAdvisory,
-  execWrapperTarget,
   homebrewOwnershipFromCommandPath,
   invalidateLatestProviderVersion,
   makeCachedProviderMaintenanceResolution,
@@ -2947,23 +2946,4 @@ it("pins only owned package-manager installs and preserves their execution conte
     ).toBeNull();
   }
   expect(makeTargetedProviderUpdateAction(capabilities, "2.0.0; rm -rf /")).toBeNull();
-});
-
-describe("execWrapperTarget", () => {
-  it("follows an env-only launcher to the real CLI", () => {
-    const script = [
-      "#!/bin/sh",
-      "# Keep caches outside the isolated home.",
-      "export HF_HOME='/Users/me/cache'",
-      'export HF_HUB_CACHE="$HF_HOME/hub"',
-      "exec '/Users/me/.local/bin/claude' \"$@\"",
-      "",
-    ].join("\n");
-    expect(execWrapperTarget(script)).toBe("/Users/me/.local/bin/claude");
-  });
-  it("ignores scripts that do more than set environment, and relative targets", () => {
-    expect(execWrapperTarget("#!/bin/sh\nrm -rf /tmp/x\nexec '/bin/claude' \"$@\"\n")).toBeNull();
-    expect(execWrapperTarget("#!/bin/sh\nexec 'claude' \"$@\"\n")).toBeNull();
-    expect(execWrapperTarget("#!/usr/bin/env node\nconsole.log(1)\n")).toBeNull();
-  });
 });

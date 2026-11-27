@@ -50,7 +50,6 @@ import {
   FileDiff,
   Files,
   Globe2,
-  ListTodo,
   MessagesSquare,
   Plus,
   TerminalSquare,
@@ -597,8 +596,6 @@ function surfaceTitle(
   resolve: MessageResolver = m,
 ): string {
   switch (surface.kind) {
-    case "tasks":
-      return resolve(msg("Tasks"));
     case "diff":
       return resolve(msg("Diff"));
     case "files":
@@ -692,8 +689,6 @@ function SurfaceIcon({
   switch (surface.kind) {
     case "preview":
       return <PreviewFavicon capturedUrl={previewCapturedUrl} url={previewUrl} />;
-    case "tasks":
-      return <ListTodo className="size-3 shrink-0" />;
     case "diff":
       return <FileDiff className="size-3 shrink-0" />;
     case "files":

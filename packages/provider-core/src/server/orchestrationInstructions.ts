@@ -10,7 +10,6 @@ Ordinary coding tasks need no T3 tools.
 - Call \`orchestrator_capabilities\` once per thread, before the first \`delegate_task\`. Again only after an error or a user-named provider change. Settings go in \`target.options\`. Provider or model unavailable: say so. Never switch unasked or fall back to native tools, Workflow or CLIs. Never make a child's checkout in the shell or in \`task\`.
 - Every new delegate review or re-check is a new \`delegate_task\` (brief, findings, objections), never a \`t3_thread_send\`. Fix small review findings yourself; start no delegate for them. When told to proceed without a delegate, or to run fewer, \`task_cancel\` the extras. Start no replacement.
 - Follow a running delegate's \`next\`. Don't poll it (\`task_status\`, \`sleep\`, watchers, Monitor, ScheduleWakeup). Stop a delegate run you replace or no longer need with \`task_cancel\`, never \`t3_thread_interrupt\` on a \`childThreadId\`.
-- Keep every \`delegate_task\` brief self-contained (goal, hard constraints, preferred reply language/format, expected deliverable). After compaction, if unsure about active delegates or background tasks, inspect your thread via \`t3_thread_read\` (\`view:"activity"\`) or \`t3_thread_list\` (\`includeSubagents:true\`).
 - As a subagent or child, do the work yourself. Start no subagents unless your task says to.`,
   `- \`t3_thread_launch\` and \`create_threads\` make new top-level threads, only when the user asks for a new thread. "Subagent", "delegate", and "parallel" never mean one. Worktree thread: set \`workspaceStrategy\`. Honor a requested base. Otherwise independent work uses the default branch as \`remote/branch\` with \`startFromOrigin:true\`; with no remote, use the local default. Required unpublished commits and dependent work use their local base. Shell worktrees don't bind it, and no checkout setup in its prompt. No \`workspaceStrategy\`: project root, not your worktree.
 - Given a thread id, \`t3_thread_read\` it before you answer about it. Asked to settle a thread, this one too: \`t3_thread_organize\`.
@@ -29,21 +28,6 @@ export const T3_CODE_ORCHESTRATION_INSTRUCTIONS = `
 
 ${T3_CODE_ORCHESTRATION_SECTIONS.join("\n\n")}
 `;
-
-/**
- * Compact preservation checklist read by Claude's summarizer ("## Compact Instructions"),
- * PreCompact hooks, and Codex additionalContext. Kept concise (<700 bytes) to avoid context bloat.
- */
-export const T3_CODE_COMPACT_INSTRUCTIONS = `## Compact Instructions
-
-When compacting this conversation, preserve verbatim:
-1. The user's reply language, tone, formatting preferences, and explicit corrections.
-2. Active goals, key decisions with rationale, and hard constraints.
-3. Every delegated or background task (taskId, childThreadId link, purpose, expected output) and open PR/thread links.
-4. Key absolute file paths and tool conventions (html_preview -> html_render for visuals, clickable file links, never poll delegates).`;
-
-export const T3_CODE_POST_COMPACT_CONTEXT =
-  "Conversation was just compacted. Maintain the user's preferred reply language and formatting; if unsure about active delegated or background tasks, call `t3_thread_read` (`view:\"activity\"`) or `t3_thread_list` (`includeSubagents:true`) to recover them.";
 
 export const T3_CODE_BROWSER_TOOL_INSTRUCTIONS = `
 

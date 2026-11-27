@@ -1,5 +1,3 @@
-
-import { uiText } from "~/i18n";
 import type { FileDiffContentsLoader, FileDiffMetadata } from "@pierre/diffs";
 import type {
   PullRequestReviewGuideAttention,
@@ -15,7 +13,7 @@ import {
   MessageCircleQuestionIcon,
   MessageSquareIcon,
 } from "lucide-react";
-import { T, useGT, useMessages, Var } from "gt-react";
+import { msg, T, useGT, useMessages, Var } from "gt-react";
 import type { ReactNode } from "react";
 
 import { getDiffLineStat } from "~/lib/diffRendering";
@@ -34,21 +32,11 @@ import { GuideProse } from "./GuideProse";
 import { letterStopNotes } from "@t3tools/client-runtime/review-guide-tour";
 
 const ATTENTION_LABELS = {
-  get tradeoff() {
-    return uiText("A tradeoff to weigh");
-  },
-  get contract() {
-    return uiText("A contract to check");
-  },
-  get product() {
-    return uiText("A product call");
-  },
-  get risk() {
-    return uiText("A risk to judge");
-  },
-  get accessibility() {
-    return uiText("An accessibility call");
-  },
+  tradeoff: msg("A tradeoff to weigh"),
+  contract: msg("A contract to check"),
+  product: msg("A product call"),
+  risk: msg("A risk to judge"),
+  accessibility: msg("An accessibility call"),
 } as const satisfies Record<PullRequestReviewGuideAttention["kind"], string>;
 
 export function GuideStop({

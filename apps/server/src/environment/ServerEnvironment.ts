@@ -221,7 +221,6 @@ export const make = Effect.gen(function* () {
     ...(databaseMigration === undefined ? {} : { databaseMigration }),
     capabilities: {
       repositoryIdentity: true,
-      threadArchiveSafety: true,
       connectionProbe: true,
       attachmentUploads: true,
       accessTokenRenewal: true,
@@ -285,8 +284,7 @@ export const make = Effect.gen(function* () {
       oneTimeSchedules: true,
       freshContext: true,
       scheduledTaskThreadModes: true,
-      // The npm package is upstream's; this fork does not offer registry-based track switching.
-      npmReleaseLookup: false,
+      npmReleaseLookup: true,
       voiceTranscription: isSpeechPlatformSupported(hostPlatform, hostArchitecture, hostLibc),
       cloudVoiceTranscription: true,
       ...(serverSelfUpdate === null ? {} : { serverSelfUpdate }),

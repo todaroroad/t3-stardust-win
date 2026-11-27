@@ -21,7 +21,7 @@ interface Props {
   onSendAnnotation?: (
     annotation: PreviewAnnotationPayload,
     image: ComposerImageAttachment | null,
-  ) => void | boolean | Promise<void | boolean>;
+  ) => void;
 }
 
 export function PreviewPanel({

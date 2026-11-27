@@ -99,7 +99,6 @@ const unitTestProject = {
 // Stay below ephemeral ranges: Windows reserves Hyper-V/WSL blocks there and EACCES is not skipped.
 const browserTestApiPort = 20_000 + ((Hash.string(import.meta.dirname) >>> 0) % 4_000);
 
-const diagnosticPages = new WeakSet<object>();
 const browserTestProject = {
   extends: true,
   // Pre-bundle lazy browser and worker dependencies to avoid mid-run reloads.
@@ -139,36 +138,13 @@ const browserTestProject = {
     browser: {
       enabled: true,
       headless: true,
-      provider: playwright({
-        launchOptions: process.env.T3_BROWSER_NET_LOG
-          ? { args: [`--log-net-log=${process.env.T3_BROWSER_NET_LOG}`] }
-          : {},
-      }),
+      provider: playwright(),
       instances: [{ browser: "chromium" }],
       screenshotFailures: false,
       commands: {
         // Playwright's mouse outlives each test, so whatever mounts under its last
         // position starts hovered. test/browserSetup.ts parks it off the page before each test.
         resetPointer: async ({ page }) => {
-          if (process.env.T3_BROWSER_DIAGNOSTICS === "1" && !diagnosticPages.has(page)) {
-            diagnosticPages.add(page);
-            const diagnostic = (event: string, detail = "") =>
-              console.info("[browser-lifecycle]", event, detail);
-            page.on("close", () => diagnostic("page-close"));
-            page.on("crash", () => diagnostic("page-crash"));
-            page.on("framenavigated", (frame) => {
-              if (!frame.parentFrame())
-                diagnostic("main-navigation", new URL(frame.url()).pathname);
-            });
-            page.on("websocket", (socket) => {
-              socket.on("close", () => diagnostic("socket-close", new URL(socket.url()).pathname));
-              socket.on("socketerror", (error) => diagnostic("socket-error", error));
-            });
-            page.on("console", (message) => {
-              if (message.text().startsWith("[vite]")) diagnostic("vite", message.text());
-            });
-            diagnostic("attached", new URL(page.url()).pathname);
-          }
           await page.mouse.move(-1, -1);
         },
         // A press held across a render: userEvent only offers whole clicks.
@@ -284,7 +260,7 @@ function bootstrapTitlePlugin(): Plugin {
         hostedAppChannel: configuredHostedAppChannel,
         development,
       });
-      const title = formatAppDisplayName({ baseName: "T3 Stardust", stageLabel });
+      const title = development ? formatAppDisplayName({ baseName: "T3星辰版", stageLabel }) : "T3星辰版";
       return html.replace(/<title>[^<]*<\/title>/, `<title>${title}</title>`);
     },
   };

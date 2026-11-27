@@ -42,11 +42,8 @@ function numberFormatter(locale: string, currency: boolean): Intl.NumberFormat {
   return formatter;
 }
 
-export const MALFORMED_USAGE_WARNING_TEMPLATE =
-  "{count} malformed or inconsistent usage record(s) were skipped; usage may be incomplete.";
-
 export function formatMalformedUsageWarning(count: number): string {
-  return MALFORMED_USAGE_WARNING_TEMPLATE.replace("{count}", String(count));
+  return `${count} malformed or inconsistent usage record(s) were skipped; usage may be incomplete.`;
 }
 
 export function usageSourceMessages(

@@ -306,7 +306,6 @@ export default defineConfig({
       "t3code/no-global-process-runtime": "error",
       "t3code/no-inline-schema-compile": "error",
       "t3code/no-low-value-comments": "error",
-      "t3code/no-hardcoded-ui-han": "error",
       "t3code/no-manual-effect-runtime-in-tests": "error",
       "t3code/no-native-title-tooltip": "error",
       // Test files only (the rule checks the filename).
@@ -608,9 +607,7 @@ export default defineConfig({
           "apps/mobile/src/features/development/**",
           "packages/client-runtime/src/rpc/**",
         ],
-        // Stardust: custom copy goes through uiText/catalog.ts, which this rule does not recognise,
-        // so it reports instead of failing the lint gate.
-        rules: { "t3code/no-untranslated-copy": "warn" },
+        rules: { "t3code/no-untranslated-copy": "error" },
       },
       {
         // React Compiler owns memoization; upstream rules do not ban redundant useMemo/useCallback.

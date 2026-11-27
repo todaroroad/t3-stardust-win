@@ -290,7 +290,9 @@ const startLocalBackend = Effect.gen(function* () {
   if (yield* Ref.get(state.quitting)) {
     return false;
   }
-  yield* desktopWindow.showConnectingSplash;
+  if (settings.wslOnly === true && settings.wslBackendEnabled === true) {
+    yield* desktopWindow.showConnectingSplash;
+  }
   yield* primaryBackend.start;
   yield* logBootstrapInfo("bootstrap backend start requested");
   yield* Effect.forkScoped(restartOnFeatureFlagChange(primaryBackend));

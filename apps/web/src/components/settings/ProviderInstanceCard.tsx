@@ -1,12 +1,7 @@
-import { uiText } from "~/i18n";
-
-
 import { Spinner } from "~/components/ui/spinner";
 
 import {
   AlertTriangleIcon,
-  ArrowDownIcon,
-  ArrowUpIcon,
   CheckIcon,
   ArrowUpCircleIcon,
   CopyIcon,
@@ -207,10 +202,12 @@ export function deriveProviderModelsForDisplay(input: {
   );
   return [...serverModels, ...customModels];
 }
+
 function ProviderAuthEmail(props: { readonly email: string | undefined }) {
   const gt = useGT();
   const email = props.email?.trim();
   if (!email) return null;
+
   return (
     <RedactedSensitiveText
       value={email}
@@ -221,18 +218,21 @@ function ProviderAuthEmail(props: { readonly email: string | undefined }) {
     />
   );
 }
+
 function readProviderEnvironmentVariable(
   environment: ReadonlyArray<ProviderInstanceEnvironmentVariable> | undefined,
   name: string,
 ): ProviderInstanceEnvironmentVariable | undefined {
   return environment?.find((variable) => variable.name === name);
 }
+
 function providerEnvironmentWithoutNames(
   environment: ReadonlyArray<ProviderInstanceEnvironmentVariable> | undefined,
   names: ReadonlySet<string>,
 ): ReadonlyArray<ProviderInstanceEnvironmentVariable> {
   return (environment ?? []).filter((variable) => !names.has(variable.name));
 }
+
 export function nextProviderEnvironmentWithFieldValue(
   environment: ReadonlyArray<ProviderInstanceEnvironmentVariable> | undefined,
   field: ProviderEnvironmentField,
@@ -446,6 +446,7 @@ export function ProviderEnvironmentSection(props: {
         sensitive: true,
       },
     ]);
+
   return (
     <SettingsRow
       title={gt("Variables")}
@@ -589,10 +590,11 @@ export function ProviderEnvironmentSection(props: {
             );
           })}
           <p className="text-xs text-muted-foreground">
-            {uiText("Sensitive values are stored separately and never returned to the app.")}
             {rows.some((row) => row.valueRedacted === true)
-              ? ` ${uiText("Enter a new value to rename a saved one or make it plain text.")}`
-              : null}
+              ? gt(
+                  "Sensitive values are stored separately and never returned to the app. Enter a new value to rename a saved one or make it plain text.",
+                )
+              : gt("Sensitive values are stored separately and never returned to the app.")}
           </p>
         </div>
       ) : null}
@@ -719,8 +721,6 @@ interface ProviderInstanceCardProps {
   readonly onModelOrderChange: (next: ReadonlyArray<string>) => void;
   readonly onRunUpdate?: (() => void) | undefined;
   readonly onInstallRecommended?: (() => void) | undefined;
-  readonly onMoveUp?: (() => void) | undefined;
-  readonly onMoveDown?: (() => void) | undefined;
   readonly isUpdating?: boolean | undefined;
   readonly onAcceptUrlAuth?: ((action: AcpRegistryUrlAuthAction) => void) | undefined;
   readonly environmentId?: EnvironmentId | undefined;
@@ -792,8 +792,6 @@ export function ProviderInstanceCard({
   onModelOrderChange,
   onRunUpdate,
   onInstallRecommended,
-  onMoveUp,
-  onMoveDown,
   isUpdating = false,
   onAcceptUrlAuth,
   environmentId,
@@ -1183,16 +1181,11 @@ export function ProviderInstanceCard({
           />
           {titleIconNode}
           <span className="min-w-0 flex-1">
-            <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
-              <span className="text-sm font-medium leading-snug text-foreground [overflow-wrap:anywhere]">
-                {displayName}
-              </span>
+            <span className="flex min-w-0 items-center gap-2">
+              <span className="truncate text-sm font-medium text-foreground">{displayName}</span>
               {versionLabel ? (
-                <code className="shrink-0 text-xs text-muted-foreground">
+                <code className="max-w-24 shrink-0 truncate text-xs text-muted-foreground">
                   {versionLabel}
-                  {versionAdvisory?.targetVersion
-                    ? ` → ${getProviderVersionLabel(versionAdvisory.targetVersion)}`
-                    : null}
                 </code>
               ) : null}
               {versionAdvisoryNode}
@@ -1218,71 +1211,9 @@ export function ProviderInstanceCard({
                 </span>
               </ProviderStatusDiagnostic>
             </span>
-            {versionAdvisory && (onRunVersionAction || updateCommand) ? (
-              <span className="pointer-events-auto relative mt-1.5 flex flex-wrap items-center gap-1.5">
-                {onRunVersionAction ? (
-                  <Button
-                    type="button"
-                    size="micro"
-                    variant="outline"
-                    disabled={isUpdating}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onRunVersionAction();
-                    }}
-                  >
-                    {isUpdating ? <Spinner size="sm" /> : <DownloadIcon className="size-3" />}
-                    {isUpdating ? uiText("Updating") : uiText("Update")}
-                  </Button>
-                ) : updateCommand ? (
-                  <Button
-                    type="button"
-                    size="micro"
-                    variant="ghost-muted"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      copyToClipboard(updateCommand, { providerName: displayName });
-                    }}
-                  >
-                    <CopyIcon className="size-3" />
-                    {uiText("Copy command")}
-                  </Button>
-                ) : null}
-              </span>
-            ) : null}
           </span>
         </div>
-        <span className="pointer-events-none relative flex shrink-0 items-center gap-1 *:pointer-events-auto">
-          {!readOnly && canWriteSettings && (onMoveUp || onMoveDown) ? (
-            <span className="flex items-center opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
-              <Button
-                type="button"
-                size="icon-micro"
-                variant="ghost-muted"
-                disabled={!onMoveUp}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onMoveUp?.();
-                }}
-                aria-label={uiText("Move up")}
-              >
-                <ArrowUpIcon className="size-3" />
-              </Button>
-              <Button
-                type="button"
-                size="icon-micro"
-                variant="ghost-muted"
-                disabled={!onMoveDown}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onMoveDown?.();
-                }}
-                aria-label={uiText("Move down")}
-              >
-                <ArrowDownIcon className="size-3" />
-              </Button>
-            </span>
-          ) : null}
+        <span className="pointer-events-none relative flex h-5 shrink-0 items-center gap-1 *:pointer-events-auto">
           {projectOverride?.value !== undefined ? (
             <span className="flex items-center">
               <ProjectOverrideInheritance
@@ -1384,6 +1315,7 @@ export function ProviderInstanceCard({
       ) : null}
     </>
   );
+
   const runtimeFields = driverOption ? (
     <ProviderSettingsForm
       definition={driverOption}
@@ -1445,6 +1377,7 @@ export function ProviderInstanceCard({
           }
         />
       </SettingsSection>
+
       {setup || environmentFields.length > 0 ? (
         <SettingsSection title={gt("Setup")}>
           {setup}
@@ -1503,6 +1436,7 @@ export function ProviderInstanceCard({
           {runtimeFields}
         </SettingsSection>
       ) : null}
+
       <SettingsSection
         title={gt("Environment")}
         inert={readOnly || instanceLocks?.wholeEnvironment}
@@ -1536,6 +1470,7 @@ export function ProviderInstanceCard({
           readOnly={readOnly}
         />
       ) : null}
+
       {driverOption !== undefined ? (
         <SettingsSection title={gt("Models")}>
           <div className="px-3 py-3 sm:px-4">

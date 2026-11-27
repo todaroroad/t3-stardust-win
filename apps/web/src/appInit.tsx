@@ -8,7 +8,6 @@ import type { ClientSettings } from "@t3tools/contracts/settings";
 import { createBrowserHistory, createHashHistory } from "@tanstack/react-router";
 import * as Schema from "effect/Schema";
 
-import { applySidebarAppearance } from "./sidebarAppearance";
 import { applyAppearanceContrast } from "./appearanceContrast";
 import { applyAppearanceFontVariables, TYPOGRAPHY_ADVANCED_STORAGE_KEY } from "./appearanceFonts";
 import { startElectronBrowserHost } from "./browser/ElectronBrowserHost";
@@ -29,7 +28,7 @@ import { startDesktopUpdateLaunchNotice } from "./components/sidebar/updateEvery
 import { startSlowRpcRequestToasts } from "./components/SlowRpcRequestToastCoordinator";
 import { startThreadNotifications } from "./components/ThreadNotificationCoordinator";
 import { startGuideRunNotifications } from "./components/pullRequest/guide/PullRequestGuideRunCoordinator";
-import { appBaseName, appDisplayName, APP_STAGE_LABEL, RELEASE_CHANNEL } from "./branding";
+import { APP_BASE_NAME, APP_DISPLAY_NAME, APP_STAGE_LABEL } from "./branding";
 import { resolveServerBackedAppDisplayName, resolveWindowTitle } from "./branding.logic";
 import { isElectron } from "./env";
 import {
@@ -86,13 +85,6 @@ function startClientAppearance(): void {
     );
     const previousSeparateFonts = appliedSeparateFonts;
     appliedSeparateFonts = separateFonts;
-    if (
-      previous?.fontFamilySidebar !== settings.fontFamilySidebar ||
-      previous?.fontSizeSidebar !== settings.fontSizeSidebar ||
-      previous?.sidebarTextColorLight !== settings.sidebarTextColorLight ||
-      previous?.sidebarTextColorDark !== settings.sidebarTextColorDark
-    )
-      applySidebarAppearance(root, settings);
     if (previous?.diffColorScheme !== settings.diffColorScheme) {
       root.dataset.diffColorScheme = settings.diffColorScheme;
     }
@@ -180,10 +172,9 @@ function startDocumentTitle(router: AppRouter): void {
           );
     const title = resolveWindowTitle({
       appDisplayName: resolveServerBackedAppDisplayName({
-        baseName: appBaseName(),
-        fallbackDisplayName: appDisplayName(),
+        baseName: APP_BASE_NAME,
+        fallbackDisplayName: APP_DISPLAY_NAME,
         fallbackStageLabel: APP_STAGE_LABEL,
-        releaseChannel: RELEASE_CHANNEL,
         primaryServerVersion:
           appAtomRegistry.get(primaryServerConfigAtom)?.environment.serverVersion ?? null,
       }),

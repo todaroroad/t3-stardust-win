@@ -1,4 +1,3 @@
-import { uiText } from "~/i18n";
 import type { PullRequestInvolvement, PullRequestListState } from "@t3tools/contracts";
 import {
   CalendarArrowDownIcon,
@@ -54,55 +53,13 @@ export const STATE_TABS = [
 ] as const satisfies ReadonlyArray<PullRequestFilterOption<PullRequestListState>>;
 
 export const SORT_OPTIONS = [
-  {
-    value: "ready",
-    get label() {
-      return uiText("Merge readiness");
-    },
-    Icon: ListChecksIcon,
-  },
-  {
-    value: "blocked",
-    get label() {
-      return uiText("Blocked on me");
-    },
-    Icon: UserLockIcon,
-  },
-  {
-    value: "updated",
-    get label() {
-      return uiText("Recently updated");
-    },
-    Icon: ClockIcon,
-  },
-  {
-    value: "newest",
-    get label() {
-      return uiText("Newest shown");
-    },
-    Icon: CalendarArrowDownIcon,
-  },
-  {
-    value: "oldest",
-    get label() {
-      return uiText("Oldest shown");
-    },
-    Icon: CalendarArrowUpIcon,
-  },
-  {
-    value: "largest",
-    get label() {
-      return uiText("Largest shown");
-    },
-    Icon: Maximize2Icon,
-  },
-  {
-    value: "smallest",
-    get label() {
-      return uiText("Smallest shown");
-    },
-    Icon: Minimize2Icon,
-  },
+  { value: "ready", label: msg("Merge readiness"), Icon: ListChecksIcon },
+  { value: "blocked", label: msg("Blocked on me"), Icon: UserLockIcon },
+  { value: "updated", label: msg("Recently updated"), Icon: ClockIcon },
+  { value: "newest", label: msg("Newest shown"), Icon: CalendarArrowDownIcon },
+  { value: "oldest", label: msg("Oldest shown"), Icon: CalendarArrowUpIcon },
+  { value: "largest", label: msg("Largest shown"), Icon: Maximize2Icon },
+  { value: "smallest", label: msg("Smallest shown"), Icon: Minimize2Icon },
 ] as const satisfies ReadonlyArray<PullRequestFilterOption<PullRequestListSort>>;
 
 /** Static option tables hold `msg()` labels; components resolve them with `useMessages()`. */

@@ -32,9 +32,6 @@ import { ThreadPullRequestsPanel } from "../pullRequest/ThreadPullRequestsPanel"
 const PreviewPanel = lazy(() =>
   import("../preview/PreviewPanel").then((module) => ({ default: module.PreviewPanel })),
 );
-const TaskBoardPanel = lazy(() =>
-  import("../TaskBoardPanel").then((module) => ({ default: module.TaskBoardPanel })),
-);
 const DiffPanel = lazy(() => import("../DiffPanel"));
 const DevicePanel = lazy(() =>
   import("../device/DevicePanel").then((module) => ({ default: module.DevicePanel })),
@@ -82,7 +79,7 @@ export function RightPanelSurfaceContent(props: {
   readonly onSendAnnotation: (
     annotation: PreviewAnnotationPayload,
     image: ComposerImageAttachment | null,
-  ) => void | boolean | Promise<void | boolean>;
+  ) => void;
   readonly onCloseSurface: (surface: RightPanelSurface) => void;
   readonly terminal: RightPanelTerminalProps;
   readonly pullRequest: RightPanelPullRequestProps;
@@ -94,12 +91,6 @@ export function RightPanelSurfaceContent(props: {
   const gt = useGT();
   if (surface === null) return null;
   switch (surface.kind) {
-    case "tasks":
-      return visible ? (
-        <Suspense fallback={null}>
-          <TaskBoardPanel cwd={props.files.workspaceRoot ?? null} threadRef={threadRef} />
-        </Suspense>
-      ) : null;
     case "preview":
       return (
         <Suspense fallback={null}>

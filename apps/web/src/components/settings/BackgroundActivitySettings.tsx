@@ -1,5 +1,3 @@
-
-import { uiText } from "~/i18n";
 import { useScopedSettingsWriteAllowed } from "./useScopedSettings";
 import { SettingsIcon } from "lucide-react";
 import { msg, T, useGT, useMessages } from "gt-react";
@@ -40,15 +38,9 @@ import { useSearchableSetting } from "./settingsSearch";
 import { SharedTooltipTrigger } from "../ui/shared-tooltip";
 
 const BACKGROUND_ACTIVITY_PROFILE_LABELS: Record<BackgroundActivityProfile, string> = {
-  get balanced() {
-    return uiText("Balanced");
-  },
-  get performance() {
-    return uiText("Performance");
-  },
-  get "battery-saver"() {
-    return uiText("Battery saver");
-  },
+  balanced: msg("Balanced"),
+  performance: msg("Performance"),
+  "battery-saver": msg("Battery saver"),
 };
 
 type BackgroundActivityProfileOption = BackgroundActivityProfile | "advanced";
@@ -74,30 +66,10 @@ const BACKGROUND_ACTIVITY_BOOLEAN_OVERRIDES: ReadonlyArray<{
     | "pauseWhenOnBattery";
   readonly label: string;
 }> = [
-  {
-    key: "pauseWhenHostLocked",
-    get label() {
-      return uiText("Pause when host is locked");
-    },
-  },
-  {
-    key: "pauseWhenHostLowPower",
-    get label() {
-      return uiText("Pause on host low power");
-    },
-  },
-  {
-    key: "pauseWhenClientLowPower",
-    get label() {
-      return uiText("Pause on client low power");
-    },
-  },
-  {
-    key: "pauseWhenOnBattery",
-    get label() {
-      return uiText("Pause on battery");
-    },
-  },
+  { key: "pauseWhenHostLocked", label: msg("Pause when host is locked") },
+  { key: "pauseWhenHostLowPower", label: msg("Pause on host low power") },
+  { key: "pauseWhenClientLowPower", label: msg("Pause on client low power") },
+  { key: "pauseWhenOnBattery", label: msg("Pause on battery") },
 ];
 
 function resetBackgroundActivitySettings() {

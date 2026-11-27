@@ -2,7 +2,6 @@ import {
   ProviderInstanceId,
   ProviderSetupError,
   type OrchestrationV2ProviderCapabilities,
-  type ServerProviderModel,
   type ServerProvider,
 } from "@t3tools/contracts";
 import * as Context from "effect/Context";
@@ -51,7 +50,6 @@ export interface ProviderAdapterRegistryV2Shape {
     {
       readonly driver: ProviderAdapter.ProviderAdapterV2["Service"]["driver"];
       readonly continuationKey: string;
-      readonly models?: ReadonlyArray<ServerProviderModel>;
       readonly enabled: boolean;
       readonly capabilities: OrchestrationV2ProviderCapabilities;
     },
@@ -172,7 +170,6 @@ export const layerFromProviderInstanceRegistry: Layer.Layer<
         return {
           driver: instance.driverKind,
           continuationKey: instance.continuationIdentity.continuationKey,
-          models: (yield* instance.snapshot.getSnapshot).models,
           enabled: instance.enabled,
           capabilities,
         };

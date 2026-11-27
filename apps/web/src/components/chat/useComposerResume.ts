@@ -164,7 +164,6 @@ export function useComposerResume(input: ComposerResumeInput) {
       next.delete(routeThreadKey);
       return next;
     });
-    return result._tag === "Success";
   };
 
   return { onResume, isResuming };

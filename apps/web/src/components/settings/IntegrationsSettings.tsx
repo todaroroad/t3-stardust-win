@@ -682,16 +682,12 @@ function BrowserRecordingFrameRateSetting({ disabled }: { readonly disabled: boo
             className="w-full sm:w-40"
             aria-label={gt("Browser recording frame rate")}
           >
-            <SelectValue>
-              {frameRate}
-              {" fps"}
-            </SelectValue>
+            <SelectValue>{frameRate} fps</SelectValue>
           </SelectTrigger>
           <SelectPopup align="end" alignItemWithTrigger={false}>
             {BROWSER_RECORDING_FRAME_RATES.map((rate) => (
               <SelectItem hideIndicator key={rate} value={String(rate)}>
-                {rate}
-                {" fps"}
+                {rate} fps
               </SelectItem>
             ))}
           </SelectPopup>
@@ -843,11 +839,13 @@ function BrowserSearchEngineSetting() {
     </>
   );
 }
+
 export function PullRequestLinksOpenInAppSetting() {
   const searchableSetting = useSearchableSetting();
   const gt = useGT();
   const openInApp = useClientSettings((settings) => settings.pullRequestLinksOpenInApp);
   const updateSettings = useUpdatePrimarySettings();
+
   return (
     <SettingsRow
       {...searchableSetting("pull-request-links-open-in-app")}
@@ -874,6 +872,7 @@ export function PullRequestLinksOpenInAppSetting() {
     />
   );
 }
+
 function DeviceIntegrationSettings() {
   const gt = useGT();
   const { search, environment: selected } = useSettingsScope();
@@ -1187,6 +1186,7 @@ function BrowserAutoShowFloatingPreviewSetting({ disabled }: { readonly disabled
     />
   );
 }
+
 function BrowserProfilesSetting({ disabled }: { readonly disabled: boolean }) {
   const searchableSetting = useSearchableSetting();
   const gt = useGT();
@@ -1384,7 +1384,9 @@ function BrowserProfilesSetting({ disabled }: { readonly disabled: boolean }) {
       return undefined;
     }
   };
+
   const atProfileLimit = userProfiles.length >= BROWSER_PROFILE_MAX_COUNT;
+
   return (
     <SettingsRow
       {...searchableSetting("browser-profiles")}
@@ -1689,6 +1691,7 @@ function BrowserProfilesSetting({ disabled }: { readonly disabled: boolean }) {
     </SettingsRow>
   );
 }
+
 export function BrowserSettingsPanel() {
   const searchableSetting = useSearchableSetting();
   const gt = useGT();

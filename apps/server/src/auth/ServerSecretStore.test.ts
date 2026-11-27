@@ -272,14 +272,4 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("ServerSecretStor
       assert.equal((error.cause as PlatformError.PlatformError).reason._tag, "PermissionDenied");
     }).pipe(Effect.provide(layerRenameFailureSecretStore())),
   );
-
-  it.effect("rejects secret names containing path separators or null bytes", () =>
-    Effect.gen(function* () {
-      const secretStore = yield* ServerSecretStore.ServerSecretStore;
-      for (const badName of ["../escape", "nested/key", "win\\key", "bad\0key"]) {
-        const error = yield* Effect.flip(secretStore.get(badName));
-        assert.instanceOf(error, ServerSecretStore.SecretStoreNameError);
-      }
-    }).pipe(Effect.provide(layerServerSecretStore())),
-  );
 });

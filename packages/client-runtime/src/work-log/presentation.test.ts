@@ -47,24 +47,6 @@ describe("workEntryIndicatesToolFailure", () => {
     label: "Read",
   };
 
-  it("keeps a no-match search neutral despite the provider's failed status", () => {
-    const entry = {
-      ...base,
-      tone: "tool",
-      itemType: "command_execution",
-      toolLifecycleStatus: "failed",
-      structuredPayload: commandItem({ status: "failed", exitCode: 1 }),
-    } satisfies WorkLogPresentationEntry;
-    expect(workEntryDisplayIndicatesToolFailure(entry)).toBe(false);
-    expect(workEntryIndicatesToolFailure(entry)).toBe(false);
-    expect(
-      workEntryDisplayIndicatesToolFailure({
-        ...entry,
-        structuredPayload: commandItem({ status: "failed", exitCode: 1, outputOmitted: true }),
-      }),
-    ).toBe(true);
-  });
-
   it.each([
     [{ exitCode: 2 }, true],
     [{ output: "sh: missing-command: command not found" }, true],

@@ -462,9 +462,9 @@ function InstanceSessionManagement(
                   </SelectPopup>
                 </Select>
                 <Button
-                  type={"button"}
-                  size={"sm"}
-                  variant={"outline"}
+                  type="button"
+                  size="sm"
+                  variant="outline"
                   disabled={!canRead || loading || projectId === null}
                   onClick={() => void loadSessions()}
                 >
@@ -540,10 +540,10 @@ function InstanceSessionManagement(
 
             {nextCursor !== null ? (
               <Button
-                type={"button"}
-                size={"xs"}
-                variant={"ghost-muted"}
-                className={"w-fit"}
+                type="button"
+                size="xs"
+                variant="ghost-muted"
+                className="w-fit"
                 disabled={!canRead || loading}
                 onClick={() => void loadSessions(nextCursor)}
               >
@@ -555,8 +555,8 @@ function InstanceSessionManagement(
       </SettingsRow>
 
       {canConfigureProviders ? (
-        <div className={"grid gap-3 border-t border-border/60 px-3 py-3 sm:px-4"}>
-          <div className={"flex flex-wrap items-center justify-between gap-2"}>
+        <div className="grid gap-3 border-t border-border/60 px-3 py-3 sm:px-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <p className="text-xs font-medium text-foreground">
                 <T>Agent providers</T>
@@ -624,10 +624,10 @@ function InstanceSessionManagement(
                     [provider.providerId]: { ...draft, ...update },
                   }));
                 return (
-                  <div key={provider.providerId} className={"grid gap-2 py-3"}>
-                    <div className={"flex items-center justify-between gap-2"}>
-                      <div className={"min-w-0"}>
-                        <p className={"truncate text-xs font-medium text-foreground"}>
+                  <div key={provider.providerId} className="grid gap-2 py-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="truncate text-xs font-medium text-foreground">
                           {provider.providerId}
                         </p>
                         <p className="text-3xs text-muted-foreground">
@@ -637,11 +637,11 @@ function InstanceSessionManagement(
                           {provider.required ? ` · ${gt("Required")}` : ""}
                         </p>
                       </div>
-                      <div className={"flex items-center gap-1"}>
+                      <div className="flex items-center gap-1">
                         <Button
-                          type={"button"}
-                          size={"xs"}
-                          variant={"outline"}
+                          type="button"
+                          size="xs"
+                          variant="outline"
                           disabled={
                             props.readOnly ||
                             savingProviderId !== null ||
@@ -670,7 +670,7 @@ function InstanceSessionManagement(
                         ) : null}
                       </div>
                     </div>
-                    <div className={"grid gap-2 sm:grid-cols-[9rem_minmax(0,1fr)]"}>
+                    <div className="grid gap-2 sm:grid-cols-[9rem_minmax(0,1fr)]">
                       <Select
                         value={draft.apiType}
                         disabled={props.readOnly || savingProviderId !== null}

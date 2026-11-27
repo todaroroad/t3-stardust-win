@@ -1,5 +1,3 @@
-
-import { uiText } from "~/i18n";
 import type { CSSProperties } from "react";
 import { useState } from "react";
 import { msg, useGT, useMessages } from "gt-react";
@@ -42,17 +40,11 @@ import { TypographySection } from "./TypographySettings";
 import { ThreadDetailsItemsRow } from "./ThreadDetailsItemsRow";
 
 const ENVIRONMENT_IDENTIFICATION_LABELS: Record<EnvironmentIdentificationMode, string> = {
-  get artwork() {
-    return uiText("Artwork");
-  },
-  "nightly-artwork": "Nightly artwork",
-  "dev-artwork": "Dev artwork",
-  get pill() {
-    return uiText("Version pill");
-  },
-  get none() {
-    return uiText("None");
-  },
+  artwork: msg("Artwork"),
+  "nightly-artwork": msg("Nightly artwork"),
+  "dev-artwork": msg("Dev artwork"),
+  pill: msg("Version pill"),
+  none: msg("None"),
 };
 
 // The default "artwork" follows the running channel, so it is labeled as that channel's art,
@@ -161,6 +153,7 @@ export function AppearanceSettingsPanel() {
     "--settings-slider-progress": `${panelAnimationDurationRatio * 100}%`,
     "--settings-slider-fill-offset": `${0.5 - panelAnimationDurationRatio}rem`,
   } as CSSProperties;
+
   return (
     <SettingsPageContainer>
       <SettingsSection id="appearance" title={gt("Colors & themes")} variant="plain" hideTitle>
@@ -203,8 +196,7 @@ export function AppearanceSettingsPanel() {
                 className="min-w-12 rounded-md bg-muted px-2 py-1 text-center font-mono text-xs font-medium tabular-nums text-foreground"
                 htmlFor="appearance-contrast"
               >
-                {settings.appearanceContrast}
-                {"%"}
+                {settings.appearanceContrast}%
               </output>
               <input
                 aria-label={gt("Contrast")}
@@ -230,6 +222,7 @@ export function AppearanceSettingsPanel() {
             </div>
           }
         />
+
         <SettingsRow
           {...searchableSetting("setting-glass-opacity")}
           description={gt("Higher values make menus, dialogs, and the composer more solid.")}
@@ -249,8 +242,7 @@ export function AppearanceSettingsPanel() {
                 className="min-w-12 rounded-md bg-muted px-2 py-1 text-center font-mono text-xs font-medium tabular-nums text-foreground"
                 htmlFor="glass-opacity"
               >
-                {settings.glassOpacity}
-                {"%"}
+                {settings.glassOpacity}%
               </output>
               <input
                 aria-label={gt("Glass opacity")}
@@ -276,6 +268,7 @@ export function AppearanceSettingsPanel() {
             </div>
           }
         />
+
         <SettingsRow
           {...searchableSetting("chat-width")}
           description={gt("Set how wide messages and the composer can grow on large screens.")}
@@ -437,8 +430,7 @@ export function AppearanceSettingsPanel() {
                     className="min-w-16 rounded-md bg-muted px-2 py-1 text-center font-mono text-xs font-medium tabular-nums text-foreground"
                     htmlFor="panel-animation-duration"
                   >
-                    {settings.panelAnimationDurationMs}
-                    {" ms"}
+                    {settings.panelAnimationDurationMs} ms
                   </output>
                   <input
                     aria-label={gt("Panel animation duration")}
@@ -551,6 +543,7 @@ export function AppearanceSettingsPanel() {
           />
         </AdvancedSettings>
       </SettingsSection>
+
       <TypographySection />
     </SettingsPageContainer>
   );

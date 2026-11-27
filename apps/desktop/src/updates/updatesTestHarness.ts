@@ -37,8 +37,6 @@ export interface UpdatesHarnessOptions {
   readonly env?: Record<string, string | undefined>;
   readonly platform?: NodeJS.Platform;
   readonly packageType?: string | undefined;
-  /** Contents of the packaged app's app-update.yml; absent means the build has no feed. */
-  readonly appUpdateYml?: string | undefined;
   readonly installRecord?: string | undefined;
   readonly policy?: DesktopUpdatePolicy.UpdatePolicy;
   readonly appVersion?: string;
@@ -46,10 +44,6 @@ export interface UpdatesHarnessOptions {
   readonly savedChannel?: DesktopAppSettings.DesktopSettings["updateChannel"];
   /** Adds a WSL backend beside the primary, as on a Windows host with WSL enabled. */
   readonly wslBackend?: boolean;
-  /** Runs as T3 Stardust's macOS updater, which reports the running community version. */
-  readonly stardustFeed?: ElectronUpdater.StardustUpdateFeed;
-  /** Records setAutoInstallOnAppQuit calls. */
-  readonly autoInstallOnAppQuit?: Array<boolean>;
 }
 
 export function makeHarness(options: UpdatesHarnessOptions = {}) {
@@ -87,10 +81,7 @@ export function makeHarness(options: UpdatesHarnessOptions = {}) {
         feedUrls.push(options);
       }),
     setAutoDownload: () => Effect.void,
-    setAutoInstallOnAppQuit: (value) =>
-      Effect.sync(() => {
-        options.autoInstallOnAppQuit?.push(value);
-      }),
+    setAutoInstallOnAppQuit: () => Effect.void,
     setChannel: () => Effect.void,
     setAllowPrerelease: () => Effect.void,
     allowDowngrade: Effect.sync(() => allowDowngrade),
@@ -125,7 +116,6 @@ export function makeHarness(options: UpdatesHarnessOptions = {}) {
             removeListener(eventName, listener as unknown as (...args: readonly unknown[]) => void);
           }),
       ).pipe(Effect.asVoid),
-    ...(options.stardustFeed ? { stardustFeed: options.stardustFeed } : {}),
   } satisfies ElectronUpdater.ElectronUpdater["Service"]);
 
   const layerWindow = Layer.succeed(ElectronWindow.ElectronWindow, {
@@ -266,8 +256,6 @@ export function makeHarness(options: UpdatesHarnessOptions = {}) {
         ? (installRecords.get(path) ?? previousInstallRecord)
         : undefined;
       if (installRecord !== undefined) return Effect.succeed(installRecord);
-      if (path === "/missing/resources/app-update.yml" && options.appUpdateYml !== undefined)
-        return Effect.succeed(options.appUpdateYml);
       return path === "/missing/resources/package-type" && options.packageType !== undefined
         ? Effect.succeed(options.packageType)
         : Effect.fail(

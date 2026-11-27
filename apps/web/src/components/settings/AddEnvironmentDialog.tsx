@@ -1,11 +1,10 @@
-import { uiText } from "~/i18n";
 import { thrownErrorMessage } from "@t3tools/client-runtime/errors";
 import { m } from "~/i18n/messages";
 import { pipe } from "effect/Function";
 import { ChevronsLeftRightEllipsisIcon, PlusIcon, TerminalIcon } from "lucide-react";
 import { useAtomValue } from "@effect/atom-react";
 import { type KeyboardEvent, type ReactNode, useEffect, useRef, useState } from "react";
-import { T, useGT, useMessages } from "gt-react";
+import { T, useGT, useMessages, Var } from "gt-react";
 import {
   type DesktopDiscoveredSshHost,
   type DesktopSshEnvironmentTarget,
@@ -431,7 +430,7 @@ export function AddEnvironmentDialog({
           <Input
             value={savedBackendHost}
             onChange={(event) => handleSavedBackendHostChange(event.target.value)}
-            placeholder={uiText("backend.example.com")}
+            placeholder="backend.example.com"
             disabled={isAddingSavedBackend}
             spellCheck={false}
           />
@@ -606,8 +605,9 @@ export function AddEnvironmentDialog({
                   </AutocompleteList>
                 ) : (
                   <AutocompleteEmpty className="break-all">
-                    {uiText('No hosts match "')}
-                    {savedBackendSshHost.trim()}".
+                    <T>
+                      No hosts match "<Var>{savedBackendSshHost.trim()}</Var>".
+                    </T>
                   </AutocompleteEmpty>
                 )}
               </AutocompletePopup>
@@ -623,7 +623,7 @@ export function AddEnvironmentDialog({
               value={savedBackendSshUsername}
               onChange={(event) => setSavedBackendSshUsername(event.target.value)}
               onKeyDown={handleSavedBackendSshFieldKeyDown}
-              placeholder={uiText("root")}
+              placeholder="root"
               disabled={isAddingSavedBackend}
               spellCheck={false}
             />

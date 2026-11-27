@@ -1,10 +1,3 @@
-import type { ProjectId, UsageProject } from "@t3tools/contracts";
-import * as UsageProjectAttribution from "./UsageProjectAttribution.ts";
-import {
-  readUsageThroughput,
-  THROUGHPUT_SETTLE_MS,
-  type ToolIntervalCache,
-} from "./UsageThroughput.ts";
 import {
   type ProviderInstanceConfig,
   ProviderInstanceId,
@@ -15,7 +8,6 @@ import {
   type UsagePricing,
   type UsageSummary,
   type UsageSummaryInput,
-  UsageDay,
   UsageReadError,
 } from "@t3tools/contracts";
 import * as HostProcess from "@t3tools/shared/HostProcess";
@@ -33,7 +25,6 @@ import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 import * as Schema from "effect/Schema";
 import * as Semaphore from "effect/Semaphore";
-import * as SqlClient from "effect/sql/SqlClient";
 import { HttpClient, HttpClientResponse } from "effect/http";
 
 import { writeFileStringAtomically } from "@t3tools/shared/atomicWrite";
@@ -58,7 +49,6 @@ import {
   createOverrideRateTable,
   isUnlistedModel,
   parseRateTable,
-  lookupRate,
   type RateTable,
 } from "./usagePricing.ts";
 import {
@@ -84,54 +74,17 @@ const LITELLM_RATES_URL =
 const LITELLM_RATES_API_URL =
   "https://api.github.com/repos/BerriAI/litellm/contents/model_prices_and_context_window.json?ref=main";
 
-// Retention for the tool-throughput cache, independent of the user-facing history setting.
-const CACHE_RETENTION_DAYS = 92;
 const RATES_TTL_MS = 24 * 60 * 60 * 1000;
 
 const RATES_REFRESH_FLOOR_MS = 60 * 1000;
 
 // mtime slack includes writes just before local midnight on the window's first day.
 const MTIME_SLACK_MS = 36 * 60 * 60 * 1000;
-// Seven days of hours feeds the usage page's weekday × hour activity heatmap.
-const MAX_HOURLY_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+const MAX_HOURLY_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 const STALE_TEMP_DIRECTORY_MS = 60 * 60 * 1000;
 
 const TRANSCRIPT_READ_CONCURRENCY = 4;
-
-const driverKindByProvider = new Map(
-  BUILT_IN_USAGE_DRIVERS.flatMap((driver) =>
-    driver.usage === undefined ? [] : [[driver.usage.provider, driver.driverKind] as const],
-  ),
-);
-
-const providerByDriver = new Map<string, UsageProviderKind>(
-  BUILT_IN_USAGE_DRIVERS.flatMap((driver) =>
-    driver.usage === undefined
-      ? []
-      : [
-          [driver.driverKind, driver.usage.provider] as const,
-          [driver.usage.provider, driver.usage.provider] as const,
-        ],
-  ),
-);
-
-const MODEL_UNIT_PRICE_PREFIXES = [
-  "anthropic/",
-  "openai/",
-  "gemini/",
-  "google/",
-  "xai/",
-  "deepseek/",
-  "mistral/",
-  "meta/",
-  "openrouter/",
-] as const;
-
-function isPublishableUnitPriceKey(key: string): boolean {
-  if (!key.includes("/")) return true;
-  return MODEL_UNIT_PRICE_PREFIXES.some((prefix) => key.startsWith(prefix));
-}
 
 const transcriptReaders = BUILT_IN_USAGE_DRIVERS.flatMap((driver) =>
   driver.usage?.kind === "transcripts" ? [{ driver, reader: driver.usage }] : [],
@@ -159,18 +112,6 @@ interface TranscriptSource {
   readonly physicalSourceId?: string;
   readonly fileName?: string;
 }
-
-const THROUGHPUT_CACHE_FILE_NAME = "usage-throughput-cache-v1.json";
-const ThroughputCacheFile = Schema.Struct({
-  turns: Schema.Record(
-    Schema.String,
-    Schema.Tuple([Schema.Number, Schema.Array(Schema.Tuple([Schema.Number, Schema.Number]))]),
-  ),
-});
-const decodeThroughputCache = Schema.decodeUnknownEffect(
-  Schema.fromJsonString(ThroughputCacheFile),
-);
-const encodeThroughputCache = Schema.encodeEffect(Schema.fromJsonString(ThroughputCacheFile));
 
 const RatesCacheFile = Schema.Struct({
   fetchedAtMs: Schema.Number,
@@ -225,7 +166,6 @@ export class UsageService extends Context.Service<
   {
     readonly readSummary: (input: UsageSummaryInput) => Effect.Effect<UsageSummary, UsageReadError>;
     readonly refreshRates: Effect.Effect<UsagePricing>;
-    readonly modelRates: (models: readonly string[]) => Effect.Effect<ReadonlyMap<string, number>>;
   }
 >()("t3/usage/UsageService") {}
 
@@ -255,10 +195,6 @@ export const make = Effect.gen(function* () {
       return id;
     });
   const hostname = yield* HostProcess.Hostname;
-  const projectAttribution = Option.getOrUndefined(
-    yield* Effect.serviceOption(UsageProjectAttribution.UsageProjectAttribution),
-  );
-  const sqlClient = Option.getOrUndefined(yield* Effect.serviceOption(SqlClient.SqlClient));
   const readerContext = yield* Effect.context<BuiltInUsageReadersEnv>();
 
   const fileCache: ScanCache = new Map();
@@ -326,43 +262,13 @@ export const make = Effect.gen(function* () {
   let ratesStatus: UsagePricing["status"] = "unavailable";
   const ratesLock = yield* Semaphore.make(1);
 
-  const pricing = (overrides?: RateTable, extraModels?: ReadonlySet<string>): UsagePricing => {
-    const modelUnitPrices: Record<string, number> = {};
-    for (const [key, rate] of rates) {
-      if (!isPublishableUnitPriceKey(key)) continue;
-      const combined = rate.inputCostPerToken + rate.outputCostPerToken;
-      if (Number.isFinite(combined) && combined >= 0) modelUnitPrices[key] = combined;
-    }
-    if (extraModels !== undefined) {
-      for (const model of extraModels) {
-        const key = model.trim().toLowerCase();
-        if (key.length === 0 || Object.hasOwn(modelUnitPrices, key)) continue;
-        const rate = lookupRate(rates, model);
-        if (rate === null) continue;
-        const combined = rate.inputCostPerToken + rate.outputCostPerToken;
-        if (Number.isFinite(combined) && combined >= 0) modelUnitPrices[key] = combined;
-      }
-    }
-    if (overrides !== undefined) {
-      for (const [key, rate] of overrides) {
-        const normalized = key.trim().toLowerCase();
-        const combined = rate.inputCostPerToken + rate.outputCostPerToken;
-        if (normalized.length > 0 && Number.isFinite(combined) && combined >= 0) {
-          modelUnitPrices[normalized] = combined;
-        }
-      }
-    }
-    return {
-      status: ratesStatus,
-      source: LITELLM_RATES_URL,
-      fetchedAt:
-        ratesFetchedAtMs === null
-          ? null
-          : DateTime.formatIso(DateTime.makeUnsafe(ratesFetchedAtMs)),
-      knownModels: rates.size,
-      ...(Object.keys(modelUnitPrices).length > 0 ? { modelUnitPrices } : {}),
-    };
-  };
+  const pricing = (): UsagePricing => ({
+    status: ratesStatus,
+    source: LITELLM_RATES_URL,
+    fetchedAt:
+      ratesFetchedAtMs === null ? null : DateTime.formatIso(DateTime.makeUnsafe(ratesFetchedAtMs)),
+    knownModels: rates.size,
+  });
 
   const fetchRates = (url: string, accept = "application/json") =>
     httpClient.get(url, { headers: { accept } }).pipe(
@@ -440,7 +346,7 @@ export const make = Effect.gen(function* () {
   });
 
   const refreshRates = ensureRates(true).pipe(
-    Effect.map(() => pricing()),
+    Effect.map(pricing),
     Effect.withSpan("UsageService.refreshRates"),
   );
 
@@ -581,24 +487,6 @@ export const make = Effect.gen(function* () {
     }),
   );
 
-  // Throughput needs each turn's tool intervals. Reading them means parsing every tool item's
-  // payload (with full command output), so settled turns are kept here and saved across restarts.
-  const throughputCachePath = path.join(config.stateDir, THROUGHPUT_CACHE_FILE_NAME);
-  const toolIntervalCache: ToolIntervalCache = new Map();
-  let throughputCacheSize = 0;
-  const ensureThroughputCacheLoaded = yield* Effect.cached(
-    fileSystem.readFileString(throughputCachePath).pipe(
-      Effect.flatMap((raw) => decodeThroughputCache(raw)),
-      Effect.map((document) => {
-        for (const [turnId, [completedAtMs, intervals]] of Object.entries(document.turns)) {
-          toolIntervalCache.set(turnId, { completedAtMs, intervals });
-        }
-        throughputCacheSize = toolIntervalCache.size;
-      }),
-      Effect.ignoreCause,
-    ),
-  );
-
   const writeScanCache = makeScanCacheWriter();
   // Serialize writes so concurrently finished window scans cannot overwrite newer snapshots.
   const persistLock = yield* Semaphore.make(1);
@@ -652,30 +540,6 @@ export const make = Effect.gen(function* () {
             cacheDirty = true;
           }),
         ),
-      );
-    }
-    if (toolIntervalCache.size !== throughputCacheSize) {
-      const cutoffMs =
-        (yield* Clock.currentTimeMillis) - CACHE_RETENTION_DAYS * 24 * 60 * 60 * 1000;
-      for (const [turnId, entry] of toolIntervalCache) {
-        if (entry.completedAtMs < cutoffMs) toolIntervalCache.delete(turnId);
-      }
-      const size = toolIntervalCache.size;
-      yield* encodeThroughputCache({
-        turns: Object.fromEntries(
-          [...toolIntervalCache].map(([turnId, entry]) => [
-            turnId,
-            [entry.completedAtMs, entry.intervals] as const,
-          ]),
-        ),
-      }).pipe(
-        Effect.flatMap((contents) => writeCacheFile(throughputCachePath, contents)),
-        Effect.andThen(
-          Effect.sync(() => {
-            throughputCacheSize = size;
-          }),
-        ),
-        Effect.ignore,
       );
     }
   }).pipe(persistLock.withPermit, Effect.withSpan("UsageService.persistCaches"));
@@ -994,7 +858,7 @@ export const make = Effect.gen(function* () {
       if (durationMs <= 0 || durationMs > MAX_HOURLY_WINDOW_MS) {
         return yield* new UsageReadError({
           reason: "invalidWindow",
-          detail: "Hourly usage window must be greater than zero and at most 7 days",
+          detail: "Hourly usage window must be greater than zero and at most 24 hours",
         });
       }
       hourlyWindow = { sinceTimeMs, untilTimeMs };
@@ -1058,13 +922,6 @@ export const make = Effect.gen(function* () {
       { concurrency: 2 },
     );
 
-    const sessionProjects =
-      projectAttribution === undefined
-        ? null
-        : yield* projectAttribution.read.pipe(
-            Effect.catch((error) => Effect.logWarning(error.message).pipe(Effect.as(null))),
-          );
-    const referencedProjects = new Map<ProjectId, UsageProject>();
     const priceOverrides = createOverrideRateTable(settings.usagePriceOverrides);
     const modelAliases = resolveModelAliases(settings.usageModelAliases);
     const sources: UsageSource[] = [];
@@ -1157,7 +1014,7 @@ export const make = Effect.gen(function* () {
     // A saved answer prices with saved rates and the full scan after it refetches.
     if (!fromMemory) yield* refreshForUnlistedModels(rateModels);
 
-    const summaryPricing = pricing(priceOverrides, rateModels);
+    const summaryPricing = pricing();
 
     const aggregator = new UsageAggregator({
       timeZone: input.timeZone,
@@ -1169,22 +1026,6 @@ export const make = Effect.gen(function* () {
       priceOverrides,
       modelAliases,
       rateModel: (provider, model) => providerRateModels.get(provider)?.(model),
-      ...(sessionProjects === null
-        ? {}
-        : {
-            attributeProject: (record: UsageRecord, transcriptPath?: string) => {
-              const driverKind = driverKindByProvider.get(record.provider);
-              // Pi binds threads to the session file, rather than the header's display id.
-              const nativeId = record.provider === "pi" ? transcriptPath : record.sessionId;
-              const project =
-                driverKind === undefined || nativeId === undefined || nativeId.length === 0
-                  ? undefined
-                  : sessionProjects.get(UsageProjectAttribution.sessionKey(driverKind, nativeId));
-              if (project === undefined) return null;
-              referencedProjects.set(project.projectId, project);
-              return project.projectId;
-            },
-          }),
       ...(input.modelFilter === undefined ? {} : { modelFilter: input.modelFilter }),
     });
 
@@ -1279,7 +1120,7 @@ export const make = Effect.gen(function* () {
             eventOccurrences.set(key, occurrence);
             usageRecord = { ...record, dedupeKey: key + ":" + occurrence };
           }
-          if (aggregator.add(usageRecord, dir, file.path)) {
+          if (aggregator.add(usageRecord, dir)) {
             counted = true;
             if (record.sessionId.length > 0) sessionIds.add(record.sessionId);
           }
@@ -1344,28 +1185,6 @@ export const make = Effect.gen(function* () {
       );
 
     const aggregated = aggregator.finish();
-    const throughput =
-      sqlClient === undefined
-        ? null
-        : yield* ensureThroughputCacheLoaded.pipe(
-            Effect.andThen(Clock.currentTimeMillis),
-            Effect.flatMap((nowMs) =>
-              readUsageThroughput(sqlClient, {
-                toolIntervalCache,
-                settledBeforeMs: nowMs - THROUGHPUT_SETTLE_MS,
-                timeZone: input.timeZone,
-                sinceDay: input.sinceDay,
-                untilDay: input.untilDay,
-                hourlyWindow,
-                windowStartMs,
-                windowEndMs,
-                providerByDriver,
-                modelAliases,
-                ...(input.modelFilter === undefined ? {} : { modelFilter: input.modelFilter }),
-              }),
-            ),
-            Effect.catch((error) => Effect.logWarning(error.message).pipe(Effect.as(null))),
-          );
     const readAt = yield* DateTime.now;
     const finishedAtMs = yield* Clock.currentTimeMillis;
 
@@ -1378,10 +1197,6 @@ export const make = Effect.gen(function* () {
       buckets: aggregated.buckets,
       sources,
       pricing: summaryPricing,
-      ...(aggregated.projectTotals === undefined
-        ? {}
-        : { projectTotals: aggregated.projectTotals, projects: [...referencedProjects.values()] }),
-      ...(throughput === null ? {} : { throughput }),
       scanDurationMs: Math.max(0, finishedAtMs - startedAtMs),
       ...(input.modelFilter === undefined ? {} : { modelFilter: input.modelFilter }),
     } satisfies UsageSummary;
@@ -1454,49 +1269,7 @@ export const make = Effect.gen(function* () {
     return yield* Deferred.await(deferred);
   });
 
-  const modelRates = Effect.fn("UsageService.modelRates")(function* (models: readonly string[]) {
-    yield* ensureRates(false);
-    const settings = yield* settingsService.getSettings.pipe(Effect.orElseSucceed(() => null));
-    const overrides = createOverrideRateTable(settings?.usagePriceOverrides ?? {});
-    return new Map(
-      models.flatMap((model) => {
-        const rate = lookupRate(overrides, model) ?? lookupRate(rates, model);
-        return rate ? [[model, rate.inputCostPerToken + rate.outputCostPerToken] as const] : [];
-      }),
-    );
-  });
-  return { readSummary, refreshRates, modelRates, awaitPersisted } as const;
+  return { readSummary, refreshRates, awaitPersisted } as const;
 });
 
 export const layer = Layer.effect(UsageService, make);
-
-const WARM_UP_DELAY_MS = 45_000;
-const WARM_UP_DAYS = 30;
-
-/**
- * The first read after launch pays for cold caches (transcript index, Antigravity databases,
- * SQLite pages), several seconds on a large history. Read the default 30-day window once in the
- * background shortly after start, so opening the usage page later finds them warm.
- */
-export const layerWarmUp = Layer.effectDiscard(
-  Effect.gen(function* () {
-    const service = yield* UsageService;
-    yield* Effect.gen(function* () {
-      yield* Effect.sleep(WARM_UP_DELAY_MS);
-      const nowMs = yield* Clock.currentTimeMillis;
-      const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
-      const day = (ms: number) =>
-        new Intl.DateTimeFormat("en-CA", {
-          timeZone,
-          year: "numeric",
-          month: "2-digit",
-          day: "2-digit",
-        }).format(ms);
-      yield* service.readSummary({
-        sinceDay: UsageDay.make(day(nowMs - (WARM_UP_DAYS - 1) * 24 * 60 * 60 * 1000)),
-        untilDay: UsageDay.make(day(nowMs)),
-        timeZone,
-      });
-    }).pipe(Effect.ignoreCause, Effect.withSpan("UsageService.warmUp"), Effect.forkScoped);
-  }),
-);
