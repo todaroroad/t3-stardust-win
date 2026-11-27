@@ -1,8 +1,8 @@
-name: Sync Upstream & Release T3 Stardust Windows
+name: Sync Official T3 & Release T3星辰版 Windows
 
 on:
   schedule:
-    # Daily check at 20:30 UTC (04:30 CST / 06:30 AEST) for new zds-xiaoxin/xiaoxin-t3code commits
+    # Daily check at 20:30 UTC (04:30 CST) for new stable pingdotgg/t3code releases
     - cron: "30 20 * * *"
   push:
     branches:
@@ -10,10 +10,15 @@ on:
   workflow_dispatch:
     inputs:
       force_rebuild:
-        description: "Force rebuild & release even if upstream SHA has not changed"
+        description: "Force rebuild & release even if already synced to latest official stable tag"
         required: false
         default: false
         type: boolean
+      official_tag:
+        description: "Optional specific official tag to merge (e.g. v0.1.13); leave empty for latest stable"
+        required: false
+        default: ""
+        type: string
 
 concurrency:
   group: stardust-windows-release
@@ -21,88 +26,168 @@ concurrency:
 
 permissions:
   contents: write
+  issues: write
   actions: read
 
 jobs:
-  prepare_source:
-    name: Sync Upstream & Resolve Version
+  prepare_and_build_bundle:
+    name: Merge Official T3, Verify & Build JS Bundle
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 35
     outputs:
       should_build: ${{ steps.sync.outputs.should_build }}
-      checkout_sha: ${{ steps.sync.outputs.checkout_sha }}
+      checkout_sha: ${{ steps.finalize.outputs.checkout_sha }}
       release_version: ${{ steps.sync.outputs.release_version }}
-      upstream_sha: ${{ steps.sync.outputs.upstream_sha }}
+      official_tag: ${{ steps.sync.outputs.official_tag }}
+      official_sha: ${{ steps.sync.outputs.official_sha }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         with:
-          fetch-depth: 1
+          fetch-depth: 0
 
-      - name: Sync upstream & compute monotonic release version
+      - name: Check official pingdotgg/t3code stable release & run 3-way merge if needed
         id: sync
         env:
           GH_TOKEN: ${{ github.token }}
           EVENT_NAME: ${{ github.event_name }}
           FORCE_REBUILD: ${{ inputs.force_rebuild == true && 'true' || 'false' }}
+          INPUT_TAG: ${{ inputs.official_tag || '' }}
         run: |
           set -euo pipefail
 
-          UPSTREAM_REPO="zds-xiaoxin/xiaoxin-t3code"
-          UPSTREAM_SHA="$(gh api "repos/${UPSTREAM_REPO}/commits/main" --jq '.sha')"
+          OFFICIAL_REPO="pingdotgg/t3code"
+          RECORDED_TAG=""
+          if [[ -f .official-upstream-tag ]]; then
+            RECORDED_TAG="$(tr -d '[:space:]' < .official-upstream-tag)"
+          fi
           RECORDED_SHA=""
-          if [[ -f .stardust-upstream-sha ]]; then
-            RECORDED_SHA="$(tr -d '[:space:]' < .stardust-upstream-sha)"
+          if [[ -f .official-upstream-sha ]]; then
+            RECORDED_SHA="$(tr -d '[:space:]' < .official-upstream-sha)"
           fi
 
-          echo "Upstream main SHA : ${UPSTREAM_SHA}"
-          echo "Recorded local SHA: ${RECORDED_SHA:-<none>}"
+          if [[ -n "${INPUT_TAG}" ]]; then
+            TARGET_TAG="${INPUT_TAG}"
+          else
+            TARGET_TAG="$(gh api "repos/${OFFICIAL_REPO}/releases?per_page=30" --jq '
+              [.[] | select((.draft | not) and (.prerelease | not) and (.tag_name | test("^v[0-9]+\\.[0-9]+\\.[0-9]+$")))] | .[0].tag_name // empty
+            ')"
+          fi
+          if [[ -z "${TARGET_TAG}" ]]; then
+            TARGET_TAG="${RECORDED_TAG:-v0.1.13}"
+          fi
+          TARGET_SHA="$(gh api "repos/${OFFICIAL_REPO}/commits/${TARGET_TAG}" --jq '.sha')"
 
-          NEEDS_UPSTREAM_SYNC="false"
+          echo "Official latest stable : ${TARGET_TAG} (${TARGET_SHA})"
+          echo "Recorded local base    : ${RECORDED_TAG:-<none>} (${RECORDED_SHA:-<none>})"
+
+          NEEDS_MERGE="false"
           if [[ "${EVENT_NAME}" == "schedule" || "${EVENT_NAME}" == "workflow_dispatch" ]]; then
-            if [[ "${UPSTREAM_SHA}" != "${RECORDED_SHA}" ]]; then
-              NEEDS_UPSTREAM_SYNC="true"
+            if [[ "${TARGET_TAG}" != "${RECORDED_TAG}" ]]; then
+              NEEDS_MERGE="true"
             elif [[ "${EVENT_NAME}" == "schedule" ]]; then
-              echo "Already synced to upstream ${UPSTREAM_SHA}. Skipping build."
+              echo "Already synced to official ${TARGET_TAG}. Skipping build."
               echo "should_build=false" >> "$GITHUB_OUTPUT"
               exit 0
             elif [[ "${FORCE_REBUILD}" != "true" ]]; then
-              echo "Already synced to upstream ${UPSTREAM_SHA} and force_rebuild=false. Skipping build."
+              echo "Already synced to official ${TARGET_TAG} and force_rebuild=false. Skipping build."
               echo "should_build=false" >> "$GITHUB_OUTPUT"
               exit 0
             fi
           fi
 
-          if [[ "${NEEDS_UPSTREAM_SYNC}" == "true" ]]; then
-            echo "Syncing fresh upstream tree from ${UPSTREAM_REPO}@${UPSTREAM_SHA}..."
-            OVERLAY_BACKUP="$(mktemp -d)"
-            cp -R stardust-win "$OVERLAY_BACKUP/stardust-win"
-            cp -R .github "$OVERLAY_BACKUP/.github"
+          echo "needs_merge=${NEEDS_MERGE}" >> "$GITHUB_OUTPUT"
+          echo "official_tag=${TARGET_TAG}" >> "$GITHUB_OUTPUT"
+          echo "official_sha=${TARGET_SHA}" >> "$GITHUB_OUTPUT"
 
-            UPSTREAM_DIR="$(mktemp -d)"
-            git init "$UPSTREAM_DIR"
-            git -C "$UPSTREAM_DIR" remote add upstream "https://github.com/${UPSTREAM_REPO}.git"
-            git -C "$UPSTREAM_DIR" fetch --no-tags --depth=1 upstream "$UPSTREAM_SHA"
-            git -C "$UPSTREAM_DIR" sparse-checkout set --no-cone '/*' '!/.repos/'
-            git -C "$UPSTREAM_DIR" -c checkout.workers=0 checkout --detach FETCH_HEAD
-            rm -rf "$UPSTREAM_DIR/.git" "$UPSTREAM_DIR/.repos" "$UPSTREAM_DIR/.github/workflows"
+          if [[ "${NEEDS_MERGE}" == "true" ]]; then
+            BASE_REF="${RECORDED_SHA:-${RECORDED_TAG}}"
+            if [[ -z "${BASE_REF}" ]]; then
+              echo "ERROR: Missing .official-upstream-tag / .official-upstream-sha for 3-way merge."
+              exit 1
+            fi
+            echo "Performing 3-way merge from official ${BASE_REF} -> ${TARGET_TAG}..."
 
-            # Replace tracked working tree cleanly while preserving .git
-            find . -mindepth 1 -maxdepth 1 ! -name '.git' -exec rm -rf {} +
-            cp -a "$UPSTREAM_DIR/." .
-            rm -rf .github/workflows
-            mkdir -p .github
-            cp -R "$OVERLAY_BACKUP/.github/workflows" .github/workflows
-            cp -R "$OVERLAY_BACKUP/stardust-win" ./stardust-win
-            rm -rf "$UPSTREAM_DIR" "$OVERLAY_BACKUP"
+            WORK_TMP="$(mktemp -d)"
+            mkdir -p "$WORK_TMP/base" "$WORK_TMP/target" "$WORK_TMP/synth"
 
-            node stardust-win/apply-overlay.mjs
-            printf '%s\n' "$UPSTREAM_SHA" > .stardust-upstream-sha
+            curl -fsSL "https://codeload.github.com/${OFFICIAL_REPO}/tar.gz/${BASE_REF}" \
+              | tar -xz -C "$WORK_TMP/base" --strip-components=1
+            rm -rf "$WORK_TMP/base/.repos" "$WORK_TMP/base/.github/workflows"
+
+            curl -fsSL "https://codeload.github.com/${OFFICIAL_REPO}/tar.gz/${TARGET_TAG}" \
+              | tar -xz -C "$WORK_TMP/target" --strip-components=1
+            rm -rf "$WORK_TMP/target/.repos" "$WORK_TMP/target/.github/workflows"
+
+            git -C "$WORK_TMP/synth" init -q
+            git -C "$WORK_TMP/synth" config user.name "github-actions[bot]"
+            git -C "$WORK_TMP/synth" config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+            git --git-dir="$WORK_TMP/synth/.git" --work-tree="$WORK_TMP/base" add -A
+            git --git-dir="$WORK_TMP/synth/.git" --work-tree="$WORK_TMP/base" commit -q -m "chore(official): base ${RECORDED_TAG}"
+            BASE_COMMIT="$(git -C "$WORK_TMP/synth" rev-parse HEAD)"
+
+            git --git-dir="$WORK_TMP/synth/.git" --work-tree="$WORK_TMP/target" add -A
+            git --git-dir="$WORK_TMP/synth/.git" --work-tree="$WORK_TMP/target" commit -q -m "chore(official): release ${TARGET_TAG}"
+            TARGET_COMMIT="$(git -C "$WORK_TMP/synth" rev-parse HEAD)"
+
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git config merge.renameLimit 30000
+
+            git remote add official-synth "$WORK_TMP/synth"
+            git fetch -q official-synth
+
+            HEAD_SHA="$(git rev-parse HEAD)"
+            TREE_SHA="$(git rev-parse 'HEAD^{tree}')"
+            ANCHOR_SHA="$(git commit-tree "$TREE_SHA" -p "$HEAD_SHA" -p "$BASE_COMMIT" -m "chore(upstream): anchor official ${RECORDED_TAG}")"
+            git checkout -B "sync-work" "$ANCHOR_SHA"
+
+            set +e
+            git merge --no-commit --no-ff "$TARGET_COMMIT"
+            MERGE_CODE=$?
+            set -e
+
+            rm -rf "$WORK_TMP"
+
+            if [[ $MERGE_CODE -ne 0 ]]; then
+              if git diff --name-only --diff-filter=U | grep -qx "pnpm-lock.yaml"; then
+                git checkout --theirs pnpm-lock.yaml
+                git add pnpm-lock.yaml
+              fi
+              for keep_ours in .github/workflows stardust-win README.md; do
+                if git diff --name-only --diff-filter=U | grep -q "^${keep_ours}"; then
+                  git checkout --ours -- "$keep_ours" || true
+                  git add -- "$keep_ours" || true
+                fi
+              done
+            fi
+
+            REMAINING_CONFLICTS="$(git diff --name-only --diff-filter=U || true)"
+            if [[ -n "${REMAINING_CONFLICTS}" ]]; then
+              echo "Merge conflicts detected on ${TARGET_TAG}:"
+              echo "${REMAINING_CONFLICTS}"
+              CONFLICT_BRANCH="sync/official-${TARGET_TAG}"
+              git checkout -B "$CONFLICT_BRANCH" "$HEAD_SHA"
+              git push -f origin "$CONFLICT_BRANCH"
+
+              ISSUE_TITLE="⚠️ T3星辰版自动同步提示：官方 ${TARGET_TAG} 存在代码交集冲突需适配"
+              EXISTING_ISSUE="$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "$ISSUE_TITLE in:title" --json number --jq '.[0].number // empty')"
+              BODY="$(printf '检测到 T3 官方发布新正式版 **`%s`**（`%s`），自动三方合并时以下交集文件存在冲突，**主分支 `main` 未受任何影响**：\n\n```\n%s\n```\n\n您可以在 T3 中直接对 AI 说：\n> 帮我把 `todaroroad/t3-stardust-win` 合并适配官方 `%s` 的冲突并打包发布' "$TARGET_TAG" "${TARGET_SHA:0:10}" "$REMAINING_CONFLICTS" "$TARGET_TAG")"
+              if [[ -z "${EXISTING_ISSUE}" ]]; then
+                gh issue create --repo "$GITHUB_REPOSITORY" --title "$ISSUE_TITLE" --body "$BODY"
+              fi
+              echo "should_build=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+
+            rm -rf .repos
+            printf '%s\n' "$TARGET_TAG" > .official-upstream-tag
+            printf '%s\n' "$TARGET_SHA" > .official-upstream-sha
           fi
 
-          # Compute strictly monotonic semver X.Y.Z for electron-updater
-          RELEASE_VERSION="$(node -e '
-            const fs = require("node:fs");
+          # Compute strictly monotonic semver 1.<official_minor>.<patch> for electron-updater
+          RELEASE_VERSION="$(OFFICIAL_TAG_VAL="${TARGET_TAG}" node -e '
             const { execFileSync } = require("node:child_process");
 
             function parseVer(v) {
@@ -116,10 +201,11 @@ jobs:
               return 0;
             }
 
-            const baseRaw = fs.existsSync(".stardust-base-version")
-              ? fs.readFileSync(".stardust-base-version", "utf8").trim()
-              : "1.2.3";
-            const base = parseVer(baseRaw) || [1, 2, 3];
+            const off = parseVer(process.env.OFFICIAL_TAG_VAL || "v0.1.13") || [0, 1, 13];
+            // Map official 0.1.13 -> 1.13.0, official 0.2.0 -> 1.200.0 / 2.0.0 so always > 1.2.6
+            const mappedMajor = off[0] >= 1 ? off[0] + 1 : 1;
+            const mappedMinor = off[0] === 0 && off[1] === 1 ? off[2] : off[1] * 100 + off[2];
+            const base = [mappedMajor, mappedMinor, 0];
 
             let tags = [];
             try {
@@ -143,44 +229,16 @@ jobs:
             process.stdout.write(next.join("."));
           ')"
 
-          printf '%s\n' "$RELEASE_VERSION" > .stardust-version
           echo "Resolved monotonic release version: ${RELEASE_VERSION}"
-
-          if [[ -n "$(git status --porcelain)" ]]; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add -A
-            git commit -m "chore(sync): sync upstream ${UPSTREAM_SHA:0:7} for T3 Stardust v${RELEASE_VERSION} [skip ci]"
-            git push origin HEAD:main
-          fi
-
-          CHECKOUT_SHA="$(git rev-parse HEAD)"
           echo "should_build=true" >> "$GITHUB_OUTPUT"
-          echo "checkout_sha=${CHECKOUT_SHA}" >> "$GITHUB_OUTPUT"
           echo "release_version=${RELEASE_VERSION}" >> "$GITHUB_OUTPUT"
-          echo "upstream_sha=${UPSTREAM_SHA}" >> "$GITHUB_OUTPUT"
 
-  build_bundle:
-    name: Build Web & Server Bundle
-    needs: [prepare_source]
-    if: needs.prepare_source.outputs.should_build == 'true'
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    steps:
-      - name: Checkout
-        shell: bash
-        env:
-          CHECKOUT_REF: ${{ needs.prepare_source.outputs.checkout_sha }}
-          GIT_TERMINAL_PROMPT: "0"
-        run: |
-          set -euo pipefail
-          git init .
-          git remote add origin "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}.git"
-          git fetch --no-tags --depth=1 origin "$CHECKOUT_REF"
-          git sparse-checkout set --no-cone '/*' '!/.repos/'
-          git -c checkout.workers=0 checkout --detach FETCH_HEAD
+      - name: Apply & verify T3星辰版 branding and privacy guards
+        if: steps.sync.outputs.should_build == 'true'
+        run: node stardust-win/apply-overlay.mjs
 
       - name: Load public configuration
+        if: steps.sync.outputs.should_build == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -193,35 +251,82 @@ jobs:
           echo "T3CODE_DESKTOP_UPDATE_REPOSITORY=${GITHUB_REPOSITORY}" >> "$GITHUB_ENV"
 
       - name: Setup Vite+
+        if: steps.sync.outputs.should_build == 'true'
         uses: voidzero-dev/setup-vp@250f29ce396baf5e8f24498e17c0dfdebabc26eb
         with:
           node-version-file: package.json
           cache: true
           run-install: false
 
-      - name: Install bundle dependencies
-        run: vp install --filter=t3... --filter=@t3tools/web... --filter=@t3tools/desktop... --filter=@t3tools/scripts...
-
       - name: Install Linux build headers
+        if: steps.sync.outputs.should_build == 'true'
         run: sudo apt-get update && sudo apt-get install -y libsecret-1-dev pkg-config
 
-      - name: Align package versions
-        env:
-          RELEASE_VERSION: ${{ needs.prepare_source.outputs.release_version }}
-        run: node scripts/update-release-package-versions.ts "${RELEASE_VERSION}"
-
-      - name: Build JS bundle
-        run: vp run build:desktop
-
-      - name: Verify zero third-party telemetry endpoints in compiled bundle
+      - name: Install bundle dependencies
+        if: steps.sync.outputs.should_build == 'true'
         run: |
+          if [[ "${{ steps.sync.outputs.needs_merge }}" == "true" ]]; then
+            vp install --no-frozen-lockfile --config.minimum-release-age=0 --filter=t3... --filter=@t3tools/web... --filter=@t3tools/desktop... --filter=@t3tools/scripts...
+          else
+            vp install --filter=t3... --filter=@t3tools/web... --filter=@t3tools/desktop... --filter=@t3tools/scripts...
+          fi
+
+      - name: Align package versions & Build JS bundle (pre-push verification)
+        id: build_verify
+        if: steps.sync.outputs.should_build == 'true'
+        continue-on-error: true
+        env:
+          RELEASE_VERSION: ${{ steps.sync.outputs.release_version }}
+        run: |
+          set -euo pipefail
+          node scripts/update-release-package-versions.ts "${RELEASE_VERSION}"
+          vp run build:desktop
           if grep -rn "xiaoxin666\|api/stardust" apps/server/dist apps/desktop/dist-electron; then
             echo "ERROR: Unexpected third-party endpoint found in compiled bundle!"
             exit 1
           fi
-          echo "Privacy verification passed: zero xiaoxin666 / api/stardust references."
+          echo "Build & privacy verification passed!"
 
-      - name: Upload JS bundle
+      - name: Handle build failure on automated merge without breaking main
+        if: steps.sync.outputs.should_build == 'true' && steps.build_verify.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_TAG: ${{ steps.sync.outputs.official_tag }}
+          NEEDS_MERGE: ${{ steps.sync.outputs.needs_merge }}
+        run: |
+          set -euo pipefail
+          if [[ "${NEEDS_MERGE}" == "true" ]]; then
+            ISSUE_TITLE="⚠️ T3星辰版自动同步提示：官方 ${TARGET_TAG} 合并后编译需适配"
+            EXISTING_ISSUE="$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "$ISSUE_TITLE in:title" --json number --jq '.[0].number // empty')"
+            if [[ -z "${EXISTING_ISSUE}" ]]; then
+              gh issue create --repo "$GITHUB_REPOSITORY" --title "$ISSUE_TITLE" \
+                --body "官方 **\`${TARGET_TAG}\`** Git 合并无文本冲突，但 TypeScript / Vite 编译校验未通过（可能上游调整了组件 Props 或协议字段）。**主分支 \`main\` 未被修改**，请查看本次 Actions 日志或在 T3 中让 AI 协助适配。"
+            fi
+          fi
+          exit 1
+
+      - name: Commit verified official merge back to main (if merged)
+        id: finalize
+        if: steps.sync.outputs.should_build == 'true' && steps.build_verify.outcome == 'success'
+        env:
+          NEEDS_MERGE: ${{ steps.sync.outputs.needs_merge }}
+          TARGET_TAG: ${{ steps.sync.outputs.official_tag }}
+          RELEASE_VERSION: ${{ steps.sync.outputs.release_version }}
+        run: |
+          set -euo pipefail
+          git checkout -- package.json apps/*/package.json packages/*/package.json 2>/dev/null || true
+          if [[ "${NEEDS_MERGE}" == "true" && -n "$(git status --porcelain)" ]]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add -A
+            git commit --no-verify -m "chore(sync): merge official pingdotgg/t3code ${TARGET_TAG} for T3星辰版 v${RELEASE_VERSION} [skip ci]"
+            git push origin HEAD:main
+          fi
+          CHECKOUT_SHA="$(git rev-parse HEAD)"
+          echo "checkout_sha=${CHECKOUT_SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload verified JS bundle
+        if: steps.sync.outputs.should_build == 'true' && steps.build_verify.outcome == 'success'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: js-bundle
@@ -233,15 +338,15 @@ jobs:
 
   package_windows:
     name: Package Windows x64 Installer & Update Feed
-    needs: [prepare_source, build_bundle]
-    if: needs.prepare_source.outputs.should_build == 'true'
+    needs: [prepare_and_build_bundle]
+    if: needs.prepare_and_build_bundle.outputs.should_build == 'true'
     runs-on: windows-2025
     timeout-minutes: 60
     steps:
-      - name: Checkout
+      - name: Checkout verified commit
         shell: bash
         env:
-          CHECKOUT_REF: ${{ needs.prepare_source.outputs.checkout_sha }}
+          CHECKOUT_REF: ${{ needs.prepare_and_build_bundle.outputs.checkout_sha }}
           GIT_TERMINAL_PROMPT: "0"
         run: |
           set -euo pipefail
@@ -308,10 +413,10 @@ jobs:
 
       - name: Align package versions
         env:
-          RELEASE_VERSION: ${{ needs.prepare_source.outputs.release_version }}
+          RELEASE_VERSION: ${{ needs.prepare_and_build_bundle.outputs.release_version }}
         run: node scripts/update-release-package-versions.ts "${RELEASE_VERSION}"
 
-      - name: Download JS bundle
+      - name: Download verified JS bundle
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: js-bundle
@@ -323,7 +428,7 @@ jobs:
           pnpm_config_cache_dir: ${{ runner.temp }}/pnpm-metadata
           T3CODE_DESKTOP_WEB_ASSET_BRAND: production
           T3CODE_DESKTOP_REUSE_RESOURCE_MONITOR: ${{ steps.resource_monitor_cache.outputs.cache-hit == 'true' }}
-          RELEASE_VERSION: ${{ needs.prepare_source.outputs.release_version }}
+          RELEASE_VERSION: ${{ needs.prepare_and_build_bundle.outputs.release_version }}
         run: |
           vp run dist:desktop:artifact \
             --platform win \
@@ -336,7 +441,7 @@ jobs:
       - name: Verify electron-updater feed (latest.yml + blockmap + installer) & compute SHA256
         shell: pwsh
         env:
-          RELEASE_VERSION: ${{ needs.prepare_source.outputs.release_version }}
+          RELEASE_VERSION: ${{ needs.prepare_and_build_bundle.outputs.release_version }}
         run: |
           $ErrorActionPreference = "Stop"
           New-Item -ItemType Directory -Force -Path release-publish | Out-Null
@@ -370,7 +475,7 @@ jobs:
       - name: Upload Windows Installer Artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: "T3-Stardust-${{ needs.prepare_source.outputs.release_version }}-Windows-x64"
+          name: "T3-Stardust-${{ needs.prepare_and_build_bundle.outputs.release_version }}-Windows-x64"
           path: release-publish/*
           if-no-files-found: error
 
@@ -378,24 +483,28 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_VERSION: ${{ needs.prepare_source.outputs.release_version }}
-          UPSTREAM_SHA: ${{ needs.prepare_source.outputs.upstream_sha }}
+          RELEASE_VERSION: ${{ needs.prepare_and_build_bundle.outputs.release_version }}
+          OFFICIAL_TAG: ${{ needs.prepare_and_build_bundle.outputs.official_tag }}
+          OFFICIAL_SHA: ${{ needs.prepare_and_build_bundle.outputs.official_sha }}
         run: |
           set -euo pipefail
           tag="v${RELEASE_VERSION}"
-          notes="T3 星尘版 v${RELEASE_VERSION} Windows x64 自动同步构建（上游基准：zds-xiaoxin/xiaoxin-t3code@${UPSTREAM_SHA:0:7}）：
-          - 独立安装 ID（com.todaroroad.t3stardust）：可直接双击安装，与官方 T3 Code (Beta) 并排共存、互不覆盖，且共用全部聊天记录与登录态
-          - 原生应用内自动更新（electron-updater）：支持在「设置 → 关于」中自动检测更新、差分下载（.blockmap）并一键重启更新
-          - 定制增强：星尘三芒星渐变思考图标 + 每段思考耗时与 Token 用量统计徽章
-          - 隐私净空：已移除全部第三方统计上报与无效轮询"
+          notes="T3星辰版 v${RELEASE_VERSION} Windows x64 构建（直接基于 T3 官方正式版 pingdotgg/t3code@${OFFICIAL_TAG} / ${OFFICIAL_SHA:0:7}）：
+          - 品牌与侧边栏增强：统一升级为「T3星辰版」，新增置顶（已置顶）与活跃会话区原生折叠抽屉
+          - 独立安装共存（com.todaroroad.t3stardust）：与官方 T3 Code (Beta) 并排共存、互不覆盖，共用本地聊天记录与登录态
+          - 原生应用内热更新（electron-updater）：支持在「设置 → 关于」中自动检测更新、差分下载（.blockmap）并一键重启升级
+          - 定制增强与隐私净空：保留星辰侧边栏/星舰推理滑块/用量看板 + 三芒星渐变思考图标与 Token 耗时徽章，零第三方上报"
 
           if ! gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release create "$tag" release-publish/* \
               --repo "$GITHUB_REPOSITORY" \
-              --title "T3 Stardust v${RELEASE_VERSION} for Windows (x64)" \
+              --title "T3星辰版 v${RELEASE_VERSION} for Windows (x64) [基于官方 ${OFFICIAL_TAG}]" \
               --notes "$notes" \
               --latest
           else
             gh release upload "$tag" release-publish/* --repo "$GITHUB_REPOSITORY" --clobber
-            gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --latest
+            gh release edit "$tag" --repo "$GITHUB_REPOSITORY" \
+              --title "T3星辰版 v${RELEASE_VERSION} for Windows (x64) [基于官方 ${OFFICIAL_TAG}]" \
+              --notes "$notes" \
+              --latest
           fi

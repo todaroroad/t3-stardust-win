@@ -96,7 +96,7 @@ export function buildSpotlightGroups(input: {
     if (child.length)
       groups.push({ value: `${key}:children`, label: uiText("Matches in subtasks"), items: child });
     const matchedIds = new Set(members.map((m) => m.value));
-    const other = related.filter((m) => !matchedIds.has(m.value));
+    const other = related.filter((m: CommandPaletteActionItem) => !matchedIds.has(m.value));
     if (other.length)
       groups.push({
         value: `${key}:history`,

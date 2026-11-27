@@ -1,3 +1,4 @@
+import { useLayoutEffect, useRef, useState } from "react";
 import { useUiText } from "~/i18n/useUiText";
 
 import { Toolbar } from "@base-ui/react/toolbar";
@@ -47,6 +48,29 @@ export const ModelPickerSidebar = memo(function ModelPickerSidebar(props: {
   };
   const showFavorites = props.showFavorites ?? true;
   const showAll = props.showAll ?? true;
+  const [hoveredInstanceId, setHoveredInstanceId] = useState<ProviderInstanceId | null>(null);
+  const sidebarContentRef = useRef<HTMLDivElement>(null);
+  const [selectedIndicatorTop, setSelectedIndicatorTop] = useState<number | null>(null);
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- reads the selected provider item's DOM offset to position the selection indicator
+  useLayoutEffect(() => {
+    const content = sidebarContentRef.current;
+    if (!content) {
+      return;
+    }
+    const selectedItem = Array.from(
+      content.querySelectorAll<HTMLElement>("[data-model-picker-provider]"),
+    ).find((item) => item.dataset.modelPickerProvider === props.selectedInstanceId);
+    if (!selectedItem) {
+      setSelectedIndicatorTop(null);
+      return;
+    }
+    setSelectedIndicatorTop(selectedItem.offsetTop + selectedItem.offsetHeight / 2 - 10);
+  }, [
+    // Adding, removing or reordering providers moves the selected item, so the indicator re-measures.
+    props.instanceEntries,
+    props.selectedInstanceId,
+    showFavorites,
+  ]);
 
   return (
     <Toolbar.Root

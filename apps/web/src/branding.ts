@@ -21,9 +21,9 @@ const hostedAppChannel = import.meta.env.VITE_HOSTED_APP_CHANNEL?.trim().toLower
 export const HOSTED_APP_CHANNEL =
   hostedAppChannel === "latest" || hostedAppChannel === "nightly" ? hostedAppChannel : null;
 export const HOSTED_APP_CHANNEL_LABEL = resolveHostedAppChannelLabel(HOSTED_APP_CHANNEL);
+export const APP_BASE_NAME = "T3星辰版";
 export function appBaseName(): string {
-  const name = injectedDesktopAppBranding?.baseName;
-  return !name || name === uiText("T3 Stardust", undefined, "zh-CN") ? uiText("T3 Stardust") : name;
+  return "T3星辰版";
 }
 // Set by the stable release build (VITE_RELEASE_CHANNEL=stable). Such a build hides the Nightly
 // stage even though it carries the upstream nightly version stamp.
@@ -38,11 +38,9 @@ export const APP_STAGE_LABEL = resolveReleaseStageLabel({
   stageLabel: BUILD_STAGE_LABEL,
   releaseChannel: RELEASE_CHANNEL,
 });
+export const APP_DISPLAY_NAME = "T3星辰版";
 export function appDisplayName(): string {
-  const injected = injectedDesktopAppBranding;
-  return injected && APP_STAGE_LABEL === injected.stageLabel
-    ? injected.displayName.replace(injected.baseName, appBaseName())
-    : formatAppDisplayName({ baseName: appBaseName(), stageLabel: APP_STAGE_LABEL });
+  return "T3星辰版";
 }
 export const APP_VERSION = import.meta.env.APP_VERSION || "0.0.0";
 export const DESKTOP_DOWNLOAD_URL = "https://github.com/todaroroad/t3-stardust-win/releases";

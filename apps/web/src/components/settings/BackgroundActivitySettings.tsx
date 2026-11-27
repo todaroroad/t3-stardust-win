@@ -27,7 +27,6 @@ import {
 } from "../ui/dialog";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
 import { Switch } from "../ui/switch";
-import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import {
   backgroundActivityOverrideSettings,
   backgroundActivitySharedPolicySettings,
@@ -38,6 +37,7 @@ import {
 import { IntervalSecondsField } from "./IntervalSecondsField";
 import { PolicyTooltip, SettingResetButton, SettingsRow } from "./settingsLayout";
 import { useSearchableSetting } from "./settingsSearch";
+import { SharedTooltipTrigger } from "../ui/shared-tooltip";
 
 const BACKGROUND_ACTIVITY_PROFILE_LABELS: Record<BackgroundActivityProfile, string> = {
   get balanced() {
@@ -489,23 +489,23 @@ export function BackgroundActivitySettingsRow() {
             </SelectPopup>
           </Select>
           {backgroundActivityProfileOption === "advanced" && isEnvironmentScope ? (
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <Button
-                    size="icon-sm"
-                    variant="outline"
-                    aria-label={gt("Configure advanced background activity")}
-                    onClick={() => setBackgroundActivityDialogOpen(true)}
-                  >
-                    <SettingsIcon className="size-4" />
-                  </Button>
-                }
-              />
-              <TooltipPopup side="top">
-                <T>Configure background activity</T>
-              </TooltipPopup>
-            </Tooltip>
+            <SharedTooltipTrigger
+              render={
+                <Button
+                  size="icon-sm"
+                  variant="outline"
+                  aria-label={gt("Configure advanced background activity")}
+                  onClick={() => setBackgroundActivityDialogOpen(true)}
+                >
+                  <SettingsIcon className="size-4" />
+                </Button>
+              }
+              label={
+                <>
+                  <T>Configure background activity</T>
+                </>
+              }
+            />
           ) : null}
           <BackgroundActivityAdvancedDialog
             open={backgroundActivityDialogOpen && isEnvironmentScope}

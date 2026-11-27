@@ -1,4 +1,4 @@
-import { resolveStardustLocale, syncCustomLocale } from "./customLocale";
+import { isChineseLocale, syncCustomLocale } from "./customLocale";
 import { getTranslationsSnapshot } from "gt-react";
 
 import {
@@ -7,21 +7,29 @@ import {
   updateClientSettings,
 } from "../hooks/useSettings";
 import { initializeI18n } from "./initializeI18n";
-import { DEFAULT_LOCALE, SUPPORTED_LOCALES } from "./locales";
+import { DEFAULT_LOCALE, resolveWebLocaleSelection } from "./locales";
 import { setActiveLocale } from "./messages";
 
 type LocaleTranslations = Awaited<ReturnType<typeof getTranslationsSnapshot>>;
 
 export interface I18nSnapshot {
   readonly locale: string;
+  readonly formattingLocale: string | undefined;
   readonly translations: LocaleTranslations;
 }
 
 const loadedTranslations: LocaleTranslations = { [DEFAULT_LOCALE]: {} };
 const pendingLoads = new Map<string, Promise<void>>();
 const listeners = new Set<() => void>();
-let snapshot: I18nSnapshot = { locale: DEFAULT_LOCALE, translations: { ...loadedTranslations } };
-let requestedLocale = DEFAULT_LOCALE;
+let snapshot: I18nSnapshot = {
+  locale: DEFAULT_LOCALE,
+  formattingLocale: undefined,
+  translations: { ...loadedTranslations },
+};
+let requestedLocale: ReturnType<typeof resolveWebLocaleSelection> = {
+  catalogLocale: DEFAULT_LOCALE,
+  formattingLocale: undefined,
+};
 
 function loadLocale(locale: string): Promise<void> {
   if (locale in loadedTranslations) return Promise.resolve();
@@ -42,12 +50,17 @@ function loadLocale(locale: string): Promise<void> {
 }
 
 function activateLocale(locale: string): void {
-  if (requestedLocale !== locale) return;
-  if (snapshot.locale === locale && snapshot.translations[locale] === loadedTranslations[locale]) {
+  if (requestedLocale.catalogLocale !== locale) return;
+  const { formattingLocale } = requestedLocale;
+  if (
+    snapshot.locale === locale &&
+    snapshot.formattingLocale === formattingLocale &&
+    snapshot.translations[locale] === loadedTranslations[locale]
+  ) {
     return;
   }
   syncCustomLocale(locale);
-  snapshot = { locale, translations: { ...loadedTranslations } };
+  snapshot = { locale, formattingLocale, translations: { ...loadedTranslations } };
   setActiveLocale(locale);
   document.documentElement.lang = locale;
   for (const listener of listeners) listener();
@@ -55,10 +68,10 @@ function activateLocale(locale: string): void {
 
 function applyLanguageSetting(): void {
   // Not desktopBridge.getSystemLocale(): that is the regional/time locale, not the UI language.
-  requestedLocale = resolveStardustLocale(
-    getClientSettings().language,
-    navigator.languages[0] ?? navigator.language,
-    SUPPORTED_LOCALES,
+  const rawLanguage = getClientSettings().language;
+  requestedLocale = resolveWebLocaleSelection(
+    isChineseLocale(rawLanguage) ? "zh" : rawLanguage,
+    navigator.languages,
   );
   void whenLocaleReady();
 }
@@ -76,7 +89,7 @@ export function startI18n(): void {
 
 /** Resolves once the requested locale's translations are ready; immediate for English. */
 export function whenLocaleReady(): Promise<void> {
-  const locale = requestedLocale;
+  const locale = requestedLocale.catalogLocale;
   return loadLocale(locale).then(() => activateLocale(locale));
 }
 
@@ -89,4 +102,8 @@ export function subscribeI18n(listener: () => void): () => void {
 
 export function getI18nSnapshot(): I18nSnapshot {
   return snapshot;
+}
+
+export function getFormattingLocale(): string | undefined {
+  return snapshot.formattingLocale;
 }

@@ -54,8 +54,9 @@ import { CursorUsageHint } from "./CursorUsageHint";
 import { useUiText } from "~/i18n/useUiText";
 import { UsageCount } from "./UsageMotion";
 import { readUiLocale } from "~/i18n";
-import { CHATGPT_USAGE_URL, collectLimitAccounts, collectExternalUsageLinks, collectLimitPools, limitPoolId, cursorUsageWindowDetails, displayLimitWindows, type LimitAccount, type LimitPool, type LimitPoolMember, type LimitPoolWindow, paceRemainingPercent, remainingPercent, type ResetCreditChoice } from "@t3tools/shared/usageLimits";
-import { collectLimitNotices, formatResetsIn } from "@t3tools/shared/usageLimitsCopy";
+import { CHATGPT_USAGE_URL, collectLimitAccounts, collectLimitPools, limitPoolId, displayLimitWindows, type LimitAccount, type LimitPool, type LimitPoolMember, type LimitPoolWindow, paceRemainingPercent, remainingPercent, type ResetCreditChoice } from "@t3tools/shared/usageLimits";
+import { collectExternalUsageLinks, collectLimitNotices, cursorUsageWindowDetails, formatResetsIn } from "@t3tools/shared/usageLimitsCopy";
+import { useMessages } from "gt-react";
 import type { Popover as PopoverPrimitive } from "@base-ui/react/popover";
 import { normalizeProviderAccentColor } from "@t3tools/client-runtime/state/provider-instance-display";
 import {
@@ -1450,8 +1451,9 @@ export function UsageLimitsPooled({
   const staleAccount = pools
     .flatMap((p) => p.accounts)
     .find((a) => quotaReadingStale(a.limits, now));
-  const notices = collectLimitNotices(presentations);
-  const externalLinks = collectExternalUsageLinks(presentations);
+  const messagesResolver = useMessages();
+  const notices = collectLimitNotices(presentations, messagesResolver);
+  const externalLinks = collectExternalUsageLinks(presentations, messagesResolver);
   const headline = limitsHeadline(pools, titles, now);
   const healthSummary = summarizeHealth(health);
   const sentence = healthSentence(uiText, healthSummary);
