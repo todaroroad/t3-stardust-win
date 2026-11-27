@@ -841,7 +841,5 @@ export function __setClientSettingsForTests(settings: ClientSettings): void {
 }
 
 export function useLegacySidebarEnabled() {
-  return useClientSettings(
-    (settings) => settings.legacySidebarEnabled && !settings.boringSidebarEnabled,
-  );
+  return false;
 }

@@ -109,6 +109,7 @@ import { readLocalApi } from "../localApi";
 import { configuredHostedAppUrl } from "../hostedPairing";
 import { useSidebarPendingFileDropStore } from "../sidebarPendingFileDropStore";
 import { SidebarFolderDrop } from "./sidebar/SidebarFolderDrop";
+import { SidebarProjectRail } from "./sidebar/SidebarProjectRail";
 import {
   pickableProjectGroups,
   selectProjectGroupingSettings,
@@ -3157,7 +3158,31 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
   return (
     <SidebarFolderDrop>
       <SidebarChromeHeader isElectron={isElectron} />
-      <SidebarContent
+      <div className="flex min-h-0 flex-1 flex-row overflow-hidden">
+        {scopeGroups.length > 0 ? (
+          <SidebarProjectRail
+            projects={scopeGroups}
+            threads={listedThreads}
+            delegatedUnderParent={delegatedUnderParent}
+            serverConfigs={serverConfigs}
+            selectedProjectKeys={projectScopeKeys}
+            onSelectAll={() => setProjectScopeKeys([])}
+            onSelectProject={(projectKey, additive) => {
+              if (additive) {
+                toggleProjectScopeKey(projectKey);
+              } else {
+                setProjectScopeKeys([projectKey]);
+              }
+            }}
+            onStartThreadInProject={startThreadInProjectFolder}
+            onOpenProjectSettings={openProjectSettings}
+            onAddProject={openAddProjectCommandPalette}
+            canPinProject={canPinProject}
+            onTogglePinProject={toggleProjectGroupPin}
+          />
+        ) : null}
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+          <SidebarContent
         ref={sidebarContentRef}
         className="min-h-full"
         fixedHeader={
@@ -3909,8 +3934,10 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
             </DndContext>
           ) : null}
         </SidebarGroup>
-      </SidebarContent>
-      <SidebarChromeFooter />
+          </SidebarContent>
+          <SidebarChromeFooter />
+        </div>
+      </div>
     </SidebarFolderDrop>
   );
 }

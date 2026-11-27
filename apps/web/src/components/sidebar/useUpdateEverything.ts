@@ -72,9 +72,12 @@ export function useUpdateEverything(
     canMaintain: canUpdateServer(sessionStates[index]!),
     updateState: updateStates[index]!,
   }));
-  const { targets: servers, skipped } = channelSwitch
-    ? collectChannelSwitchTargets(machines, channelSwitch, resolve)
-    : collectServerUpdateTargets(machines, targetVersion, resolve);
+  // T3星辰版 disables remote server updates (only local desktop app & provider CLI updates run).
+  const servers: ReturnType<typeof collectServerUpdateTargets>["targets"] = [];
+  const skipped: ReturnType<typeof collectServerUpdateTargets>["skipped"] = [];
+  void targetVersion;
+  void collectChannelSwitchTargets;
+  void collectServerUpdateTargets;
   // Track-only hosts save a setting and restart nothing, so they are neither listed nor counted.
   const moving = servers.filter((server) => server.trackOnly !== true);
   const restarts = collectRestartingMachines(machines, moving, localUpdateVersion !== null);

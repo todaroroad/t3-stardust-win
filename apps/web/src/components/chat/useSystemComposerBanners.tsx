@@ -239,7 +239,9 @@ export function useSystemComposerBanners(input: SystemComposerBannersInput) {
     }
     // An available update is offered by the sidebar's update pill; the composer only shows one
     // that is running or failed, since either explains what this thread's server is doing.
+    const remoteServerUpdatesEnabled = false as boolean;
     if (
+      remoteServerUpdatesEnabled &&
       !automaticEnvironment &&
       serverUpdateEnvironmentId &&
       serverUpdateState.status !== "idle" &&

@@ -10,6 +10,15 @@ import * as Schema from "effect/Schema";
 import { msg } from "gt-react";
 
 import { APP_VERSION } from "./branding";
+
+function mapStardustVersionToOfficial(version: string): string {
+  const match = /^1\.(\d+)\.\d+$/.exec(version.trim());
+  if (!match) return version;
+  const mappedMinor = Number(match[1]);
+  return mappedMinor < 100
+    ? `0.1.${mappedMinor}`
+    : `0.${Math.floor(mappedMinor / 100)}.${mappedMinor % 100}`;
+}
 import { getLocalStorageItem, setLocalStorageItem } from "./hooks/useLocalStorage";
 import { m, type MessageResolver } from "./i18n/messages";
 
@@ -48,7 +57,7 @@ function versionCore(version: string): string {
 
 export function resolveVersionMismatch(
   serverVersion: string | null | undefined,
-  clientVersion: string = APP_VERSION,
+  clientVersion: string = mapStardustVersionToOfficial(APP_VERSION),
   resolve: MessageResolver = m,
 ): VersionMismatch | null {
   const normalizedClientVersion = normalizeVersion(clientVersion);
@@ -83,10 +92,11 @@ export function resolveVersionMismatch(
 }
 
 export function resolveServerConfigVersionMismatch(
-  serverConfig: Pick<ServerConfig, "environment"> | null | undefined,
-  resolve: MessageResolver = m,
+  _serverConfig: Pick<ServerConfig, "environment"> | null | undefined,
+  _resolve: MessageResolver = m,
 ): VersionMismatch | null {
-  return resolveVersionMismatch(serverConfig?.environment.serverVersion, APP_VERSION, resolve);
+  // T3星辰版 disables remote server version-skew prompts & updates.
+  return null;
 }
 
 export function resolveServerSelfUpdateCapability(

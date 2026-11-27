@@ -424,12 +424,10 @@ function followHandedOffServers(
 
 /** Reports, once per launch, how the update run that restarted the app ended. */
 export function startDesktopUpdateLaunchNotice(): () => void {
-  const saved = takeSavedUpdateEverythingResult();
-  if (saved) {
-    const handedOff = saved.handedOff ?? [];
-    showUpdateEverythingResult({ ...saved, restarting: handedOff.map((server) => server.label) });
-    followHandedOffServers(handedOff, saved.trackSwitch === true);
-  }
+  // Clear any stale remote server update handoff state (e.g. gcp-tw-agent retry pill).
+  clearSavedUpdateEverythingResult();
+  void takeSavedUpdateEverythingResult;
+  void followHandedOffServers;
 
   let notifiedNotAppliedVersion: string | null = null;
   return appAtomRegistry.subscribe(

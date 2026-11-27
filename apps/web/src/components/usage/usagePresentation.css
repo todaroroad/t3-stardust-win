@@ -280,8 +280,100 @@ html:root[data-theme-id="apple"] {
   }
 }
 
+.usage-limits-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
 .usage-limits-conclusion {
-  display: none;
+  display: block;
+  font-size: 22px;
+  font-weight: 650;
+  line-height: 1.25;
+  letter-spacing: -0.015em;
+  color: var(--foreground);
+}
+.usage-limits-conclusion em {
+  font-style: normal;
+  color: var(--primary);
+}
+.usage-limit-missing {
+  grid-column: 1 / -1;
+  padding: 10px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--card) 78%, transparent);
+  color: var(--muted-foreground);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.usage-section-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 10px;
+  margin: 8px 0 10px;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--foreground);
+}
+.usage-section-title span {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--muted-foreground);
+}
+.usage-reset-timeline-wrap {
+  grid-column: 1 / -1;
+  min-width: 0;
+  margin-top: 4px;
+}
+.usage-reset-timeline {
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  padding: 16px 20px;
+  --usage-today: color-mix(in srgb, var(--primary) 12%, var(--card));
+  --usage-lane: color-mix(in srgb, var(--primary) 65%, var(--card));
+}
+.usage-reset-timeline svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.usage-reset-timeline text {
+  font-family: inherit;
+  font-size: 11.5px;
+  fill: var(--muted-foreground);
+  font-variant-numeric: tabular-nums;
+}
+.usage-reset-timeline text.usage-timeline-provider {
+  font-size: 13px;
+  font-weight: 600;
+  fill: var(--foreground);
+}
+.usage-reset-timeline text.usage-timeline-event {
+  font-size: 11.5px;
+  font-weight: 600;
+  fill: var(--foreground);
+}
+.usage-reset-timeline [data-timeline-lane] {
+  cursor: pointer;
+}
+.usage-timeline-readout {
+  min-height: 22px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--muted-foreground);
+  margin-bottom: 12px;
+}
+.usage-timeline-readout b {
+  color: var(--foreground);
+  font-weight: 600;
 }
 .usage-sheet-content {
   padding: 20px;

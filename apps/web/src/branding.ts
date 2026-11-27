@@ -43,6 +43,18 @@ export function appDisplayName(): string {
   return "T3星辰版";
 }
 export const APP_VERSION = import.meta.env.APP_VERSION || "0.0.0";
+
+export function resolveOfficialCompatVersion(appVersion: string): string {
+  const match = /^1\.(\d+)\.\d+$/.exec(appVersion.trim());
+  if (!match) return appVersion;
+  const mappedMinor = Number(match[1]);
+  if (mappedMinor < 100) {
+    return `0.1.${mappedMinor}`;
+  }
+  return `0.${Math.floor(mappedMinor / 100)}.${mappedMinor % 100}`;
+}
+
+export const OFFICIAL_COMPAT_VERSION = resolveOfficialCompatVersion(APP_VERSION);
 export const DESKTOP_DOWNLOAD_URL = "https://github.com/todaroroad/t3-stardust-win/releases";
 // Redirects to the App Store or Google Play to match the phone that opens it.
 export const MOBILE_APP_URL = "https://github.com/todaroroad/t3-stardust-win";

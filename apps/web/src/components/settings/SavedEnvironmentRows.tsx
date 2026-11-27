@@ -387,7 +387,8 @@ export function SavedBackendListRow({
         </>
       }
     >
-      {unsupported &&
+      {(false as boolean) &&
+      unsupported &&
       environment.entry.serverUpdateRequired === true &&
       serverUpdateState.status !== "running" ? (
         <OutdatedServerUpdateAction
@@ -401,7 +402,7 @@ export function SavedBackendListRow({
           label={serverUpdateState.status === "failed" ? gt("Retry update") : gt("Update")}
         />
       ) : null}
-      {showUpdateAction ? (
+      {(false as boolean) && showUpdateAction ? (
         <ServerUpdateAction
           environmentId={environmentId}
           serverLabel={gt("{label} server", {
@@ -411,7 +412,7 @@ export function SavedBackendListRow({
           selfUpdate={resolveServerSelfUpdateCapability(environment.serverConfig)}
           installation={environment.serverConfig?.environment.capabilities.serverInstallation}
           desktopAppUpdate={supportsDesktopAppUpdate(environment.serverConfig)}
-          targetVersion={versionMismatch.clientVersion}
+          targetVersion={versionMismatch!.clientVersion}
           label={serverUpdateState.status === "failed" ? gt("Retry update") : gt("Update")}
           appearance="icon"
         />

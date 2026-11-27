@@ -392,4 +392,23 @@ for (const rel of [
   writeText(rel, src);
 }
 
+// ---------------------------------------------------------------------------
+// 5. Verify T3星辰版 Sidebar Project Rail, Server Update Suppression & Usage CSS
+// ---------------------------------------------------------------------------
+assertIncludes(
+  readText("apps/web/src/branding.ts"),
+  "OFFICIAL_COMPAT_VERSION",
+  "apps/web/src/branding.ts",
+);
+assertIncludes(
+  readText("apps/web/src/components/Sidebar.tsx"),
+  "SidebarProjectRail",
+  "apps/web/src/components/Sidebar.tsx",
+);
+assertIncludes(
+  readText("apps/web/src/components/usage/usagePresentation.css"),
+  ".usage-reset-timeline {",
+  "apps/web/src/components/usage/usagePresentation.css",
+);
+
 console.log(`[apply-overlay] All ${DISPLAY_BRAND_NAME} customizations, guards & auto-updater settings verified.`);
