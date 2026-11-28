@@ -865,6 +865,28 @@ copyAsset(
 
     writeText(rel, src);
   }
+  assertIncludes(src, "const stardustCustomCatsActive =", rel);
+  if (!src.includes("stardustCustomCatsDrag")) {
+    const dragRe =
+      /  const isContextDrag =\r?\n    projectFolders !== null \|\|\r?\n    dragState\?\.contextDrag === true \|\|\r?\n    dragState\?\.activeSection === "working";/;
+    if (!dragRe.test(src)) {
+      throw new Error(`[apply-overlay] Missing isContextDrag block in ${rel}`);
+    }
+    src = src.replace(
+      dragRe,
+      `  const stardustCustomCatsDrag =
+    projectScopeKeys.length === 0 &&
+    !isSearchingThreads &&
+    stardustCatSettings.enabled &&
+    stardustCatSettings.preset !== "project";
+  const isContextDrag =
+    projectFolders !== null ||
+    stardustCustomCatsDrag ||
+    dragState?.contextDrag === true ||
+    dragState?.activeSection === "working";`,
+    );
+    writeText(rel, src);
+  }
   assertIncludes(src, "StardustAllProjectsTopWorkbench", rel);
   assertIncludes(src, 'data-project-scope-popup="true"', rel);
 }

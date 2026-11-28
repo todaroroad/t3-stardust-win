@@ -1791,8 +1791,14 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
   };
 
   // Folder rows only drag out to the composer; folders own their order, so nothing drops in the list.
+  const stardustCustomCatsDrag =
+    projectScopeKeys.length === 0 &&
+    !isSearchingThreads &&
+    stardustCatSettings.enabled &&
+    stardustCatSettings.preset !== "project";
   const isContextDrag =
     projectFolders !== null ||
+    stardustCustomCatsDrag ||
     dragState?.contextDrag === true ||
     dragState?.activeSection === "working";
   const dragTargetSection = isContextDrag ? null : (dragState?.targetSection ?? null);

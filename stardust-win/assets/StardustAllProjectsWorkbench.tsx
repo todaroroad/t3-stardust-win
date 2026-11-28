@@ -16,7 +16,6 @@ import {
 import { memo, type ReactNode, useEffect, useMemo, useState } from "react";
 
 import { cn } from "~/lib/utils";
-import { environmentIdsKey } from "~/state/environmentAtomList";
 import { serverEnvironment } from "~/state/server";
 import {
   getVisibleCategories,
@@ -113,7 +112,7 @@ export const StardustAllProjectsTopWorkbench = memo(function StardustAllProjects
   const [expandedParentIds, setExpandedParentIds] = useState<ReadonlySet<string>>(() => new Set());
   const [acknowledgedKeys, setAcknowledgedKeys] = useState<ReadonlySet<string>>(() => new Set());
 
-  const envKey = environmentIdsKey(connectedEnvironmentIds);
+  const envKey = useMemo(() => JSON.stringify(connectedEnvironmentIds), [connectedEnvironmentIds]);
   const workflowsAcross = useAtomValue(serverEnvironment.workflowsLiveAcross(envKey));
 
   const { runningGroups, totalSubagentsCount } = useMemo(() => {
@@ -191,32 +190,42 @@ export const StardustAllProjectsTopWorkbench = memo(function StardustAllProjects
 
     for (const { environmentId, result } of workflowsAcross) {
       if (!AsyncResult.isSuccess(result) || !result.value) continue;
-      for (const wf of result.value.workflows ?? []) {
-        const statusStr = String((wf as { readonly status?: unknown }).status ?? "");
+      const openQuestionRunIds = new Set(
+        (result.value.questions ?? []).map((q) => q.runId),
+      );
+      for (const run of result.value.runs ?? []) {
+        if (run.parentRunId !== null) continue;
+        const hasQuestion = openQuestionRunIds.has(run.runId);
         const isActive =
-          statusStr === "running" ||
-          statusStr === "starting" ||
-          statusStr === "waiting" ||
-          statusStr === "paused" ||
-          Boolean((wf as { readonly pendingQuestion?: unknown }).pendingQuestion);
+          run.status === "running" ||
+          run.status === "waiting" ||
+          run.status === "paused" ||
+          hasQuestion;
         if (!isActive) continue;
-        const runId = String((wf as { readonly runId?: unknown }).runId ?? "");
-        if (!runId) continue;
-        const rKey = `${environmentId}:${runId}`;
+        const rKey = `${environmentId}:${run.runId}`;
         if (seenRuns.has(rKey)) continue;
         seenRuns.add(rKey);
-        const name = String(
-          (wf as { readonly workflow?: unknown; readonly title?: unknown }).workflow ??
-            (wf as { readonly title?: unknown }).title ??
-            "工作流",
-        );
-        const needsYou = Boolean((wf as { readonly pendingQuestion?: unknown }).pendingQuestion);
+        const needsYou =
+          hasQuestion || (run.status === "paused" && run.resumesAt === null);
+        const subtitle = hasQuestion
+          ? "等待你的输入"
+          : run.status === "paused"
+            ? run.detail
+              ? `已暂停 · ${run.detail}`
+              : "已暂停 · 待处理"
+            : run.status === "waiting"
+              ? run.detail
+                ? `等待中 · ${run.detail}`
+                : "等待中"
+              : run.detail
+                ? `${run.workflow} · ${run.detail}`
+                : "运行中";
         items.push({
           key: rKey,
           environmentId,
-          runId,
-          title: name,
-          subtitle: needsYou ? "等待你的输入" : "运行中",
+          runId: run.runId,
+          title: run.title || run.workflow || "工作流",
+          subtitle,
           needsYou,
         });
       }
