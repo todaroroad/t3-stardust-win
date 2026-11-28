@@ -174,7 +174,7 @@ export const StardustAllProjectsTopWorkbench = memo(function StardustAllProjects
   const pinnedCollapsed = usePinnedSectionCollapsed();
   const localLastVisitedAtById = useUiStateStore((state) => state.threadLastVisitedAtById);
 
-  const [runningManualExpanded, setRunningManualExpanded] = useState<boolean | null>(null);
+  const [runningExpanded, setRunningExpanded] = useState(true);
   const [showAllRunning, setShowAllRunning] = useState(false);
   const [attentionExpanded, setAttentionExpanded] = useState(true);
   const [workflowsExpanded, setWorkflowsExpanded] = useState(true);
@@ -186,7 +186,8 @@ export const StardustAllProjectsTopWorkbench = memo(function StardustAllProjects
   const envKey = useMemo(() => JSON.stringify(connectedEnvironmentIds), [connectedEnvironmentIds]);
   const workflowsAcross = useAtomValue(serverEnvironment.workflowsLiveAcross(envKey));
 
-  const { runningGroups, totalSubagentsCount } = useMemo(() => {
+  const { runningGroups, totalSubagentsCount, coveredInPinnedCount } = useMemo(() => {
+    const nowIso = new Date().toISOString();
     const childrenByParent = new Map<string, EnvironmentThreadShell[]>();
     for (const t of allThreads) {
       if (t.archivedAt) continue;
@@ -204,34 +205,32 @@ export const StardustAllProjectsTopWorkbench = memo(function StardustAllProjects
       readonly children: readonly EnvironmentThreadShell[];
     }> = [];
     let subCount = 0;
+    let pinnedCovered = 0;
 
     for (const t of allThreads) {
       if (t.archivedAt || t.lineage?.parentThreadId) continue;
       const pKey = `${t.environmentId}:${t.id}`;
       const children = (childrenByParent.get(pKey) ?? []).filter(isThreadActivelyRunning);
       if (isThreadActivelyRunning(t) || children.length > 0) {
+        const isVisibleInExpandedPinned =
+          !pinnedCollapsed &&
+          t.pinnedAt != null &&
+          t.settledOverride !== "settled" &&
+          !effectiveSnoozed(t, { now: nowIso });
+        if (isVisibleInExpandedPinned && children.length === 0) {
+          pinnedCovered += 1;
+          continue;
+        }
         subCount += children.length;
         groups.push({ key: pKey, parent: t, children });
       }
     }
-    return { runningGroups: groups, totalSubagentsCount: subCount };
-  }, [allThreads]);
-
-  // When every running thread (with 0 subagents) is already visible in the expanded `置顶` section
-  // directly below, collapse the duplicate list by default while keeping accurate count & click-to-expand.
-  const allCoveredByExpandedPinned =
-    runningGroups.length > 0 &&
-    !pinnedCollapsed &&
-    runningGroups.every((g) => g.parent.pinnedAt != null && g.children.length === 0);
-
-  const prevCoveredRef = useRef(allCoveredByExpandedPinned);
-  if (prevCoveredRef.current !== allCoveredByExpandedPinned) {
-    prevCoveredRef.current = allCoveredByExpandedPinned;
-    if (runningManualExpanded !== null) {
-      setRunningManualExpanded(null);
-    }
-  }
-  const runningExpanded = runningManualExpanded ?? !allCoveredByExpandedPinned;
+    return {
+      runningGroups: groups,
+      totalSubagentsCount: subCount,
+      coveredInPinnedCount: pinnedCovered,
+    };
+  }, [allThreads, pinnedCollapsed]);
 
   const [now, setNow] = useState(() => Date.now());
   const hasRunning = runningGroups.length > 0;
@@ -362,8 +361,14 @@ export const StardustAllProjectsTopWorkbench = memo(function StardustAllProjects
         <div className="rounded-lg">
           {runningGroups.length === 0 ? (
             <div className="flex h-7 items-center justify-between px-2 text-xs text-sidebar-muted-foreground">
-              <span>运行中 · 暂无运行任务</span>
-              <span className="tabular-nums">0</span>
+              <span>
+                {coveredInPinnedCount > 0 ? "运行中 · 已在置顶显示" : "运行中 · 暂无运行任务"}
+              </span>
+              <span
+                className={cn("tabular-nums", coveredInPinnedCount > 0 && "text-sky-400/85")}
+              >
+                {coveredInPinnedCount > 0 ? coveredInPinnedCount : 0}
+              </span>
             </div>
           ) : (
             <div>
@@ -371,7 +376,7 @@ export const StardustAllProjectsTopWorkbench = memo(function StardustAllProjects
                 <button
                   type="button"
                   aria-expanded={runningExpanded}
-                  onClick={() => setRunningManualExpanded(!runningExpanded)}
+                  onClick={() => setRunningExpanded((v) => !v)}
                   className="inline-flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 text-left font-medium text-sidebar-foreground"
                 >
                   <ChevronDownIcon
@@ -387,10 +392,10 @@ export const StardustAllProjectsTopWorkbench = memo(function StardustAllProjects
                         {" "}
                         · 含 {totalSubagentsCount} 个子任务
                       </span>
-                    ) : allCoveredByExpandedPinned && !runningExpanded ? (
+                    ) : coveredInPinnedCount > 0 ? (
                       <span className="font-normal text-sidebar-muted-foreground">
                         {" "}
-                        · 置顶中执行
+                        · 另 {coveredInPinnedCount} 个在置顶
                       </span>
                     ) : null}
                   </span>
