@@ -223,8 +223,14 @@
     }
 
     function addCompletedRecord(entry) {
-      // Replace existing record for same thread so the list never stacks duplicates for one conversation
-      completedHistory = completedHistory.filter((item) => item.threadId !== entry.threadId);
+      // Replace existing record for same scoped thread so the list never stacks duplicates for one conversation
+      completedHistory = completedHistory.filter(
+        (item) =>
+          !(
+            item.threadId === entry.threadId &&
+            (item.environmentId || '') === (entry.environmentId || '')
+          )
+      );
       completedHistory.unshift({
         ...entry,
         uid: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
@@ -437,7 +443,7 @@
       let totalRunning = 0;
 
       for (const t of threads) {
-        if (!t || t.deletedAt || t.archivedAt || t.settledAt) continue;
+        if (!t || t.deletedAt || t.archivedAt || t.settledAt || t.settledOverride === 'settled') continue;
         if (t.lineage?.parentThreadId) continue;
 
         const isRunning =
@@ -485,8 +491,9 @@
           runStatus === 'starting' ||
           t.runtime?.activeRunId != null;
 
-        const prev = threadSnapshotMap.get(t.id);
-        threadSnapshotMap.set(t.id, { isRunning, runId, runStatus });
+        const snapKey = `${t.environmentId || ''}:${t.id}`;
+        const prev = threadSnapshotMap.get(snapKey);
+        threadSnapshotMap.set(snapKey, { isRunning, runId, runStatus });
 
         if (!hasBootstrappedThreads) continue;
         if (!prev) continue;
@@ -1855,8 +1862,10 @@
       // Reorder Web Context Menu ("按 xx 筛选" -> DOM #1)
       document.querySelectorAll('[data-context-menu="true"] > div').forEach((menuInner) => {
         if (menuInner.dataset.filterPinned === '1') return;
-        const filterBtn = [...menuInner.querySelectorAll(':scope > button[role="menuitem"]')].find((btn) =>
-          btn.querySelector('svg path[d^="M20 10a1 1 0 0 0 1-1V6"]')
+        const filterBtn = [...menuInner.querySelectorAll(':scope > button[role="menuitem"]')].find(
+          (btn) =>
+            btn.querySelector('svg path[d^="M20 10a1 1 0 0 0 1-1V6"]') &&
+            !btn.textContent?.includes('归入分类')
         );
         if (filterBtn && menuInner.firstElementChild !== filterBtn) {
           menuInner.dataset.filterPinned = '1';

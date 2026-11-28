@@ -16,7 +16,9 @@ export interface StardustCategorySettings {
   readonly suggestEnabled: boolean;
   readonly suggestModelKey: string | null;
   readonly hideEmptyCategories: boolean;
-  readonly editedCategories: Partial<Record<EditableStardustPreset, readonly StardustThreadCategory[]>>;
+  readonly editedCategories: Partial<
+    Record<EditableStardustPreset, readonly StardustThreadCategory[]>
+  >;
 }
 
 export const UNSORTED_CATEGORY_ID = "unsorted";
@@ -45,11 +47,23 @@ export const DEFAULT_PRESET_CATEGORIES: Readonly<
   Record<EditableStardustPreset, readonly StardustThreadCategory[]>
 > = {
   general: [
-    defCat("development", "开发", "代码|接口|开发|数据库|代码库|构建|逆向|脚本|code|api|bug|refactor|database|test|git|build"),
-    defCat("content", "写作与内容", "文章|博客|文案|写作|小说|总结|笔记|书签|article|blog|copywriting|readme"),
+    defCat(
+      "development",
+      "开发",
+      "代码|接口|开发|数据库|代码库|构建|逆向|脚本|code|api|bug|refactor|database|test|git|build",
+    ),
+    defCat(
+      "content",
+      "写作与内容",
+      "文章|博客|文案|写作|小说|总结|笔记|书签|article|blog|copywriting|readme",
+    ),
     defCat("research", "研究分析", "分析|对比|调研|研究|方案|排查|辨析|analyze|compare|research"),
     defCat("work", "工作事务", "周报|会议|邮件|报销|账单|交易|筛选|report|meeting|email|invoice"),
-    defCat("systems", "工具与系统", "磁盘|模型|设置|系统|服务器|部署|美化|额度|同步|disk|model|settings|network|install|gcp|t3"),
+    defCat(
+      "systems",
+      "工具与系统",
+      "磁盘|模型|设置|系统|服务器|部署|美化|额度|同步|disk|model|settings|network|install|gcp|t3",
+    ),
   ],
   developer: [
     defCat("fixes", "问题修复", "修复|报错|故障|异常|闪退|bug|fix|error|debug|issue"),
@@ -75,6 +89,7 @@ export const UNSORTED_CATEGORY: StardustThreadCategory = {
 const SETTINGS_STORAGE_KEY = "t3m:sidebar-categories-settings:v1";
 const OVERRIDES_STORAGE_KEY = "t3code:thread-categories:v1";
 const COLLAPSED_STORAGE_KEY = "t3m:collapsed-categories:v1";
+const PINNED_COLLAPSED_STORAGE_KEY = "t3m:pinned-collapsed:v1";
 const CHANGE_EVENT = "t3m:sidebar-categories-change";
 export const OPEN_CATEGORY_DIALOG_EVENT = "t3m:open-category-settings";
 
@@ -104,7 +119,9 @@ function parseSettings(raw: string | null): StardustCategorySettings {
       obj.editedCategories && typeof obj.editedCategories === "object"
         ? (obj.editedCategories as Record<string, unknown>)
         : {};
-    const editedCategories: Partial<Record<EditableStardustPreset, readonly StardustThreadCategory[]>> = {};
+    const editedCategories: Partial<
+      Record<EditableStardustPreset, readonly StardustThreadCategory[]>
+    > = {};
     for (const key of ["general", "developer", "creator"] as const) {
       const arr = editedRaw[key];
       if (Array.isArray(arr)) {
@@ -291,8 +308,52 @@ export function toggleCategoryCollapsed(categoryKey: string) {
   setCollapsedCategories(next);
 }
 
+export function uncollapseCategory(categoryKey: string) {
+  const current = readCollapsedCategories();
+  if (!current.has(categoryKey)) return;
+  const next = new Set(current);
+  next.delete(categoryKey);
+  setCollapsedCategories(next);
+}
+
 export function useCollapsedCategories(): ReadonlySet<string> {
   return useSyncExternalStore(subscribeStore, readCollapsedCategories, () => EMPTY_COLLAPSED);
+}
+
+// -------------------- Collapsed `置顶` section state in `所有项目` --------------------
+let cachedPinnedCollapsedRaw: string | null | undefined;
+let cachedPinnedCollapsed = false;
+
+export function readPinnedSectionCollapsed(): boolean {
+  let raw: string | null = null;
+  try {
+    raw = window.localStorage.getItem(PINNED_COLLAPSED_STORAGE_KEY);
+  } catch {
+    // ignore
+  }
+  if (raw !== cachedPinnedCollapsedRaw) {
+    cachedPinnedCollapsedRaw = raw;
+    cachedPinnedCollapsed = raw === "1" || raw === "true";
+  }
+  return cachedPinnedCollapsed;
+}
+
+export function setPinnedSectionCollapsed(collapsed: boolean) {
+  try {
+    window.localStorage.setItem(PINNED_COLLAPSED_STORAGE_KEY, collapsed ? "1" : "0");
+  } catch {
+    // ignore
+  }
+  cachedPinnedCollapsedRaw = undefined;
+  notifyStoreChange();
+}
+
+export function togglePinnedSectionCollapsed() {
+  setPinnedSectionCollapsed(!readPinnedSectionCollapsed());
+}
+
+export function usePinnedSectionCollapsed(): boolean {
+  return useSyncExternalStore(subscribeStore, readPinnedSectionCollapsed, () => false);
 }
 
 // -------------------- Classification logic --------------------

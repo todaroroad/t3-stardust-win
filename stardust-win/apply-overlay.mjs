@@ -1017,11 +1017,89 @@ copyAsset(
       `            : { id: "pin" as const, label: resolve(msg("Pin thread")), icon: "pin" },
         ]
       : []),
-    { id: "move-to-category" as const, label: "归入分类…", icon: "folder-tree" },`,
+    { id: "move-to-category" as const, label: "归入分类…", icon: "layers" },`,
+    );
+    writeText(rel, src);
+  } else if (
+    src.includes('{ id: "move-to-category" as const, label: "归入分类…", icon: "folder-tree" }')
+  ) {
+    src = src.replace(
+      '{ id: "move-to-category" as const, label: "归入分类…", icon: "folder-tree" }',
+      '{ id: "move-to-category" as const, label: "归入分类…", icon: "layers" }',
     );
     writeText(rel, src);
   }
-  assertIncludes(src, '"move-to-category"', rel);
+  assertIncludes(src, '{ id: "move-to-category" as const, label: "归入分类…", icon: "layers" }', rel);
+}
+
+// 7a-2. apps/web/src/contextMenuFallback.ts -> Add `layers` SVG icon for "归入分类…"
+{
+  const rel = "apps/web/src/contextMenuFallback.ts";
+  let src = readText(rel);
+  if (!src.includes("  layers: [")) {
+    const anchor =
+      '    { tag: "path", attrs: { d: "M3 3v13a2 2 0 0 0 2 2h3" } },\n  ],\n  "text-search": [';
+    assertIncludes(src, anchor, rel);
+    src = src.replace(
+      anchor,
+      `    { tag: "path", attrs: { d: "M3 3v13a2 2 0 0 0 2 2h3" } },
+  ],
+  layers: [
+    {
+      tag: "path",
+      attrs: {
+        d: "M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z",
+      },
+    },
+    {
+      tag: "path",
+      attrs: {
+        d: "M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12",
+      },
+    },
+    {
+      tag: "path",
+      attrs: {
+        d: "M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17",
+      },
+    },
+  ],
+  "text-search": [`,
+    );
+    writeText(rel, src);
+  }
+  assertIncludes(src, "  layers: [", rel);
+}
+
+// 7a-3. apps/web/src/hooks/useThreadActionMenu.ts -> Handle "move-to-category" in chat header "..." menu
+{
+  const rel = "apps/web/src/hooks/useThreadActionMenu.ts";
+  let src = readText(rel);
+  if (!src.includes("openStardustThreadCategoryPicker")) {
+    src = src.replace(
+      'import { scopeProjectRef } from "@t3tools/client-runtime/environment";',
+      'import { scopeProjectRef, scopedThreadKey } from "@t3tools/client-runtime/environment";\nimport { openStardustThreadCategoryPicker } from "../components/sidebar/stardustCategories";',
+    );
+    assertIncludes(src, '        case "project-settings": {', rel);
+    src = src.replace(
+      '        case "project-settings": {',
+      `        case "move-to-category": {
+          const project = projects.find(
+            (candidate) =>
+              candidate.environmentId === thread.environmentId && candidate.id === thread.projectId,
+          );
+          openStardustThreadCategoryPicker({
+            threadKey: scopedThreadKey(threadRef),
+            title: thread.title,
+            projectName: project?.title ?? null,
+          });
+          return;
+        }
+        case "project-settings": {`,
+    );
+    writeText(rel, src);
+  }
+  assertIncludes(src, 'case "move-to-category":', rel);
 }
 
 // 7b. apps/web/src/components/Sidebar.tsx
@@ -1029,17 +1107,88 @@ copyAsset(
   const rel = "apps/web/src/components/Sidebar.tsx";
   let src = readText(rel);
   if (!src.includes("StardustAllProjectsTopWorkbench")) {
-    src = `import {\n  openStardustThreadCategoryPicker,\n  useStardustCategorySettings,\n} from "./sidebar/stardustCategories";\nimport {\n  StardustAllProjectsCategories,\n  StardustAllProjectsTopWorkbench,\n} from "./sidebar/StardustAllProjectsWorkbench";\nimport { StardustSidebarCategoryModals } from "./sidebar/StardustSidebarCategoryModals";\n${src}`;
+    src = `import {\n  openStardustThreadCategoryPicker,\n  usePinnedSectionCollapsed,\n  useStardustCategorySettings,\n} from "./sidebar/stardustCategories";\nimport {\n  StardustAllProjectsCategories,\n  StardustAllProjectsPinnedHeader,\n  StardustAllProjectsTopWorkbench,\n} from "./sidebar/StardustAllProjectsWorkbench";\nimport { StardustSidebarCategoryModals } from "./sidebar/StardustSidebarCategoryModals";\n${src}`;
+
+    // Disable Working shelf split-brain & support collapsible Pinned section in 所有项目
+    assertIncludes(
+      src,
+      "  readonly keepEmptyFolders: (group: SidebarProjectSnapshot) => boolean;\n}) {",
+      rel,
+    );
+    src = src.replace(
+      "  readonly keepEmptyFolders: (group: SidebarProjectSnapshot) => boolean;\n}) {",
+      "  readonly keepEmptyFolders: (group: SidebarProjectSnapshot) => boolean;\n  readonly disableWorkingShelf?: boolean;\n  readonly hidePinnedRows?: boolean;\n}) {",
+    );
+    assertIncludes(
+      src,
+      "  const workingShelfEnabled =\n    useClientSettings((s) => s.sidebarWorkingShelfEnabled) && folderGroups === null;",
+      rel,
+    );
+    src = src.replace(
+      "  const workingShelfEnabled =\n    useClientSettings((s) => s.sidebarWorkingShelfEnabled) && folderGroups === null;",
+      "  const workingShelfEnabled =\n    useClientSettings((s) => s.sidebarWorkingShelfEnabled) &&\n    folderGroups === null &&\n    !input.disableWorkingShelf;",
+    );
+    src = src.replace(
+      "  const orderedThreads = [\n    ...pinnedThreads,",
+      "  const orderedThreads = [\n    ...(input.hidePinnedRows ? EMPTY_THREADS : pinnedThreads),",
+    );
+    src = src.replace(
+      "    threadByKey: new Map(orderedThreads.map((thread) => [threadShellKey(thread), thread] as const)),",
+      `    threadByKey: new Map(
+      [
+        ...pinnedThreads,
+        ...activeThreads,
+        ...workingThreads,
+        ...snoozedThreads,
+        ...settledThreads,
+      ].map((thread) => [threadShellKey(thread), thread] as const),
+    ),`,
+    );
 
     // Enable native project folders when user selects preset === "project" in 所有项目
     assertIncludes(src, "  const {\n    workingShelfEnabled,", rel);
     src = src.replace(
       "  const {\n    workingShelfEnabled,",
-      "  const stardustCatSettings = useStardustCategorySettings();\n  const {\n    workingShelfEnabled,",
+      "  const stardustCatSettings = useStardustCategorySettings();\n  const isPinnedSectionCollapsed = usePinnedSectionCollapsed();\n  const isAllProjectsSidebarMode = projectScopeKeys.length === 0 && !isSearchingThreads;\n  const {\n    workingShelfEnabled,",
     );
     src = src.replace(
       "    folderGroups: boringSidebarEnabled\n      ? scopedProjectGroups.length === 0",
-      "    folderGroups: (boringSidebarEnabled || (scopedProjectGroups.length === 0 && stardustCatSettings.enabled && stardustCatSettings.preset === \"project\"))\n      ? scopedProjectGroups.length === 0",
+      '    folderGroups: (boringSidebarEnabled || (scopedProjectGroups.length === 0 && stardustCatSettings.enabled && stardustCatSettings.preset === "project"))\n      ? scopedProjectGroups.length === 0',
+    );
+    src = src.replace(
+      "    keepEmptyFolders: (group) =>\n      scopedProjectGroups.length > 0 || (group.pinned && !group.archived),\n  });",
+      "    keepEmptyFolders: (group) =>\n      scopedProjectGroups.length > 0 || (group.pinned && !group.archived),\n    disableWorkingShelf: isAllProjectsSidebarMode,\n    hidePinnedRows: isAllProjectsSidebarMode && isPinnedSectionCollapsed,\n  });",
+    );
+
+    // Guard both visual sorting AND drop mutation when list reorder drag is disabled
+    assertIncludes(
+      src,
+      '  const isContextDrag =\n    projectFolders !== null ||\n    dragState?.contextDrag === true ||\n    dragState?.activeSection === "working";',
+      rel,
+    );
+    src = src.replace(
+      '  const isContextDrag =\n    projectFolders !== null ||\n    dragState?.contextDrag === true ||\n    dragState?.activeSection === "working";',
+      `  const stardustCustomCatsDrag =
+    isAllProjectsSidebarMode &&
+    stardustCatSettings.enabled &&
+    stardustCatSettings.preset !== "project";
+  const disableListReorderDrag =
+    projectFolders !== null ||
+    stardustCustomCatsDrag ||
+    (isAllProjectsSidebarMode && isPinnedSectionCollapsed);
+  const isContextDrag =
+    disableListReorderDrag ||
+    dragState?.contextDrag === true ||
+    dragState?.activeSection === "working";`,
+    );
+    assertIncludes(
+      src,
+      "  const handleThreadDragEnd = (event: DragEndEvent) => {\n    if (projectFolders !== null) return;",
+      rel,
+    );
+    src = src.replace(
+      "  const handleThreadDragEnd = (event: DragEndEvent) => {\n    if (projectFolders !== null) return;",
+      "  const handleThreadDragEnd = (event: DragEndEvent) => {\n    if (disableListReorderDrag) return;",
     );
 
     // Handle right-click "move-to-category"
@@ -1063,7 +1212,7 @@ copyAsset(
     );
 
     // Inject Top Workbench (`运行中 / 待处理 / 工作流`) + Middle `分类` in `所有项目` mode
-    assertIncludes(src, '                    const items: ReactNode[] = [', rel);
+    assertIncludes(src, "                    const items: ReactNode[] = [", rel);
     src = src.replace(
       `                    const items: ReactNode[] = [
                       <SidebarDraftBlock
@@ -1115,18 +1264,36 @@ copyAsset(
                                 });
                               }}
                               onSettleThread={attemptSettle}
+                              onThreadContextMenu={handleThreadContextMenu}
                             />,
                           ]
                         : []),
                     ];`,
     );
 
-    // Skip flat active rows when custom categories render them, and skip redundant bottom working rows in 所有项目
+    // Skip flat active rows when custom categories render them, skip redundant bottom working rows, and skip collapsed pinned rows in 所有项目
     src = src.replace(
       '                        // Folders draw active rows in their own place below.\n                        if (projectFolders !== null && item.section === "active") continue;',
       `                        // Folders or custom categories draw active rows in their own place below.
                         if ((projectFolders !== null || stardustCustomCatsActive) && item.section === "active") continue;
-                        if (isAllProjectsWorkbench && item.section === "working") continue;`,
+                        if (isAllProjectsWorkbench && item.section === "working") continue;
+                        if (isAllProjectsWorkbench && isPinnedSectionCollapsed && item.section === "pinned") continue;`,
+    );
+
+    // Render collapsible 置顶 section header above pinned threads in 所有项目
+    src = src.replace(
+      '                        case "pinned-header":\n                          items.push(',
+      `                        case "pinned-header":
+                          if (isAllProjectsWorkbench && pinnedThreads.length > 0) {
+                            items.push(
+                              <StardustAllProjectsPinnedHeader
+                                key="t3m-pinned-header"
+                                pinnedThreads={pinnedThreads}
+                                routeRowThreadKey={routeRowThreadKey}
+                              />,
+                            );
+                          }
+                          items.push(`,
     );
 
     // Render custom categories at active-placeholder in 所有项目
@@ -1166,11 +1333,23 @@ copyAsset(
       "      <SidebarChromeFooter />\n    </SidebarFolderDrop>",
       `      <SidebarChromeFooter />
       <StardustSidebarCategoryModals
-        activeThreads={[...activeThreads, ...workingThreads].map((t) => ({
-          key: scopedThreadKey(scopeThreadRef(t.environmentId, t.id)),
-          title: t.title,
-          projectName: projectDisplayNameByKey.get(\`\${t.environmentId}:\${t.projectId}\`) ?? null,
-        }))}
+        activeThreads={filterSidebarV2VisibleThreads(listedThreads, null, delegatedUnderParent).flatMap((t) => {
+          if (
+            t.pinnedAt != null ||
+            (serverConfigs.has(t.environmentId) &&
+              (t.settledOverride === "settled" || effectiveSnoozed(t, { now: snoozeNow })))
+          ) {
+            return [];
+          }
+          return [
+            {
+              key: scopedThreadKey(scopeThreadRef(t.environmentId, t.id)),
+              title: t.title,
+              projectName:
+                projectDisplayNameByKey.get(\`\${t.environmentId}:\${t.projectId}\`) ?? null,
+            },
+          ];
+        })}
       />
     </SidebarFolderDrop>`,
     );
@@ -1178,27 +1357,10 @@ copyAsset(
     writeText(rel, src);
   }
   assertIncludes(src, "const stardustCustomCatsActive =", rel);
-  if (!src.includes("stardustCustomCatsDrag")) {
-    const dragRe =
-      /  const isContextDrag =\r?\n    projectFolders !== null \|\|\r?\n    dragState\?\.contextDrag === true \|\|\r?\n    dragState\?\.activeSection === "working";/;
-    if (!dragRe.test(src)) {
-      throw new Error(`[apply-overlay] Missing isContextDrag block in ${rel}`);
-    }
-    src = src.replace(
-      dragRe,
-      `  const stardustCustomCatsDrag =
-    projectScopeKeys.length === 0 &&
-    !isSearchingThreads &&
-    stardustCatSettings.enabled &&
-    stardustCatSettings.preset !== "project";
-  const isContextDrag =
-    projectFolders !== null ||
-    stardustCustomCatsDrag ||
-    dragState?.contextDrag === true ||
-    dragState?.activeSection === "working";`,
-    );
-    writeText(rel, src);
-  }
+  assertIncludes(src, "disableWorkingShelf: isAllProjectsSidebarMode", rel);
+  assertIncludes(src, "StardustAllProjectsPinnedHeader", rel);
+  assertIncludes(src, "if (disableListReorderDrag) return;", rel);
+  assertIncludes(src, "onThreadContextMenu={handleThreadContextMenu}", rel);
   assertIncludes(src, "StardustAllProjectsTopWorkbench", rel);
   assertIncludes(src, 'data-project-scope-popup="true"', rel);
 }

@@ -181,7 +181,7 @@ export function buildThreadActionMenuItems(
             : { id: "pin" as const, label: resolve(msg("Pin thread")), icon: "pin" },
         ]
       : []),
-    { id: "move-to-category" as const, label: "归入分类…", icon: "folder-tree" },
+    { id: "move-to-category" as const, label: "归入分类…", icon: "layers" },
     ...(state.supports.settlement
       ? [
           state.isSettled

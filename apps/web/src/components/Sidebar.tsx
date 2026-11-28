@@ -1,9 +1,11 @@
 import {
   openStardustThreadCategoryPicker,
+  usePinnedSectionCollapsed,
   useStardustCategorySettings,
 } from "./sidebar/stardustCategories";
 import {
   StardustAllProjectsCategories,
+  StardustAllProjectsPinnedHeader,
   StardustAllProjectsTopWorkbench,
 } from "./sidebar/StardustAllProjectsWorkbench";
 import { StardustSidebarCategoryModals } from "./sidebar/StardustSidebarCategoryModals";
@@ -452,6 +454,8 @@ function useSidebarThreads(input: {
   readonly folderGroups: readonly SidebarProjectSnapshot[] | null;
   // Keeps folders with no active threads, so a project the user filtered to or pinned can start one.
   readonly keepEmptyFolders: (group: SidebarProjectSnapshot) => boolean;
+  readonly disableWorkingShelf?: boolean;
+  readonly hidePinnedRows?: boolean;
 }) {
   const {
     projectScopeKey,
@@ -469,7 +473,9 @@ function useSidebarThreads(input: {
   const shelfRouteThreadKey = routeRowThreadKey === departingThreadKey ? null : routeRowThreadKey;
   // Folders already separate the work, so boring mode has no Working shelf.
   const workingShelfEnabled =
-    useClientSettings((s) => s.sidebarWorkingShelfEnabled) && folderGroups === null;
+    useClientSettings((s) => s.sidebarWorkingShelfEnabled) &&
+    folderGroups === null &&
+    !input.disableWorkingShelf;
   const inboxReturnsVersion = useSyncExternalStore(
     inboxReturns.subscribe,
     inboxReturns.getSnapshot,
@@ -572,7 +578,7 @@ function useSidebarThreads(input: {
           };
         });
   const orderedThreads = [
-    ...pinnedThreads,
+    ...(input.hidePinnedRows ? EMPTY_THREADS : pinnedThreads),
     ...(projectFolders === null
       ? activeThreads
       : projectFolders.flatMap((folder) => folder.threads)),
@@ -625,7 +631,15 @@ function useSidebarThreads(input: {
     visibleSnoozedThreads,
     visibleWorkingThreads,
     orderedThreadKeys: orderedThreads.map(threadShellKey),
-    threadByKey: new Map(orderedThreads.map((thread) => [threadShellKey(thread), thread] as const)),
+    threadByKey: new Map(
+      [
+        ...pinnedThreads,
+        ...activeThreads,
+        ...workingThreads,
+        ...snoozedThreads,
+        ...settledThreads,
+      ].map((thread) => [threadShellKey(thread), thread] as const),
+    ),
     settledThreadKeys: new Set(settledThreads.map(threadShellKey)),
     snoozedThreadKeys: new Set(snoozedThreads.map(threadShellKey)),
     sectionByThreadKey,
@@ -1342,6 +1356,8 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
   );
 
   const stardustCatSettings = useStardustCategorySettings();
+  const isPinnedSectionCollapsed = usePinnedSectionCollapsed();
+  const isAllProjectsSidebarMode = projectScopeKeys.length === 0 && !isSearchingThreads;
   const {
     workingShelfEnabled,
     pinnedThreads,
@@ -1396,6 +1412,8 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
       : null,
     keepEmptyFolders: (group) =>
       scopedProjectGroups.length > 0 || (group.pinned && !group.archived),
+    disableWorkingShelf: isAllProjectsSidebarMode,
+    hidePinnedRows: isAllProjectsSidebarMode && isPinnedSectionCollapsed,
   });
 
   // Ranked across environments as the palette ranks them, so one
@@ -1792,13 +1810,15 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
 
   // Folder rows only drag out to the composer; folders own their order, so nothing drops in the list.
   const stardustCustomCatsDrag =
-    projectScopeKeys.length === 0 &&
-    !isSearchingThreads &&
+    isAllProjectsSidebarMode &&
     stardustCatSettings.enabled &&
     stardustCatSettings.preset !== "project";
-  const isContextDrag =
+  const disableListReorderDrag =
     projectFolders !== null ||
     stardustCustomCatsDrag ||
+    (isAllProjectsSidebarMode && isPinnedSectionCollapsed);
+  const isContextDrag =
+    disableListReorderDrag ||
     dragState?.contextDrag === true ||
     dragState?.activeSection === "working";
   const dragTargetSection = isContextDrag ? null : (dragState?.targetSection ?? null);
@@ -2167,7 +2187,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     );
   })();
   const handleThreadDragEnd = (event: DragEndEvent) => {
-    if (projectFolders !== null) return;
+    if (disableListReorderDrag) return;
     const activeKey = String(event.active.id);
     const activeSection = sectionByThreadKey.get(activeKey);
     const target =
@@ -3669,6 +3689,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                                 });
                               }}
                               onSettleThread={attemptSettle}
+                              onThreadContextMenu={handleThreadContextMenu}
                             />,
                           ]
                         : []),
@@ -3678,6 +3699,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                         // Folders or custom categories draw active rows in their own place below.
                         if ((projectFolders !== null || stardustCustomCatsActive) && item.section === "active") continue;
                         if (isAllProjectsWorkbench && item.section === "working") continue;
+                        if (isAllProjectsWorkbench && isPinnedSectionCollapsed && item.section === "pinned") continue;
                         items.push(renderThreadRow(threadByKey.get(item.key)!, item.section));
                         continue;
                       }
@@ -3708,6 +3730,15 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                       }
                       switch (item.marker) {
                         case "pinned-header":
+                          if (isAllProjectsWorkbench && pinnedThreads.length > 0) {
+                            items.push(
+                              <StardustAllProjectsPinnedHeader
+                                key="t3m-pinned-header"
+                                pinnedThreads={pinnedThreads}
+                                routeRowThreadKey={routeRowThreadKey}
+                              />,
+                            );
+                          }
                           items.push(
                             <SidebarDragBoundary
                               key="pinned-header"
@@ -3867,11 +3898,23 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
       </SidebarContent>
       <SidebarChromeFooter />
       <StardustSidebarCategoryModals
-        activeThreads={[...activeThreads, ...workingThreads].map((t) => ({
-          key: scopedThreadKey(scopeThreadRef(t.environmentId, t.id)),
-          title: t.title,
-          projectName: projectDisplayNameByKey.get(`${t.environmentId}:${t.projectId}`) ?? null,
-        }))}
+        activeThreads={filterSidebarV2VisibleThreads(listedThreads, null, delegatedUnderParent).flatMap((t) => {
+          if (
+            t.pinnedAt != null ||
+            (serverConfigs.has(t.environmentId) &&
+              (t.settledOverride === "settled" || effectiveSnoozed(t, { now: snoozeNow })))
+          ) {
+            return [];
+          }
+          return [
+            {
+              key: scopedThreadKey(scopeThreadRef(t.environmentId, t.id)),
+              title: t.title,
+              projectName:
+                projectDisplayNameByKey.get(`${t.environmentId}:${t.projectId}`) ?? null,
+            },
+          ];
+        })}
       />
     </SidebarFolderDrop>
   );

@@ -1,5 +1,6 @@
 import { thrownErrorMessage } from "@t3tools/client-runtime/errors";
-import { scopeProjectRef } from "@t3tools/client-runtime/environment";
+import { scopeProjectRef, scopedThreadKey } from "@t3tools/client-runtime/environment";
+import { openStardustThreadCategoryPicker } from "../components/sidebar/stardustCategories";
 import { requestCustomSnooze } from "../components/CustomSnoozeDialog";
 import { openGuestShareDialog } from "../components/chat/guestShareDialogState";
 import {
@@ -198,6 +199,18 @@ export function useThreadActionMenu(input: {
         case "find":
           onFind?.(threadRef);
           return;
+        case "move-to-category": {
+          const project = projects.find(
+            (candidate) =>
+              candidate.environmentId === thread.environmentId && candidate.id === thread.projectId,
+          );
+          openStardustThreadCategoryPicker({
+            threadKey: scopedThreadKey(threadRef),
+            title: thread.title,
+            projectName: project?.title ?? null,
+          });
+          return;
+        }
         case "project-settings": {
           const project = projects.find(
             (candidate) =>
