@@ -20,7 +20,11 @@ import { memo, useMemo, useState } from "react";
 
 import { useEnvironmentModelPreferences } from "~/hooks/useSettings";
 import { cn } from "~/lib/utils";
-import { useEnvironmentProviders, usePrimaryEnvironmentId } from "~/state/environments";
+import {
+  useEnvironmentIdentities,
+  useEnvironmentProviders,
+  usePrimaryEnvironmentId,
+} from "~/state/environments";
 import { serverEnvironment } from "~/state/server";
 import { useAtomCommand } from "~/state/use-atom-command";
 import { Button } from "../ui/button";
@@ -66,46 +70,61 @@ export interface StarredModelChoice {
 
 export function useStarredSuggestionModels(): readonly StarredModelChoice[] {
   const primaryEnvironmentId = usePrimaryEnvironmentId();
+  const environments = useEnvironmentIdentities();
   const providersByEnv = useEnvironmentProviders();
   const prefs = useEnvironmentModelPreferences(primaryEnvironmentId);
 
   return useMemo(() => {
     if (!primaryEnvironmentId) return [];
-    const providers = providersByEnv.get(primaryEnvironmentId) ?? [];
+    const envLabelById = new Map(environments.map((e) => [e.environmentId, e.label] as const));
+    const orderedEnvIds: EnvironmentId[] = [
+      primaryEnvironmentId,
+      ...[...providersByEnv.keys()].filter((id) => id !== primaryEnvironmentId),
+    ];
+    const multiEnv = orderedEnvIds.length > 1;
     const out: StarredModelChoice[] = [];
     const seen = new Set<string>();
 
     for (const fav of prefs.favorites) {
-      const provider = providers.find((p) => p.instanceId === fav.provider);
-      if (
-        !provider ||
-        !provider.enabled ||
-        !provider.installed ||
-        provider.status !== "ready" ||
-        provider.auth.status === "unauthenticated" ||
-        !isProviderAvailable(provider) ||
-        !isProviderTextGenerationCapable(provider)
-      ) {
-        continue;
+      for (const envId of orderedEnvIds) {
+        const providers = providersByEnv.get(envId) ?? [];
+        const provider = providers.find((p) => p.instanceId === fav.provider);
+        if (
+          !provider ||
+          !provider.enabled ||
+          !provider.installed ||
+          provider.status !== "ready" ||
+          provider.auth.status === "unauthenticated" ||
+          !isProviderAvailable(provider) ||
+          (provider.driver !== "antigravity" && !isProviderTextGenerationCapable(provider))
+        ) {
+          continue;
+        }
+        const modelObj = provider.models.find(
+          (m) => m.slug === fav.model && m.supportsTextGeneration !== false,
+        );
+        if (!modelObj) continue;
+        const modelName = modelObj.name || fav.model;
+        const providerLabel = provider.displayName?.trim() || String(provider.driver);
+        const envPrefix =
+          multiEnv && envId !== primaryEnvironmentId
+            ? `${envLabelById.get(envId) ?? envId} · `
+            : "";
+        const key = `${envId}::${provider.instanceId}::${fav.model}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push({
+          key,
+          environmentId: envId,
+          instanceId: provider.instanceId,
+          model: fav.model,
+          label: `${envPrefix}${providerLabel} · ${modelName}`,
+        });
+        break;
       }
-      const modelObj = provider.models.find(
-        (m) => m.slug === fav.model && m.supportsTextGeneration !== false,
-      );
-      const modelName = modelObj?.name || fav.model;
-      const providerLabel = provider.displayName?.trim() || String(provider.driver);
-      const key = `${primaryEnvironmentId}::${provider.instanceId}::${fav.model}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      out.push({
-        key,
-        environmentId: primaryEnvironmentId,
-        instanceId: provider.instanceId,
-        model: fav.model,
-        label: `${providerLabel} · ${modelName}`,
-      });
     }
     return out;
-  }, [primaryEnvironmentId, providersByEnv, prefs.favorites]);
+  }, [primaryEnvironmentId, environments, providersByEnv, prefs.favorites]);
 }
 
 export interface CategorizableThreadSummary {

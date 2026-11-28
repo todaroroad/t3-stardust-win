@@ -46,7 +46,7 @@ export const suggestSidebarCategories = Effect.fn("SidebarCategorySuggestions.su
         provider.auth.status !== "unauthenticated" &&
         provider.compatibilityAdvisory?.status !== "broken" &&
         isProviderAvailable(provider) &&
-        isProviderTextGenerationCapable(provider),
+        (provider.driver === "antigravity" || isProviderTextGenerationCapable(provider)),
     )
     .flatMap((provider) =>
       provider.models

@@ -429,6 +429,18 @@ copyAsset("antigravityUsageLimits.ts", "apps/server/src/provider/antigravityUsag
   assertIncludes(src, "makeAntigravityUsageProbe", rel);
 }
 
+// 4b-2. apps/server/src/textGeneration/AntigravityTextGeneration.ts -> Allow Antigravity profiles with MCP servers (tool calls remain strictly cancelled in default mode)
+{
+  const rel = "apps/server/src/textGeneration/AntigravityTextGeneration.ts";
+  let src = readText(rel);
+  src = src.replace(
+    'for (const name of ["hooks.json", "mcp_config.json"]) {',
+    'for (const name of ["hooks.json"]) {',
+  );
+  assertIncludes(src, 'for (const name of ["hooks.json"]) {', rel);
+  writeText(rel, src);
+}
+
 // 4c. apps/web/src/components/usage/UsageLimitsPooled.tsx -> Missing Antigravity Quota Refresh Reminder
 {
   const rel = "apps/web/src/components/usage/UsageLimitsPooled.tsx";

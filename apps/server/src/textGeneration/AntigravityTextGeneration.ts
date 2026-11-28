@@ -74,7 +74,7 @@ export const isAntigravityTextGenerationAvailable = Effect.fn(
 )(function* (profileDirectory: string) {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
-  for (const name of ["hooks.json", "mcp_config.json"]) {
+  for (const name of ["hooks.json"]) {
     const configurationPath = path.join(profileDirectory, "config", name);
     if (!(yield* fs.exists(configurationPath))) {
       continue;
