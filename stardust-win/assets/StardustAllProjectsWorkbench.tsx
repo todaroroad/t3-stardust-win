@@ -1,7 +1,7 @@
 import { useAtomValue } from "@effect/atom-react";
-import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/shell";
-import { scopeThreadRef, scopedThreadKey, type ScopedThreadRef } from "@t3tools/client-runtime/threadRef";
-import type { EnvironmentId } from "@t3tools/contracts";
+import { scopeThreadRef, scopedThreadKey } from "@t3tools/client-runtime/environment";
+import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/models";
+import type { EnvironmentId, ScopedThreadRef } from "@t3tools/contracts";
 import { AsyncResult } from "effect/reactivity";
 import {
   AlertCircleIcon,
