@@ -1,5 +1,10 @@
 import { mediaFileReference, mediaUrlReference } from "@t3tools/client-runtime/media-reference";
-import type { AssetResource, EnvironmentId, SOURCE_CONTROL_MEDIA_ASSET } from "@t3tools/contracts";
+import type {
+  AssetResource,
+  EnvironmentId,
+  SOURCE_CONTROL_MEDIA_ASSET,
+  ThreadId,
+} from "@t3tools/contracts";
 import { msg, useGT, useMessages } from "gt-react";
 import { TriangleAlertIcon } from "lucide-react";
 import {
@@ -11,6 +16,7 @@ import {
   type CSSProperties,
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
+  type ReactNode,
 } from "react";
 
 import { useAssetUrlRefresh, useAssetUrlState } from "../../assets/assetUrls";
@@ -518,5 +524,104 @@ export const ChatMarkdownAssetImage = memo(function ChatMarkdownAssetImage(props
       originalUrl={props.originalUrl}
       onImageExpand={props.onImageExpand}
     />
+  );
+});
+
+const ISOLATED_LOCAL_DIR_FRAGMENT = "模型越狱";
+
+function isCrossBoundaryIsolatedPath(targetPath: string, workspaceRoot: string | undefined): boolean {
+  const normalizedTarget = targetPath.replaceAll("\\", "/").toLowerCase();
+  if (!normalizedTarget.includes(ISOLATED_LOCAL_DIR_FRAGMENT.toLowerCase())) {
+    return false;
+  }
+  const normalizedRoot = (workspaceRoot ?? "").replaceAll("\\", "/").toLowerCase();
+  return !normalizedRoot.includes(ISOLATED_LOCAL_DIR_FRAGMENT.toLowerCase());
+}
+
+/**
+ * Preview card for Markdown file links pointing to generated/local images or videos:
+ * renders the live image/video thumbnail on top and the clickable filename chip below.
+ * Automatically falls back to the standard file chip if the file cannot be read.
+ */
+export const StardustMediaFileLinkCard = memo(function StardustMediaFileLinkCard(props: {
+  readonly environmentId: EnvironmentId;
+  readonly threadId: ThreadId;
+  readonly path: string;
+  readonly hostOnly?: boolean | undefined;
+  readonly kind: "image" | "video";
+  readonly alt: string;
+  readonly copyMarkdown: string;
+  readonly workspaceRoot?: string | undefined;
+  readonly onOpenMediaPreview: (imgEl: HTMLImageElement | null) => void;
+  readonly chip: ReactNode;
+}) {
+  const [decodeFailed, setDecodeFailed] = useState(false);
+  const threadWorkspaceMutationId = use(WorkspaceMutationIdContext);
+  const blocked = isCrossBoundaryIsolatedPath(props.path, props.workspaceRoot);
+  const resource: ChatMarkdownAssetResource = {
+    _tag: "media-file",
+    threadId: props.threadId,
+    path: props.path,
+    ...(props.hostOnly ? { hostOnly: true as const } : {}),
+  };
+  const assetUrl = useAssetUrlState(
+    props.environmentId,
+    blocked ? null : resource,
+    threadWorkspaceMutationId !== undefined && props.kind !== "video"
+      ? threadWorkspaceMutationId
+      : undefined,
+  );
+
+  if (blocked || decodeFailed || assetUrl._tag === "Failure") {
+    return <>{props.chip}</>;
+  }
+
+  const src = assetUrl._tag === "Success" ? assetUrl.url : null;
+
+  return (
+    <span
+      data-markdown-copy={props.copyMarkdown}
+      data-stardust-media-link-card={props.kind}
+      className="my-1.5 mr-2 inline-flex max-w-[min(100%,19.5rem)] flex-col overflow-hidden rounded-xl border border-border/65 bg-card/65 align-top shadow-xs transition-colors duration-150 hover:border-border"
+    >
+      {src === null ? (
+        <span
+          aria-hidden
+          className="block h-32 w-52 max-w-full animate-pulse bg-muted/40"
+        />
+      ) : props.kind === "video" ? (
+        <span className="relative flex max-h-56 items-center justify-center overflow-hidden bg-black/45">
+          <video
+            src={src}
+            controls
+            preload="metadata"
+            onError={() => setDecodeFailed(true)}
+            className="block max-h-56 w-auto max-w-full object-contain"
+          />
+        </span>
+      ) : (
+        <button
+          type="button"
+          title={`点击放大预览 ${props.alt}`}
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            props.onOpenMediaPreview(event.currentTarget.querySelector("img"));
+          }}
+          className="group/mcard relative flex max-h-56 min-h-20 cursor-zoom-in items-center justify-center overflow-hidden bg-muted/30 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+        >
+          <img
+            src={src}
+            alt={props.alt}
+            loading="lazy"
+            onError={() => setDecodeFailed(true)}
+            className="block max-h-56 w-auto max-w-full object-contain transition-transform duration-200 group-hover/mcard:scale-[1.015]"
+          />
+        </button>
+      )}
+      <span className="flex min-w-0 items-center border-t border-border/50 bg-background/65 px-2 py-1 text-xs">
+        {props.chip}
+      </span>
+    </span>
   );
 });

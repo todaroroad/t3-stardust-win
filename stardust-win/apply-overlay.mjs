@@ -1052,6 +1052,10 @@ copyAsset(
   "StardustAllProjectsWorkbench.tsx",
   "apps/web/src/components/sidebar/StardustAllProjectsWorkbench.tsx",
 );
+copyAsset(
+  "SidebarDraftBlock.tsx",
+  "apps/web/src/components/sidebar/SidebarDraftBlock.tsx",
+);
 
 // 7a. apps/web/src/components/threadActionMenu.logic.ts -> Right-Click "归入分类…"
 {
@@ -1411,8 +1415,11 @@ copyAsset(
     writeText(rel, src);
   }
   assertIncludes(src, "const stardustCustomCatsActive =", rel);
-  assertIncludes(src, "disableWorkingShelf: isAllProjectsSidebarMode", rel);
+  assertIncludes(src, "workingAtTop: isAllProjectsSidebarMode", rel);
   assertIncludes(src, "StardustAllProjectsPinnedHeader", rel);
+  assertIncludes(src, "StardustSidebarLocateLockButton", rel);
+  assertIncludes(src, "__t3mProjectRailBridge", rel);
+  assertIncludes(src, "handleJumpToProjectIcon", rel);
   assertIncludes(src, "if (disableListReorderDrag) return;", rel);
   assertIncludes(src, "onThreadContextMenu={handleThreadContextMenu}", rel);
   assertIncludes(src, "StardustAllProjectsTopWorkbench", rel);
@@ -1726,7 +1733,7 @@ copyAsset(
           alignOffset={alignOffset}
           anchor={anchor}
           collisionAvoidance={collisionAvoidance}
-          className="pointer-events-none fixed! inset-0! z-[140] flex! h-dvh! w-screen! transform-none! flex-col items-center px-4 pt-[max(1rem,4vh,calc(var(--workspace-topbar-height,48px)+0.5rem))] pb-[4vh] select-none [-webkit-app-region:no-drag] sm:pt-[max(10vh,calc(var(--workspace-topbar-height,48px)+0.5rem))] sm:pb-[10vh]"
+          className="pointer-events-none fixed! inset-0! z-[140] flex! h-dvh! w-screen! transform-none! flex-col items-center px-4 pt-[max(1rem,4vh,calc(var(--workspace-topbar-height,48px)+0.5rem))] pb-[4vh] select-none sm:pt-[max(10vh,calc(var(--workspace-topbar-height,48px)+0.5rem))] sm:pb-[10vh]"
           data-slot="combobox-positioner"
           side={side}
           sideOffset={sideOffset}
@@ -1734,7 +1741,7 @@ copyAsset(
           <ComboboxPrimitive.Popup
             className={cn(
               DIALOG_POPUP_CLASS,
-              "pointer-events-auto max-h-105 w-full max-w-xl overflow-hidden text-foreground data-ending-style:pointer-events-none",
+              "pointer-events-auto max-h-105 w-full max-w-xl overflow-hidden text-foreground [-webkit-app-region:no-drag] data-ending-style:pointer-events-none",
               className,
             )}
             data-slot="combobox-popup"
@@ -1751,6 +1758,45 @@ copyAsset(
   }
   assertIncludes(src, "DIALOG_BACKDROP_CLASS", rel);
   assertIncludes(src, "isCenteredModal", rel);
+}
+
+// 7g. Verify v1.13.13 UX Polish (Header Drag Spacer, Media Link Cards, Atomic Close-All, Project Jump)
+{
+  assertIncludes(
+    readText("apps/web/src/components/chat/ChatHeader.tsx"),
+    "data-header-drag-spacer",
+    "ChatHeader.tsx",
+  );
+  assertIncludes(
+    readText("apps/web/src/components/chat/ChatCanvas.tsx"),
+    "extraFutureShrink",
+    "ChatCanvas.tsx",
+  );
+  assertIncludes(
+    readText("apps/web/src/rightPanelStore.ts"),
+    "closeSurfaces: (ref, surfaceIds)",
+    "rightPanelStore.ts",
+  );
+  assertIncludes(
+    readText("apps/web/src/hooks/useRightPanelSurfaceClose.ts"),
+    "store.closeSurfaces(",
+    "useRightPanelSurfaceClose.ts",
+  );
+  assertIncludes(
+    readText("apps/web/src/components/chat/ChatMarkdownMedia.tsx"),
+    "StardustMediaFileLinkCard",
+    "ChatMarkdownMedia.tsx",
+  );
+  assertIncludes(
+    readText("apps/web/src/components/ChatMarkdown.tsx"),
+    "<StardustMediaFileLinkCard",
+    "ChatMarkdown.tsx",
+  );
+  assertIncludes(
+    readText("apps/web/src/components/sidebar/SidebarThreadRow.tsx"),
+    "onProjectClick",
+    "SidebarThreadRow.tsx",
+  );
 }
 
 // 7f. apps/web/src/components/files/FilePreviewPanel.tsx & AttachmentFilePreview.tsx -> Default Markdown Reading View + [阅读 | 源码] switch & word count

@@ -356,6 +356,80 @@ export function usePinnedSectionCollapsed(): boolean {
   return useSyncExternalStore(subscribeStore, readPinnedSectionCollapsed, () => false);
 }
 
+// -------------------- Sidebar "Don't Auto-Locate / Lock Sidebar Position" --------------------
+const SIDEBAR_NO_AUTO_LOCATE_STORAGE_KEY = "t3m:sidebar-no-auto-locate:v1";
+let cachedNoAutoLocateRaw: string | null | undefined;
+let cachedNoAutoLocate = false;
+
+export function readSidebarNoAutoLocate(): boolean {
+  let raw: string | null = null;
+  try {
+    raw = window.localStorage.getItem(SIDEBAR_NO_AUTO_LOCATE_STORAGE_KEY);
+  } catch {
+    // ignore
+  }
+  if (raw !== cachedNoAutoLocateRaw) {
+    cachedNoAutoLocateRaw = raw;
+    cachedNoAutoLocate = raw === "1" || raw === "true";
+  }
+  return cachedNoAutoLocate;
+}
+
+export function setSidebarNoAutoLocate(disabled: boolean) {
+  try {
+    window.localStorage.setItem(SIDEBAR_NO_AUTO_LOCATE_STORAGE_KEY, disabled ? "1" : "0");
+  } catch {
+    // ignore
+  }
+  cachedNoAutoLocateRaw = undefined;
+  notifyStoreChange();
+}
+
+export function toggleSidebarNoAutoLocate() {
+  setSidebarNoAutoLocate(!readSidebarNoAutoLocate());
+}
+
+export function useSidebarNoAutoLocate(): boolean {
+  return useSyncExternalStore(subscribeStore, readSidebarNoAutoLocate, () => false);
+}
+
+// -------------------- Collapsible `待编辑` (Pending Edits / Drafts) Section --------------------
+const PENDING_EDITS_COLLAPSED_STORAGE_KEY = "t3m:pending-edits-collapsed:v1";
+let cachedPendingEditsCollapsedRaw: string | null | undefined;
+let cachedPendingEditsCollapsed = false;
+
+export function readPendingEditsCollapsed(): boolean {
+  let raw: string | null = null;
+  try {
+    raw = window.localStorage.getItem(PENDING_EDITS_COLLAPSED_STORAGE_KEY);
+  } catch {
+    // ignore
+  }
+  if (raw !== cachedPendingEditsCollapsedRaw) {
+    cachedPendingEditsCollapsedRaw = raw;
+    cachedPendingEditsCollapsed = raw === "1" || raw === "true";
+  }
+  return cachedPendingEditsCollapsed;
+}
+
+export function setPendingEditsCollapsed(collapsed: boolean) {
+  try {
+    window.localStorage.setItem(PENDING_EDITS_COLLAPSED_STORAGE_KEY, collapsed ? "1" : "0");
+  } catch {
+    // ignore
+  }
+  cachedPendingEditsCollapsedRaw = undefined;
+  notifyStoreChange();
+}
+
+export function togglePendingEditsCollapsed() {
+  setPendingEditsCollapsed(!readPendingEditsCollapsed());
+}
+
+export function usePendingEditsCollapsed(): boolean {
+  return useSyncExternalStore(subscribeStore, readPendingEditsCollapsed, () => false);
+}
+
 // -------------------- Classification logic --------------------
 export function getEditableCategories(
   settings: StardustCategorySettings,

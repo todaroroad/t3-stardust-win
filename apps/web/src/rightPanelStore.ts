@@ -243,6 +243,7 @@ interface RightPanelStoreState {
   /** Agent-driven activation. Not a user action, so it does not move keyboard focus. */
   revealSurface: (ref: ScopedThreadRef, surfaceId: string) => void;
   closeSurface: (ref: ScopedThreadRef, surfaceId: string) => void;
+  closeSurfaces: (ref: ScopedThreadRef, surfaceIds: readonly string[]) => void;
   closeOtherSurfaces: (ref: ScopedThreadRef, surfaceId: string) => void;
   closeSurfacesToRight: (ref: ScopedThreadRef, surfaceId: string) => void;
   closeAllSurfaces: (ref: ScopedThreadRef) => void;
@@ -1181,6 +1182,37 @@ export const useRightPanelStore = create<RightPanelStoreState>()(
             return {
               ...next,
               activeSurfaceId: fallback?.id ?? null,
+            };
+          }),
+        ),
+      closeSurfaces: (ref, surfaceIds) =>
+        set((state) =>
+          closeAction(state, scopedThreadKey(ref), (current) => {
+            if (surfaceIds.length === 0 || current.surfaces.length === 0) return current;
+            const removeSet = new Set(surfaceIds);
+            const surfaces = current.surfaces.filter((surface) => !removeSet.has(surface.id));
+            if (surfaces.length === current.surfaces.length) return current;
+            if (surfaces.length === 0) {
+              return { ...current, isOpen: false, surfaces: [], activeSurfaceId: null };
+            }
+            const activeStillExists = surfaces.some(
+              (surface) => surface.id === current.activeSurfaceId,
+            );
+            const activeOldIndex = current.surfaces.findIndex(
+              (surface) => surface.id === current.activeSurfaceId,
+            );
+            const fallback = activeStillExists
+              ? null
+              : (surfaces[Math.min(Math.max(0, activeOldIndex), surfaces.length - 1)] ??
+                surfaces.at(-1) ??
+                null);
+            return {
+              ...current,
+              isOpen: current.isOpen,
+              surfaces,
+              activeSurfaceId: activeStillExists
+                ? current.activeSurfaceId
+                : (fallback?.id ?? null),
             };
           }),
         ),

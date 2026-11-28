@@ -254,25 +254,30 @@ export const ChatHeader = memo(function ChatHeader({
     <div
       ref={breadcrumbContainerRef}
       className={cn(
-        "flex min-w-0 flex-1 items-center gap-2 sm:gap-3",
+        "flex h-full min-w-0 flex-1 items-center gap-2 [-webkit-app-region:drag] sm:gap-3",
         rightPanelOpen ? "pr-10" : "pr-24",
       )}
       onContextMenu={handleHeaderContextMenu}
     >
       <WorkspaceBreadcrumb
         ariaLabel={gt("Thread breadcrumb")}
-        className="flex-1 overflow-clip [overflow-clip-margin:2px]"
+        className={cn(
+          "min-w-0 overflow-clip [overflow-clip-margin:2px]",
+          renamingTitle !== null
+            ? "flex-1 [-webkit-app-region:no-drag]"
+            : "shrink [-webkit-app-region:drag]",
+        )}
       >
         {activeProject ? (
           <>
-            <WorkspaceBreadcrumbItem className="shrink">
+            <WorkspaceBreadcrumbItem className="shrink [-webkit-app-region:no-drag]">
               <SharedTooltipTrigger
                 render={
                   <button
                     type="button"
                     aria-label={gt("New thread in {project}", { project: activeProjectName })}
                     onClick={onNewThreadInProject}
-                    className="inline-flex min-w-0 max-w-full cursor-pointer items-center gap-1.5 rounded-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                    className="inline-flex min-w-0 max-w-full cursor-pointer items-center gap-1.5 rounded-sm text-muted-foreground transition-colors [-webkit-app-region:no-drag] hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                   />
                 }
                 label={
@@ -299,7 +304,7 @@ export const ChatHeader = memo(function ChatHeader({
         ) : null}
         {parentThreadLink ? (
           <>
-            <WorkspaceBreadcrumbItem>
+            <WorkspaceBreadcrumbItem className="[-webkit-app-region:no-drag]">
               <SharedTooltipTrigger
                 render={
                   <button
@@ -308,7 +313,7 @@ export const ChatHeader = memo(function ChatHeader({
                       title: parentThreadLink.title,
                     })}
                     onClick={() => onOpenThread(parentThreadLink.threadId)}
-                    className="inline-flex min-w-0 max-w-full cursor-pointer items-center rounded-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                    className="inline-flex min-w-0 max-w-full cursor-pointer items-center rounded-sm text-muted-foreground transition-colors [-webkit-app-region:no-drag] hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                   />
                 }
                 label={parentThreadLink.title}
@@ -331,13 +336,19 @@ export const ChatHeader = memo(function ChatHeader({
             </WorkspaceBreadcrumbSeparator>
           </>
         ) : null}
-        <WorkspaceBreadcrumbItem current className="min-w-10 flex-1">
+        <WorkspaceBreadcrumbItem
+          current
+          className={cn(
+            "min-w-0 [-webkit-app-region:no-drag]",
+            renamingTitle !== null ? "min-w-10 flex-1" : "shrink",
+          )}
+        >
           {renamingTitle !== null ? (
             <input
               autoFocus
               dir="auto"
               aria-label={gt("Thread title")}
-              className="min-w-0 flex-1 rounded-sm bg-transparent text-sm font-medium text-foreground outline-none ring-1 ring-inset ring-ring/50 focus:ring-ring"
+              className="min-w-0 flex-1 rounded-sm bg-transparent text-sm font-medium text-foreground outline-none ring-1 ring-inset ring-ring/50 [-webkit-app-region:no-drag] focus:ring-ring"
               defaultValue={renamingTitle}
               onBlur={(event) => {
                 if (renameCommittedRef.current) return;
@@ -362,7 +373,7 @@ export const ChatHeader = memo(function ChatHeader({
                   aria-haspopup="menu"
                   onClick={openMenuFromTitle}
                   onDoubleClick={canOperateThread ? handleTitleDoubleClick : undefined}
-                  className="group/thread-title inline-flex min-w-0 max-w-full cursor-pointer items-center gap-1 rounded-sm text-left focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                  className="group/thread-title inline-flex min-w-0 max-w-full cursor-pointer items-center gap-1 rounded-sm text-left [-webkit-app-region:no-drag] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                 />
               }
               label={activeThreadTitle}
@@ -381,7 +392,7 @@ export const ChatHeader = memo(function ChatHeader({
               render={
                 <h2
                   aria-label={activeThreadTitle}
-                  className="min-w-0 flex-1"
+                  className="min-w-0 truncate [-webkit-app-region:no-drag]"
                   dir={textDirection(activeThreadTitle)}
                 />
               }
@@ -409,7 +420,16 @@ export const ChatHeader = memo(function ChatHeader({
           ) : null}
         </WorkspaceBreadcrumbItem>
       </WorkspaceBreadcrumb>
-      {isServerThread ? <GuestShareIndicator threadRef={activeThreadRef} /> : null}
+      {isServerThread ? (
+        <span className="shrink-0 [-webkit-app-region:no-drag]">
+          <GuestShareIndicator threadRef={activeThreadRef} />
+        </span>
+      ) : null}
+      <div
+        aria-hidden
+        data-header-drag-spacer
+        className="h-full min-w-6 flex-1 [-webkit-app-region:drag]"
+      />
     </div>
   );
 });

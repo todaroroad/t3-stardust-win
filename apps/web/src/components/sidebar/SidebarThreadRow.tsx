@@ -34,6 +34,7 @@ import {
   type ContextMenuSource,
   type EnvironmentId,
   type EnvironmentMachineKind,
+  type ProjectId,
   type ScopedThreadRef,
 } from "@t3tools/contracts";
 
@@ -661,6 +662,8 @@ type SidebarThreadRowProps = {
   onUnpin: (threadRef: ScopedThreadRef) => void;
   onAcknowledgeWoke: (threadRef: ScopedThreadRef, visitedAt: string) => void;
   onFileDropThreads?: ((threadRef: ScopedThreadRef, files: File[]) => void) | undefined;
+  onProjectClick?: ((environmentId: EnvironmentId, projectId: ProjectId) => void) | undefined;
+  isProjectScoped?: boolean | undefined;
 };
 
 // Mounted only while renaming, so each rename starts uncommitted.
@@ -1391,7 +1394,36 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
                 )}
               >
                 {props.project ? (
-                  <ProjectFavicon project={props.project} className="size-4" />
+                  props.onProjectClick ? (
+                    <SharedTooltipTrigger
+                      render={
+                        <button
+                          type="button"
+                          aria-label={
+                            props.isProjectScoped
+                              ? "返回所有项目"
+                              : `进入项目「${props.projectDisplayName || props.project.title}」`
+                          }
+                          onPointerDown={(event) => event.stopPropagation()}
+                          onClick={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            props.onProjectClick?.(thread.environmentId, thread.projectId);
+                          }}
+                          className="inline-flex size-4 shrink-0 cursor-pointer items-center justify-center rounded-xs outline-none transition-transform duration-150 hover:scale-110 active:scale-95 focus-visible:ring-2 focus-visible:ring-ring"
+                        />
+                      }
+                      label={
+                        props.isProjectScoped
+                          ? "返回所有项目"
+                          : `进入项目「${props.projectDisplayName || props.project.title}」`
+                      }
+                    >
+                      <ProjectFavicon project={props.project} className="size-4" />
+                    </SharedTooltipTrigger>
+                  ) : (
+                    <ProjectFavicon project={props.project} className="size-4" />
+                  )
                 ) : null}
               </span>
             )}
@@ -1596,7 +1628,36 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
           <div className="flex h-5 min-w-0 items-center gap-1.5">
             {draftIndicator}
             {props.project ? (
-              <ProjectFavicon project={props.project} className="size-4 shrink-0" />
+              props.onProjectClick ? (
+                <SharedTooltipTrigger
+                  render={
+                    <button
+                      type="button"
+                      aria-label={
+                        props.isProjectScoped
+                          ? "返回所有项目"
+                          : `进入项目「${props.projectDisplayName || props.project.title}」`
+                      }
+                      onPointerDown={(event) => event.stopPropagation()}
+                      onClick={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        props.onProjectClick?.(thread.environmentId, thread.projectId);
+                      }}
+                      className="inline-flex size-4 shrink-0 cursor-pointer items-center justify-center rounded-xs outline-none transition-transform duration-150 hover:scale-110 active:scale-95 focus-visible:ring-2 focus-visible:ring-ring"
+                    />
+                  }
+                  label={
+                    props.isProjectScoped
+                      ? "返回所有项目"
+                      : `进入项目「${props.projectDisplayName || props.project.title}」`
+                  }
+                >
+                  <ProjectFavicon project={props.project} className="size-4 shrink-0" />
+                </SharedTooltipTrigger>
+              ) : (
+                <ProjectFavicon project={props.project} className="size-4 shrink-0" />
+              )
             ) : null}
             {/* Left of the status slot, the pin would slide when hover swaps the
                 label for the wider row controls. */}
@@ -1800,6 +1861,8 @@ export const SidebarSearchResultRow = memo(function SidebarSearchResultRow(props
   searchMatchQuery?: string;
   onHighlight: () => void;
   onSelect: () => void;
+  onProjectClick?: ((environmentId: EnvironmentId, projectId: ProjectId) => void) | undefined;
+  isProjectScoped?: boolean | undefined;
   onContextMenu: (
     threadRef: ScopedThreadRef,
     position: { x: number; y: number },
@@ -1945,16 +2008,58 @@ export const SidebarSearchResultRow = memo(function SidebarSearchResultRow(props
         }
       >
         {props.project ? (
-          <ProjectFavicon
-            project={props.project}
-            className={cn(
-              "size-4 shrink-0 transition-opacity",
-              props.isSettled &&
-                !props.isRouteActive &&
-                !props.isHighlighted &&
-                "opacity-40 grayscale group-hover/sidebar-row:opacity-100 group-hover/sidebar-row:grayscale-0",
-            )}
-          />
+          props.onProjectClick ? (
+            <SharedTooltipTrigger
+              render={
+                <span
+                  role="button"
+                  tabIndex={-1}
+                  aria-label={
+                    props.isProjectScoped
+                      ? "返回所有项目"
+                      : `进入项目「${props.projectDisplayName || props.project.title}」`
+                  }
+                  onPointerDown={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                  }}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    props.onProjectClick?.(thread.environmentId, thread.projectId);
+                  }}
+                  className="inline-flex size-4 shrink-0 cursor-pointer items-center justify-center rounded-xs transition-transform duration-150 hover:scale-110 active:scale-95"
+                />
+              }
+              label={
+                props.isProjectScoped
+                  ? "返回所有项目"
+                  : `进入项目「${props.projectDisplayName || props.project.title}」`
+              }
+            >
+              <ProjectFavicon
+                project={props.project}
+                className={cn(
+                  "size-4 shrink-0 transition-opacity",
+                  props.isSettled &&
+                    !props.isRouteActive &&
+                    !props.isHighlighted &&
+                    "opacity-40 grayscale group-hover/sidebar-row:opacity-100 group-hover/sidebar-row:grayscale-0",
+                )}
+              />
+            </SharedTooltipTrigger>
+          ) : (
+            <ProjectFavicon
+              project={props.project}
+              className={cn(
+                "size-4 shrink-0 transition-opacity",
+                props.isSettled &&
+                  !props.isRouteActive &&
+                  !props.isHighlighted &&
+                  "opacity-40 grayscale group-hover/sidebar-row:opacity-100 group-hover/sidebar-row:grayscale-0",
+              )}
+            />
+          )
         ) : null}
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="flex min-w-0 items-center gap-2.5">

@@ -219,6 +219,7 @@ import {
   ChatMarkdownVideo,
   MarkdownLinkContext,
   markdownImageCopy,
+  StardustMediaFileLinkCard,
 } from "./chat/ChatMarkdownMedia";
 import { MarkdownExternalLinkContent } from "./chat/MarkdownExternalLink";
 import { MarkdownFileLink } from "./chat/MarkdownFileLink";
@@ -1121,6 +1122,7 @@ function useChatMarkdownState(
     resolvedTheme,
     pullRequestsEnabled,
     issuesEnabled,
+    inline,
     skills,
     threadRef,
     updateThreadPullRequestLink,
@@ -1292,6 +1294,7 @@ const CHAT_MARKDOWN_COMPONENTS = {
       resolveThreadPullRequest,
       pullRequestsEnabled,
       issuesEnabled,
+      inline,
       updateThreadPullRequestLink,
       fileLinkChip,
       renderContextReference,
@@ -1603,17 +1606,48 @@ const CHAT_MARKDOWN_COMPONENTS = {
         ? source
         : `[${(label || fileLinkMeta.basename).replace(/[\\[\]]/g, "\\$&")}](${normalizedHref})`;
     // Media previews resolve the parsed host path; they do not understand the sandbox: scheme.
+    const isSandboxLink = Boolean(parseMarkdownSandboxFileLink(normalizedHref));
     const chip = fileLinkChip(
       fileLinkMeta,
       copyMarkdown,
-      parseMarkdownSandboxFileLink(normalizedHref) ? undefined : normalizedHref,
+      isSandboxLink ? undefined : normalizedHref,
+    );
+    const linkMediaKind = mediaKindFromPath(fileLinkMeta.filePath);
+    const shouldRenderMediaCard =
+      !inline &&
+      !isSandboxLink &&
+      threadRef !== undefined &&
+      environmentId !== null &&
+      (linkMediaKind === "image" || linkMediaKind === "video");
+    const mediaPathForCard = isHostPath(fileLinkMeta.filePath)
+      ? fileLinkMeta.filePath
+      : cwd
+        ? resolveWorkspaceFilePath(fileLinkMeta.filePath, cwd)
+        : fileLinkMeta.filePath;
+    const renderedFileTarget = shouldRenderMediaCard ? (
+      <StardustMediaFileLinkCard
+        environmentId={environmentId}
+        threadId={threadRef.threadId}
+        path={mediaPathForCard}
+        hostOnly={!isHostPath(mediaPathForCard)}
+        kind={linkMediaKind}
+        alt={fileLinkMeta.basename}
+        copyMarkdown={copyMarkdown}
+        workspaceRoot={cwd}
+        onOpenMediaPreview={(clickedImg) =>
+          openMarkdownMedia(normalizedHref, fileLinkMeta.filePath, clickedImg)
+        }
+        chip={chip}
+      />
+    ) : (
+      chip
     );
     return isMarkdownFileLinkLabel(label, normalizedHref) ? (
-      chip
+      renderedFileTarget
     ) : (
       <span data-markdown-copy={copyMarkdown}>
         <span className="whitespace-normal">{children} </span>
-        {chip}
+        {renderedFileTarget}
       </span>
     );
   },

@@ -94,6 +94,14 @@ function buildInjectedHeadBlock(defaultLang = "zh") {
 [data-chat-header]:has(> .t3-topbar-quota-strip) > div.flex-1 {
   padding-right: 0.375rem !important;
 }
+[data-header-drag-spacer] {
+  -webkit-app-region: drag !important;
+  pointer-events: auto !important;
+}
+[data-slot="popover-positioner"]:not(:has([data-open])),
+[data-slot="tooltip-positioner"]:not(:has([data-open])) {
+  -webkit-app-region: initial !important;
+}
 .t3-topbar-quota-strip {
   -webkit-app-region: no-drag;
   display: flex;

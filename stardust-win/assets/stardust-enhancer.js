@@ -18,6 +18,7 @@
 
     const RAIL_WIDTH = 68;
     const COMPLETED_LIST_KEY = 't3m:completed-threads:v1';
+    const RAIL_ORDER_KEY = 't3m:project-rail-order:v1';
     const IS_ELECTRON = Boolean(window.desktopBridge);
 
     const MODEL_NAMES = {
@@ -184,6 +185,11 @@
       bell: '<path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/>',
       'check-circle':
         '<circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/>',
+      pin: '<path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/>',
+      'pin-off':
+        '<path d="M12 17v5"/><path d="M15 9.34V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H7.89"/><path d="m2 2 20 20"/><path d="M9 9v1.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h11"/>',
+      'arrow-up': '<path d="m5 12 7-7 7 7"/><path d="M12 19V5"/>',
+      'arrow-down': '<path d="M12 5v14"/><path d="m19 12-7 7-7-7"/>',
       x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
     };
 
@@ -652,12 +658,183 @@
 
     // ==================== Completed List Popover (Left Rail Bell) ====================
     const onDocPointerDown = (e) => {
+      const ctxMenu = document.getElementById('t3-rail-ctx-menu');
+      if (ctxMenu && ctxMenu.getAttribute('data-open') === '1' && !ctxMenu.contains(e.target)) {
+        closeRailContextMenu();
+      }
       const pop = document.getElementById('t3-notif-popover');
       if (!pop || pop.getAttribute('data-open') !== '1') return;
       if (pop.contains(e.target) || e.target?.closest?.('[data-rail-value="__notify__"]')) return;
       closeNotifPopover();
     };
+    const onDocKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        closeRailContextMenu();
+      }
+    };
     document.addEventListener('pointerdown', onDocPointerDown);
+    document.addEventListener('keydown', onDocKeyDown);
+
+    // ==================== Rail Custom Order & Right-Click Context Menu ====================
+    function loadRailOrder() {
+      try {
+        const raw = localStorage.getItem(RAIL_ORDER_KEY);
+        if (!raw) return [];
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed.filter((v) => typeof v === 'string') : [];
+      } catch {
+        return [];
+      }
+    }
+
+    function saveRailOrder(order) {
+      try {
+        localStorage.setItem(RAIL_ORDER_KEY, JSON.stringify(order));
+      } catch {}
+    }
+
+    const optimisticPinMap = new Map();
+
+    function isItemEffectivelyPinned(value, rawPinned) {
+      const ov = optimisticPinMap.get(value);
+      if (ov && ov.until > Date.now()) {
+        if (ov.pinned === rawPinned) optimisticPinMap.delete(value);
+        return ov.pinned;
+      }
+      if (ov) optimisticPinMap.delete(value);
+      return rawPinned;
+    }
+
+    function sortRailItemsWithOrder(items) {
+      const order = loadRailOrder();
+      const idxMap = new Map(order.map((val, i) => [val, i]));
+      const sortTier = (arr) =>
+        [...arr].sort((a, b) => {
+          const ia = idxMap.has(a.value) ? idxMap.get(a.value) : 1e9;
+          const ib = idxMap.has(b.value) ? idxMap.get(b.value) : 1e9;
+          if (ia !== ib) return ia - ib;
+          return 0;
+        });
+      const pinnedTier = sortTier(items.filter((it) => it.pinned));
+      const unpinnedTier = sortTier(items.filter((it) => !it.pinned));
+      return { pinnedTier, unpinnedTier, combined: [...pinnedTier, ...unpinnedTier] };
+    }
+
+    function moveRailItem(targetValue, direction, tierItems) {
+      const values = tierItems.map((it) => it.value);
+      const pos = values.indexOf(targetValue);
+      const swapPos = pos + direction;
+      if (pos < 0 || swapPos < 0 || swapPos >= values.length) return;
+      const nextTier = [...values];
+      const tmp = nextTier[pos];
+      nextTier[pos] = nextTier[swapPos];
+      nextTier[swapPos] = tmp;
+
+      const existing = loadRailOrder().filter((v) => !values.includes(v));
+      saveRailOrder([...nextTier, ...existing]);
+      window.dispatchEvent(new CustomEvent('t3m:rail-order-updated'));
+      lastRailSignature = '';
+      renderProjectRail();
+    }
+
+    function toggleRailItemPin(item, allTierValues) {
+      const nextPinned = !item.pinned;
+      optimisticPinMap.set(item.value, { pinned: nextPinned, until: Date.now() + 1800 });
+      // Place newly pinned/unpinned item cleanly at top of its target tier if not ordered
+      const curOrder = loadRailOrder().filter((v) => v !== item.value);
+      saveRailOrder(nextPinned ? [item.value, ...curOrder] : [...allTierValues.filter((v) => v !== item.value), item.value, ...curOrder]);
+
+      const bridge = window.__t3mProjectRailBridge;
+      if (bridge && typeof bridge.setProjectPinned === 'function') {
+        bridge.setProjectPinned(item.value, nextPinned);
+      }
+      lastRailSignature = '';
+      renderProjectRail();
+    }
+
+    function ensureRailContextMenu() {
+      let menu = document.getElementById('t3-rail-ctx-menu');
+      if (!menu) {
+        menu = document.createElement('div');
+        menu.id = 't3-rail-ctx-menu';
+        menu.setAttribute('data-quota-ui-managed', 'true');
+        menu.setAttribute('role', 'menu');
+        menu.setAttribute('data-open', '0');
+        document.body.appendChild(menu);
+      }
+      return menu;
+    }
+
+    function closeRailContextMenu() {
+      const menu = document.getElementById('t3-rail-ctx-menu');
+      if (menu) menu.setAttribute('data-open', '0');
+    }
+
+    function openRailContextMenu(mouseEvent, item, tierItems, allCombinedValues) {
+      mouseEvent.preventDefault();
+      mouseEvent.stopPropagation();
+      hideRailTooltip();
+      closeNotifPopover();
+
+      const tierIdx = tierItems.findIndex((it) => it.value === item.value);
+      const canMoveUp = tierIdx > 0;
+      const canMoveDown = tierIdx >= 0 && tierIdx < tierItems.length - 1;
+
+      const menu = ensureRailContextMenu();
+      menu.innerHTML = '';
+
+      const titleBar = document.createElement('div');
+      titleBar.className = 't3-rcm-header';
+      titleBar.textContent = item.label;
+      menu.appendChild(titleBar);
+
+      const actions = [
+        {
+          id: 'pin',
+          label: item.pinned ? '取消置顶' : '置顶',
+          icon: item.pinned ? 'pin-off' : 'pin',
+          disabled: false,
+          onRun: () => toggleRailItemPin(item, allCombinedValues),
+        },
+        {
+          id: 'up',
+          label: '向上移动',
+          icon: 'arrow-up',
+          disabled: !canMoveUp,
+          onRun: () => moveRailItem(item.value, -1, tierItems),
+        },
+        {
+          id: 'down',
+          label: '向下移动',
+          icon: 'arrow-down',
+          disabled: !canMoveDown,
+          onRun: () => moveRailItem(item.value, 1, tierItems),
+        },
+      ];
+
+      for (const act of actions) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 't3-rcm-item';
+        btn.setAttribute('role', 'menuitem');
+        if (act.disabled) btn.disabled = true;
+        btn.innerHTML = `<span class="t3-rcm-icon">${svgIcon(act.icon, 14)}</span><span class="t3-rcm-label"></span>`;
+        btn.querySelector('.t3-rcm-label').textContent = act.label;
+        btn.addEventListener('click', (ev) => {
+          ev.preventDefault();
+          ev.stopPropagation();
+          closeRailContextMenu();
+          if (!act.disabled) act.onRun();
+        });
+        menu.appendChild(btn);
+      }
+
+      const x = Math.min(window.innerWidth - 160, Math.max(8, mouseEvent.clientX + 6));
+      const y = Math.min(window.innerHeight - 148, Math.max(8, mouseEvent.clientY - 6));
+      menu.style.left = `${Math.round(x)}px`;
+      menu.style.top = `${Math.round(y)}px`;
+      menu.setAttribute('data-open', '1');
+    }
 
     function ensureNotifPopover() {
       let pop = document.getElementById('t3-notif-popover');
@@ -1366,6 +1543,84 @@
           color: var(--foreground);
         }
 
+        /* Project Rail Right-Click Context Menu */
+        #t3-rail-ctx-menu {
+          position: fixed;
+          z-index: 2147483646;
+          min-width: 144px;
+          padding: 5px;
+          border-radius: 11px;
+          background: var(--t3-float-bg);
+          border: 1px solid var(--t3-float-border);
+          box-shadow: 0 16px 38px rgba(0, 0, 0, 0.45);
+          -webkit-backdrop-filter: blur(20px) saturate(1.5);
+          backdrop-filter: blur(20px) saturate(1.5);
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+          opacity: 0;
+          pointer-events: none;
+          transform: scale(0.96);
+          transform-origin: top left;
+          transition: opacity 120ms ease, transform 120ms cubic-bezier(0.2, 0.9, 0.3, 1);
+          user-select: none;
+          -webkit-app-region: no-drag;
+        }
+        #t3-rail-ctx-menu[data-open="1"] {
+          opacity: 1;
+          pointer-events: auto;
+          transform: scale(1);
+        }
+        .t3-rcm-header {
+          padding: 4px 8px 5px;
+          margin-bottom: 2px;
+          font-size: 11px;
+          font-weight: 600;
+          color: var(--muted-foreground);
+          border-bottom: 1px solid color-mix(in srgb, var(--foreground) 9%, transparent);
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          max-width: 168px;
+        }
+        .t3-rcm-item {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          width: 100%;
+          height: 29px;
+          padding: 0 8px;
+          border: 0;
+          border-radius: 7px;
+          background: transparent;
+          color: var(--foreground);
+          font-size: 12.5px;
+          font-weight: 500;
+          text-align: left;
+          cursor: pointer;
+          transition: background-color 110ms ease, color 110ms ease;
+        }
+        .t3-rcm-item:hover:not(:disabled) {
+          background: color-mix(in srgb, var(--foreground) 9%, transparent);
+        }
+        .t3-rcm-item:active:not(:disabled) {
+          transform: scale(0.985);
+        }
+        .t3-rcm-item:disabled {
+          opacity: 0.38;
+          cursor: not-allowed;
+        }
+        .t3-rcm-icon {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          color: var(--muted-foreground);
+          flex-shrink: 0;
+        }
+        .t3-rcm-item:hover:not(:disabled) .t3-rcm-icon {
+          color: var(--foreground);
+        }
+
         @media (prefers-reduced-motion: reduce) {
           .t3-rail-btn,
           .t3-rail-icon-wrap,
@@ -1667,8 +1922,14 @@
       btn.addEventListener('blur', hideRailTooltip);
       btn.addEventListener('click', (e) => {
         hideRailTooltip();
+        closeRailContextMenu();
         cfg.onClick(e, btn);
       });
+      if (typeof cfg.onContextMenu === 'function') {
+        btn.addEventListener('contextmenu', (e) => {
+          cfg.onContextMenu(e, btn);
+        });
+      }
 
       return btn;
     }
@@ -1716,10 +1977,11 @@
       const stats = computeProjectStats(projects, threads);
       const completedCount = completedHistory.length;
 
-      const enriched = projectItems.map((it) => {
+      const rawEnriched = projectItems.map((it) => {
         const rec = matchProjectRecord(it, projects);
         const st = (rec?.id && stats.byProjectId.get(rec.id)) || { active: 0, running: 0 };
-        const pinned = Boolean(rec?.pinnedAt);
+        const rawPinned = Boolean(it.pinned ?? rec?.pinned ?? rec?.pinnedAt);
+        const pinned = isItemEffectivelyPinned(it.value, rawPinned);
         const iconObj = rec?.projectIcon || null;
         const sem = resolveSemanticProjectIcon(it.label);
         const explicitLucide = iconObj?.kind === 'lucide' && iconObj.name ? iconObj.name : null;
@@ -1752,6 +2014,9 @@
           selected: selectedSet.has(it.value),
         };
       });
+
+      const { pinnedTier, unpinnedTier, combined: enriched } = sortRailItemsWithOrder(rawEnriched);
+      const allCombinedValues = enriched.map((e) => e.value);
 
       const sig = JSON.stringify({
         sel: [...selectedSet],
@@ -1866,8 +2131,9 @@
         if (item.pinned) subParts.push('已置顶');
         if (item.runningCount > 0) subParts.push(`${item.runningCount} 运行中`);
         else if (item.activeCount > 0) subParts.push(`${item.activeCount} 活跃`);
-        subParts.push('Shift+点击可多选');
+        subParts.push('右键可置顶/上下移动');
 
+        const tierForItem = item.pinned ? pinnedTier : unpinnedTier;
         scrollBox.appendChild(
           createRailButton({
             value: item.value,
@@ -1884,6 +2150,7 @@
             badgeCount: item.activeCount,
             badgeRunning: item.runningCount > 0,
             onClick: (e) => invokeProjectSelection(item.value, e),
+            onContextMenu: (e) => openRailContextMenu(e, item, tierForItem, allCombinedValues),
           })
         );
       }
@@ -2079,9 +2346,11 @@
       clearInterval(pollTimer);
       document.removeEventListener('visibilitychange', onVisChange);
       document.removeEventListener('pointerdown', onDocPointerDown);
+      document.removeEventListener('keydown', onDocKeyDown);
       if (rafId) cancelAnimationFrame(rafId);
       hideRailTooltip();
       closeNotifPopover();
+      closeRailContextMenu();
     };
   };
 

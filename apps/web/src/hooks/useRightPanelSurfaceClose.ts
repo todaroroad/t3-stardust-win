@@ -102,18 +102,20 @@ export function useRightPanelSurfaceClose(input: {
       () => undefined,
     );
   };
-  // The active surface closes last so the panel does not flash through it.
+  // Close all requested surfaces in a single atomic store commit so multi-tab / close-all
+  // actions never trigger N sequential localStorage writes and layout re-render cascades.
   const finishClose = (toClose: readonly RightPanelSurface[]) => {
-    if (!threadRef) return;
+    if (!threadRef || toClose.length === 0) return;
     const store = useRightPanelStore.getState();
     const activeId = selectThreadRightPanelState(store.byThreadKey, threadRef).activeSurfaceId;
     const ordered = toClose.toSorted(
       (left, right) => Number(left.id === activeId) - Number(right.id === activeId),
     );
+    store.closeSurfaces(
+      threadRef,
+      ordered.map((surface) => surface.id),
+    );
     for (const surface of ordered) {
-      // Releasing a browser drops its session, which prunes the tab automatically; close it
-      // first so the close stays a user action that hides the panel after the last tab.
-      store.closeSurface(threadRef, surface.id);
       releaseSurfaceResources(threadRef, surface);
     }
     const nextActiveSurface = selectActiveRightPanelSurface(

@@ -1,12 +1,14 @@
 import {
   openStardustThreadCategoryPicker,
   usePinnedSectionCollapsed,
+  useSidebarNoAutoLocate,
   useStardustCategorySettings,
 } from "./sidebar/stardustCategories";
 import {
   StardustAllProjectsCategories,
   StardustAllProjectsPinnedHeader,
   StardustAllProjectsTopWorkbench,
+  StardustSidebarLocateLockButton,
 } from "./sidebar/StardustAllProjectsWorkbench";
 import { StardustSidebarCategoryModals } from "./sidebar/StardustSidebarCategoryModals";
 import { thrownErrorMessage } from "@t3tools/client-runtime/errors";
@@ -456,8 +458,9 @@ function useSidebarThreads(input: {
   readonly folderGroups: readonly SidebarProjectSnapshot[] | null;
   // Keeps folders with no active threads, so a project the user filtered to or pinned can start one.
   readonly keepEmptyFolders: (group: SidebarProjectSnapshot) => boolean;
-  readonly disableWorkingShelf?: boolean;
-  readonly hidePinnedRows?: boolean;
+  readonly disableWorkingShelf?: boolean | undefined;
+  readonly workingAtTop?: boolean | undefined;
+  readonly hidePinnedRows?: boolean | undefined;
 }) {
   const {
     projectScopeKey,
@@ -558,7 +561,9 @@ function useSidebarThreads(input: {
     : routeThreadOnly(snoozedThreads, shelfRouteThreadKey);
   const visibleWorkingThreads = workingShelfExpanded
     ? workingThreads
-    : routeThreadOnly(workingThreads, routeRowThreadKey);
+    : input.workingAtTop
+      ? EMPTY_THREADS
+      : routeThreadOnly(workingThreads, routeRowThreadKey);
   const projectFolders =
     folderGroups === null
       ? null
@@ -580,11 +585,12 @@ function useSidebarThreads(input: {
           };
         });
   const orderedThreads = [
+    ...(input.workingAtTop ? visibleWorkingThreads : EMPTY_THREADS),
     ...(input.hidePinnedRows ? EMPTY_THREADS : pinnedThreads),
     ...(projectFolders === null
       ? activeThreads
       : projectFolders.flatMap((folder) => folder.threads)),
-    ...visibleWorkingThreads,
+    ...(input.workingAtTop ? EMPTY_THREADS : visibleWorkingThreads),
     ...visibleSnoozedThreads,
     ...renderedSettledThreads,
   ];
@@ -873,12 +879,20 @@ function useSidebarLookups() {
   const projectGroupByScopeKey = new Map(
     projectGroups.map((project) => [project.projectKey, project] as const),
   );
+  const projectGroupByMemberKey = new Map(
+    projectGroups.flatMap((group) =>
+      group.memberProjects.map(
+        (project) => [`${project.environmentId}:${project.id}`, group] as const,
+      ),
+    ),
+  );
   const projectScopeItems = [
-    { value: ADD_PROJECT_SCOPE_ITEM_VALUE, label: gt("Add project") },
-    { value: "all", label: gt("All projects") },
+    { value: ADD_PROJECT_SCOPE_ITEM_VALUE, label: gt("Add project"), pinned: false },
+    { value: "all", label: gt("All projects"), pinned: false },
     ...pickableProjectGroups(projectGroups).map((project) => ({
       value: project.projectKey,
       label: project.displayName,
+      pinned: project.pinned,
     })),
   ];
   return {
@@ -890,6 +904,7 @@ function useSidebarLookups() {
     projectByKey,
     projectDisplayNameByKey,
     projectGroupByScopeKey,
+    projectGroupByMemberKey,
     projectScopeItems,
   };
 }
@@ -963,6 +978,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     projectByKey,
     projectDisplayNameByKey,
     projectGroupByScopeKey,
+    projectGroupByMemberKey,
     projectScopeItems: lookupProjectScopeItems,
   } = useSidebarLookups();
   const delegatedUnderParent = useDelegatedUnderParent();
@@ -1402,7 +1418,20 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
 
   const stardustCatSettings = useStardustCategorySettings();
   const isPinnedSectionCollapsed = usePinnedSectionCollapsed();
+  const sidebarNoAutoLocate = useSidebarNoAutoLocate();
   const isAllProjectsSidebarMode = projectScopeKeys.length === 0 && !isSearchingThreads;
+  const handleJumpToProjectIcon = useStableCallback(
+    (environmentId: EnvironmentId, projectId: ProjectId) => {
+      const group = projectGroupByMemberKey.get(`${environmentId}:${projectId}`);
+      if (!group) return;
+      if (isSearchingThreads) clearThreadSearch();
+      if (projectScopeKeys.length === 1 && projectScopeKeys[0] === group.projectKey) {
+        setProjectScopeKeys([]);
+      } else {
+        setProjectScopeKeys([group.projectKey]);
+      }
+    },
+  );
   const {
     workingShelfEnabled,
     pinnedThreads,
@@ -1457,7 +1486,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
       : null,
     keepEmptyFolders: (group) =>
       scopedProjectGroups.length > 0 || (group.pinned && !group.archived),
-    disableWorkingShelf: isAllProjectsSidebarMode,
+    workingAtTop: isAllProjectsSidebarMode,
     hidePinnedRows: isAllProjectsSidebarMode && isPinnedSectionCollapsed,
   });
 
@@ -1946,6 +1975,20 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     settledThreadKeysRef.current = settledThreadKeys;
     snoozedThreadKeysRef.current = snoozedThreadKeys;
     sectionByThreadKeyRef.current = sectionByThreadKey;
+    (
+      window as unknown as {
+        __t3mProjectRailBridge?: {
+          setProjectPinned: (projectKey: string, pinned: boolean) => void;
+        };
+      }
+    ).__t3mProjectRailBridge = {
+      setProjectPinned: (projectKey, pinned) => {
+        const group = projectGroupByScopeKey.get(projectKey);
+        if (group && canPinProject(group)) {
+          setProjectGroupPinned(group, pinned);
+        }
+      },
+    };
   });
   const startActionSweep = useStableCallback(
     (threadRef: ScopedThreadRef, action: SidebarSweepAction, event: PointerEvent) => {
@@ -2094,14 +2137,19 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     ) {
       return [];
     }
-    const items: SidebarListItem[] = [{ kind: "marker", marker: "pinned-header" }];
+    const items: SidebarListItem[] = [];
+    if (isAllProjectsSidebarMode && workingThreads.length > 0) {
+      items.push({ kind: "marker", marker: "working-header" });
+      items.push(...rowsOf(visibleWorkingThreads, "working"));
+    }
+    items.push({ kind: "marker", marker: "pinned-header" });
     const pinnedRows = rowsOf(pinnedThreads, "pinned");
     items.push(...pinnedRows);
     items.push({ kind: "marker", marker: "pinned-divider" });
     const activeRows = rowsOf(activeThreads, "active");
     items.push({ kind: "marker", marker: "active-placeholder" });
     items.push(...activeRows);
-    if (workingThreads.length > 0) {
+    if (!isAllProjectsSidebarMode && workingThreads.length > 0) {
       items.push({ kind: "marker", marker: "working-header" });
       items.push(...rowsOf(visibleWorkingThreads, "working"));
     }
@@ -3557,6 +3605,8 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                         searchMatchQuery={threadSearch.query}
                         onHighlight={() => setActiveSearchResultIndex(index)}
                         onSelect={() => selectThreadSearchResult(thread)}
+                        onProjectClick={handleJumpToProjectIcon}
+                        isProjectScoped={projectScopeKeys.length === 1}
                         onContextMenu={handleSearchResultContextMenu}
                         onFileDropThreads={handleThreadFileDrop}
                       />
@@ -3724,7 +3774,11 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                           }
                           wokeAt={threadWokeAt(thread, { now: snoozeNow })}
                           isActive={routeRowThreadKey === threadKey}
-                          revealRef={routeRowThreadKey === threadKey ? revealActiveRow : undefined}
+                          revealRef={
+                            !sidebarNoAutoLocate && routeRowThreadKey === threadKey
+                              ? revealActiveRow
+                              : undefined
+                          }
                           isRouteThread={routeThreadKey === threadKey}
                           readOpensPullRequestsInRightPanel={readOpensPullRequestsInRightPanel}
                           jumpLabel={showJumpHints ? (jumpLabelByKey.get(threadKey) ?? null) : null}
@@ -3762,6 +3816,8 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                           onUnpin={attemptUnpin}
                           onAcknowledgeWoke={acknowledgeWoke}
                           onFileDropThreads={handleThreadFileDrop}
+                          onProjectClick={handleJumpToProjectIcon}
+                          isProjectScoped={projectScopeKeys.length === 1}
                         />
                       );
                     };
@@ -3784,6 +3840,19 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                         routeDraftId={routeDraftIdForRows}
                         onNavigateToDraft={navigateToDraft}
                         onDraftContextMenu={handleDraftContextMenu}
+                        allThreads={listedThreads}
+                        scopedProjectKeys={scopedProjectKeys}
+                        delegatedUnderParent={delegatedUnderParent}
+                        routeRowThreadKey={routeRowThreadKey}
+                        isProjectScoped={projectScopeKeys.length === 1}
+                        headerAction={
+                          isAllProjectsWorkbench && workingThreads.length === 0 ? (
+                            <StardustSidebarLocateLockButton />
+                          ) : undefined
+                        }
+                        onNavigateToThread={navigateToThread}
+                        onThreadContextMenu={handleThreadContextMenu}
+                        onProjectClick={handleJumpToProjectIcon}
                       />,
                       ...(isAllProjectsWorkbench
                         ? [
@@ -3811,7 +3880,6 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                       if (item.kind === "thread") {
                         // Folders or custom categories draw active rows in their own place below.
                         if ((projectFolders !== null || stardustCustomCatsActive) && item.section === "active") continue;
-                        if (isAllProjectsWorkbench && item.section === "working") continue;
                         if (isAllProjectsWorkbench && isPinnedSectionCollapsed && item.section === "pinned") continue;
                         items.push(renderThreadRow(threadByKey.get(item.key)!, item.section));
                         continue;
@@ -3878,9 +3946,11 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                             items.push(
                               <StardustAllProjectsCategories
                                 key="t3m-categories-workbench"
-                                activeThreads={[...activeThreads, ...workingThreads]}
+                                activeThreads={activeThreads}
+                                workingThreads={workingThreads}
                                 routeRowThreadKey={routeRowThreadKey}
                                 projectDisplayNameByKey={projectDisplayNameByKey}
+                                showLocateLockInToolbar={workingThreads.length === 0}
                                 renderThreadRow={(t) => renderThreadRow(t, "active")}
                               />,
                             );
@@ -3903,14 +3973,18 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                           );
                           break;
                         case "working-header":
-                          if (isAllProjectsWorkbench) break;
                           items.push(
                             <SidebarSectionHeader
                               key="working-shelf-header"
                               marker="working-header"
-                              className="mt-auto"
+                              className={cn(!isAllProjectsWorkbench && "mt-auto")}
                               label={gt("Working", { $context: "sidebar section" })}
                               count={workingThreads.length}
+                              action={
+                                isAllProjectsWorkbench ? (
+                                  <StardustSidebarLocateLockButton />
+                                ) : undefined
+                              }
                               toggle={{
                                 expanded: workingShelfExpanded,
                                 onToggle: toggleWorkingShelf,

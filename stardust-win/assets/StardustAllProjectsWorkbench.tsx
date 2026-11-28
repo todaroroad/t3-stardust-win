@@ -1,7 +1,11 @@
 import { useAtomValue } from "@effect/atom-react";
 import { scopeThreadRef, scopedThreadKey } from "@t3tools/client-runtime/environment";
 import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/models";
-import { effectiveSnoozed, hasUnseenRunFailure } from "@t3tools/client-runtime/state/thread-settled";
+import {
+  effectiveSnoozed,
+  hasUnseenCompletion,
+  hasUnseenRunFailure,
+} from "@t3tools/client-runtime/state/thread-settled";
 import type { ContextMenuSource, EnvironmentId, ScopedThreadRef } from "@t3tools/contracts";
 import { AsyncResult } from "effect/reactivity";
 import {
@@ -12,9 +16,11 @@ import {
   ChevronsDownUpIcon,
   ChevronsUpDownIcon,
   LayersIcon,
-  LoaderCircleIcon,
+  LocateFixedIcon,
+  LocateOffIcon,
   PinIcon,
   SparklesIcon,
+  SquarePenIcon,
   WorkflowIcon,
 } from "lucide-react";
 import {
@@ -26,7 +32,9 @@ import {
   useRef,
   useState,
 } from "react";
+import { useShallow } from "zustand/react/shallow";
 
+import { composerDraftHasUserContent, useComposerDraftStore } from "~/composerDraftStore";
 import { cn } from "~/lib/utils";
 import {
   resolveSemanticCategoryIcon,
@@ -34,7 +42,11 @@ import {
 } from "~/lib/stardustSemanticIcons";
 import { serverEnvironment } from "~/state/server";
 import { useUiStateStore } from "~/uiStateStore";
-import { resolveThreadLastVisitedAt, resolveWorkingStartedAt } from "../Sidebar.logic";
+import {
+  resolveSidebarRowStatus,
+  resolveThreadLastVisitedAt,
+} from "../Sidebar.logic";
+import { SharedTooltipTrigger } from "../ui/shared-tooltip";
 import {
   getVisibleCategories,
   resolveStardustThreadCategory,
@@ -43,25 +55,74 @@ import {
   setPinnedSectionCollapsed,
   toggleCategoryCollapsed,
   togglePinnedSectionCollapsed,
+  toggleSidebarNoAutoLocate,
   uncollapseCategory,
   UNSORTED_CATEGORY_ID,
   useCollapsedCategories,
   usePinnedSectionCollapsed,
+  useSidebarNoAutoLocate,
   useStardustCategorySettings,
   useThreadCategoryOverrides,
 } from "./stardustCategories";
 import { useStarredSuggestionModels } from "./StardustSidebarCategoryModals";
 
 export function isThreadActivelyRunning(t: EnvironmentThreadShell): boolean {
-  if (t.hasPendingApprovals || t.hasPendingUserInput) return false;
-  if (t.runtime?.status === "running" && t.blockedOnThreadWait === true) return false;
-  const rts = t.runtime?.status;
-  if (rts === "running" || rts === "starting" || rts === "preparing" || rts === "queued") {
-    return true;
-  }
-  const rs = t.latestRun?.status;
-  return rs === "running" || rs === "starting" || rs === "preparing";
+  const status = resolveSidebarRowStatus(t);
+  return status === "working" || status === "preparing";
 }
+
+function isThreadUnreadCompleted(
+  t: EnvironmentThreadShell,
+  localLastVisitedAtById: Readonly<Record<string, string>>,
+): boolean {
+  const key = scopedThreadKey(scopeThreadRef(t.environmentId, t.id));
+  const lastVisitedAt = resolveThreadLastVisitedAt(t.lastVisitedAt, localLastVisitedAtById[key]);
+  const enriched = { ...t, lastVisitedAt };
+  return resolveSidebarRowStatus(enriched) === "ready" && hasUnseenCompletion(enriched);
+}
+
+/**
+ * Toggle button allowing the user to switch right-hand chat content without
+ * auto-expanding or scrolling the sidebar to that conversation's category/row.
+ */
+export const StardustSidebarLocateLockButton = memo(function StardustSidebarLocateLockButton(props: {
+  readonly compact?: boolean | undefined;
+}) {
+  const noAutoLocate = useSidebarNoAutoLocate();
+  const label = noAutoLocate
+    ? "已开启「不跳转侧栏」：点击会话仅切换右侧内容，不自动展开或滚动定位侧栏（点击恢复自动定位）"
+    : "点击开启「不跳转侧栏」：切换会话时保持侧栏当前位置与折叠状态";
+  return (
+    <SharedTooltipTrigger
+      render={
+        <button
+          type="button"
+          aria-pressed={noAutoLocate}
+          aria-label={label}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            toggleSidebarNoAutoLocate();
+          }}
+          className={cn(
+            "inline-flex h-6 shrink-0 cursor-pointer items-center gap-1 rounded-md px-1.5 text-[11px] font-medium transition-colors duration-150 select-none focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring",
+            noAutoLocate
+              ? "bg-sky-500/16 text-sky-400 hover:bg-sky-500/24"
+              : "text-sidebar-muted-foreground hover:bg-sidebar-row-hover hover:text-sidebar-foreground",
+          )}
+        />
+      }
+      label={label}
+    >
+      {noAutoLocate ? (
+        <LocateOffIcon className="size-3.5 shrink-0" />
+      ) : (
+        <LocateFixedIcon className="size-3.5 shrink-0" />
+      )}
+      {!props.compact ? <span>{noAutoLocate ? "不跳转" : "定位"}</span> : null}
+    </SharedTooltipTrigger>
+  );
+});
 
 type AttentionKind = "approval" | "question" | "failed" | "unread";
 
@@ -120,17 +181,6 @@ function getThreadAttentionKind(
   return null;
 }
 
-function formatElapsedMinutes(startedAt: string | null | undefined, now: number): string {
-  if (!startedAt) return "";
-  const ms = now - Date.parse(startedAt);
-  if (!Number.isFinite(ms) || ms <= 0) return "刚刚";
-  const mins = Math.floor(ms / 60_000);
-  if (mins < 1) return "小于 1 分";
-  if (mins < 60) return `已运行 ${mins} 分`;
-  const hrs = Math.floor(mins / 60);
-  return `已运行 ${hrs} 时 ${mins % 60} 分`;
-}
-
 function eventContextMenuSource(event: ReactMouseEvent): ContextMenuSource {
   return event.nativeEvent instanceof PointerEvent && event.nativeEvent.button === -1
     ? "keyboard"
@@ -140,13 +190,13 @@ function eventContextMenuSource(event: ReactMouseEvent): ContextMenuSource {
 const DISMISSED_SUGGEST_KEY = "t3m:dismissed-suggest-count:v1";
 
 /**
- * Top Tier in `所有项目`: `运行中` + `待处理` + `工作流`
+ * Top Alerts Tier in `所有项目`: `待处理` + `工作流`
+ * (Official native `运行中` and `待编辑` render directly as native sidebar sections at the top!)
  */
 export const StardustAllProjectsTopWorkbench = memo(function StardustAllProjectsTopWorkbench({
   allThreads,
   connectedEnvironmentIds,
   routeRowThreadKey,
-  projectDisplayNameByKey,
   onNavigateToThread,
   onOpenWorkflows,
   onSettleThread,
@@ -155,89 +205,31 @@ export const StardustAllProjectsTopWorkbench = memo(function StardustAllProjects
   readonly allThreads: readonly EnvironmentThreadShell[];
   readonly connectedEnvironmentIds: readonly EnvironmentId[];
   readonly routeRowThreadKey: string | null;
-  readonly projectDisplayNameByKey: ReadonlyMap<string, string>;
+  readonly projectDisplayNameByKey?: ReadonlyMap<string, string> | undefined;
   readonly onNavigateToThread: (ref: ScopedThreadRef) => void;
   readonly onOpenWorkflows: (target?: {
     readonly env: EnvironmentId;
     readonly run: string;
   }) => void;
   readonly onSettleThread: (ref: ScopedThreadRef) => void;
-  readonly onThreadContextMenu?: (
-    ref: ScopedThreadRef,
-    position: { x: number; y: number },
-    source: ContextMenuSource,
-  ) => void;
+  readonly onThreadContextMenu?:
+    | ((
+        ref: ScopedThreadRef,
+        position: { x: number; y: number },
+        source: ContextMenuSource,
+      ) => void)
+    | undefined;
 }) {
-  const pinnedCollapsed = usePinnedSectionCollapsed();
   const localLastVisitedAtById = useUiStateStore((state) => state.threadLastVisitedAtById);
 
-  const [runningExpanded, setRunningExpanded] = useState(true);
-  const [showAllRunning, setShowAllRunning] = useState(false);
   const [attentionExpanded, setAttentionExpanded] = useState(true);
   const [workflowsExpanded, setWorkflowsExpanded] = useState(true);
-  const [expandedParentIds, setExpandedParentIds] = useState<ReadonlySet<string>>(() => new Set());
   const [acknowledgedMap, setAcknowledgedMap] = useState<Readonly<Record<string, string>>>(() =>
     readAckAttentionMap(),
   );
 
   const envKey = useMemo(() => JSON.stringify(connectedEnvironmentIds), [connectedEnvironmentIds]);
   const workflowsAcross = useAtomValue(serverEnvironment.workflowsLiveAcross(envKey));
-
-  const { runningGroups, totalSubagentsCount, coveredInPinnedCount } = useMemo(() => {
-    const nowIso = new Date().toISOString();
-    const childrenByParent = new Map<string, EnvironmentThreadShell[]>();
-    for (const t of allThreads) {
-      if (t.archivedAt) continue;
-      if (t.lineage?.parentThreadId) {
-        const pKey = `${t.environmentId}:${t.lineage.parentThreadId}`;
-        const arr = childrenByParent.get(pKey) ?? [];
-        arr.push(t);
-        childrenByParent.set(pKey, arr);
-      }
-    }
-
-    const groups: Array<{
-      readonly key: string;
-      readonly parent: EnvironmentThreadShell;
-      readonly children: readonly EnvironmentThreadShell[];
-    }> = [];
-    let subCount = 0;
-    let pinnedCovered = 0;
-
-    for (const t of allThreads) {
-      if (t.archivedAt || t.lineage?.parentThreadId) continue;
-      const pKey = `${t.environmentId}:${t.id}`;
-      const children = (childrenByParent.get(pKey) ?? []).filter(isThreadActivelyRunning);
-      if (isThreadActivelyRunning(t) || children.length > 0) {
-        const isVisibleInExpandedPinned =
-          !pinnedCollapsed &&
-          t.pinnedAt != null &&
-          t.settledOverride !== "settled" &&
-          !effectiveSnoozed(t, { now: nowIso });
-        if (isVisibleInExpandedPinned && children.length === 0) {
-          pinnedCovered += 1;
-          continue;
-        }
-        subCount += children.length;
-        groups.push({ key: pKey, parent: t, children });
-      }
-    }
-    return {
-      runningGroups: groups,
-      totalSubagentsCount: subCount,
-      coveredInPinnedCount: pinnedCovered,
-    };
-  }, [allThreads, pinnedCollapsed]);
-
-  const [now, setNow] = useState(() => Date.now());
-  const hasRunning = runningGroups.length > 0;
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- 15s clock refresh only while tasks are running
-  useEffect(() => {
-    if (!hasRunning) return;
-    setNow(Date.now());
-    const id = window.setInterval(() => setNow(Date.now()), 15_000);
-    return () => window.clearInterval(id);
-  }, [hasRunning]);
 
   const attentionRows = useMemo(() => {
     const nowIso = new Date().toISOString();
@@ -349,176 +341,14 @@ export const StardustAllProjectsTopWorkbench = memo(function StardustAllProjects
     return items;
   }, [workflowsAcross, allThreads]);
 
-  const visibleRunningGroups = showAllRunning ? runningGroups : runningGroups.slice(0, 3);
+  if (attentionRows.length === 0 && liveWorkflowItems.length === 0) {
+    return null;
+  }
 
   return (
     <li className="list-none px-1 pt-0.5 pb-1 select-none">
       <div className="space-y-1.5 border-b border-sidebar-border/45 pb-1.5">
-        {/* 1) 运行中 */}
-        <div className="rounded-lg">
-          {runningGroups.length === 0 ? (
-            <div className="flex h-7 items-center justify-between px-2 text-xs text-sidebar-muted-foreground">
-              <span>
-                {coveredInPinnedCount > 0 ? "运行中 · 已在置顶显示" : "运行中 · 暂无运行任务"}
-              </span>
-              <span
-                className={cn("tabular-nums", coveredInPinnedCount > 0 && "text-sky-400/85")}
-              >
-                {coveredInPinnedCount > 0 ? coveredInPinnedCount : 0}
-              </span>
-            </div>
-          ) : (
-            <div>
-              <div className="flex h-7 items-center justify-between px-2 text-xs">
-                <button
-                  type="button"
-                  aria-expanded={runningExpanded}
-                  onClick={() => setRunningExpanded((v) => !v)}
-                  className="inline-flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 text-left font-medium text-sidebar-foreground"
-                >
-                  <ChevronDownIcon
-                    className={cn(
-                      "size-3.5 shrink-0 text-sidebar-muted-foreground transition-transform duration-150",
-                      !runningExpanded && "-rotate-90",
-                    )}
-                  />
-                  <span className="truncate">
-                    运行中
-                    {totalSubagentsCount > 0 ? (
-                      <span className="font-normal text-sidebar-muted-foreground">
-                        {" "}
-                        · 含 {totalSubagentsCount} 个子任务
-                      </span>
-                    ) : coveredInPinnedCount > 0 ? (
-                      <span className="font-normal text-sidebar-muted-foreground">
-                        {" "}
-                        · 另 {coveredInPinnedCount} 个在置顶
-                      </span>
-                    ) : null}
-                  </span>
-                </button>
-                <div className="flex shrink-0 items-center gap-2">
-                  {runningExpanded && runningGroups.length > 3 ? (
-                    <button
-                      type="button"
-                      onClick={() => setShowAllRunning((v) => !v)}
-                      className="cursor-pointer text-[11px] text-primary hover:underline"
-                    >
-                      {showAllRunning ? "收起" : "查看全部"}
-                    </button>
-                  ) : null}
-                  <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-sky-500/18 px-1.5 text-[11px] font-semibold text-sky-400 tabular-nums">
-                    {runningGroups.length}
-                  </span>
-                </div>
-              </div>
-
-              {runningExpanded ? (
-                <div className="mt-0.5 space-y-0.5 pl-1">
-                  {visibleRunningGroups.map(({ key, parent, children }) => {
-                    const ref = scopeThreadRef(parent.environmentId, parent.id);
-                    const rowKey = scopedThreadKey(ref);
-                    const isOpen = routeRowThreadKey === rowKey;
-                    const projName =
-                      projectDisplayNameByKey.get(`${parent.environmentId}:${parent.projectId}`) ??
-                      null;
-                    const activeStartedAt = isThreadActivelyRunning(parent)
-                      ? (resolveWorkingStartedAt(parent) ?? parent.latestRun?.startedAt)
-                      : children[0]
-                        ? (resolveWorkingStartedAt(children[0]) ??
-                          children[0].latestRun?.startedAt)
-                        : null;
-                    const elapsed = formatElapsedMinutes(activeStartedAt, now);
-                    const subOpen = expandedParentIds.has(key);
-                    const isPinned = parent.pinnedAt != null;
-                    return (
-                      <div key={key} className="rounded-lg">
-                        <div
-                          onContextMenu={(e) => {
-                            if (!onThreadContextMenu) return;
-                            e.preventDefault();
-                            onThreadContextMenu(
-                              ref,
-                              { x: e.clientX, y: e.clientY },
-                              eventContextMenuSource(e),
-                            );
-                          }}
-                          className={cn(
-                            "group relative flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs transition-colors hover:bg-sidebar-row-hover",
-                            isOpen && "bg-sidebar-row-hover",
-                          )}
-                        >
-                          <LoaderCircleIcon className="size-3.5 shrink-0 animate-spin text-sky-400" />
-                          <button
-                            type="button"
-                            onClick={() => onNavigateToThread(ref)}
-                            className="min-w-0 flex-1 cursor-pointer text-left"
-                          >
-                            <div className="truncate font-medium text-sidebar-foreground">
-                              {parent.title || "未命名会话"}
-                            </div>
-                            <div className="mt-0.5 flex items-center gap-1 truncate text-[11px] text-sidebar-muted-foreground">
-                              {isPinned ? (
-                                <PinIcon
-                                  aria-label="已置顶"
-                                  className="size-2.5 shrink-0 text-sidebar-muted-foreground/80"
-                                />
-                              ) : null}
-                              {projName ? <span>{projName} ·</span> : null}
-                              <span>{elapsed || "执行中"}</span>
-                            </div>
-                          </button>
-                          {children.length > 0 ? (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setExpandedParentIds((prev) => {
-                                  const next = new Set(prev);
-                                  if (next.has(key)) next.delete(key);
-                                  else next.add(key);
-                                  return next;
-                                });
-                              }}
-                              className="inline-flex shrink-0 cursor-pointer items-center gap-0.5 rounded bg-muted/60 px-1.5 py-0.5 text-[10.5px] text-sidebar-muted-foreground hover:text-sidebar-foreground"
-                            >
-                              <span>{children.length} 子任务</span>
-                              <ChevronRightIcon
-                                className={cn("size-3 transition-transform", subOpen && "rotate-90")}
-                              />
-                            </button>
-                          ) : null}
-                        </div>
-                        {children.length > 0 && subOpen ? (
-                          <div className="ml-4 space-y-0.5 border-l border-sidebar-border/70 pl-2">
-                            {children.map((child) => {
-                              const childRef = scopeThreadRef(child.environmentId, child.id);
-                              return (
-                                <button
-                                  key={child.id}
-                                  type="button"
-                                  onClick={() => onNavigateToThread(childRef)}
-                                  className="flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1 text-left text-[11.5px] text-sidebar-muted-foreground hover:bg-sidebar-row-hover hover:text-sidebar-foreground"
-                                >
-                                  <LoaderCircleIcon className="size-3 shrink-0 animate-spin text-sky-400" />
-                                  <span className="min-w-0 flex-1 truncate">
-                                    {child.title || "子任务"}
-                                  </span>
-                                </button>
-                              );
-                            })}
-                          </div>
-                        ) : null}
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : null}
-            </div>
-          )}
-        </div>
-
-        {/* 2) 待处理 */}
+        {/* 1) 待处理 */}
         {attentionRows.length > 0 ? (
           <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 py-1">
             <button
@@ -624,7 +454,7 @@ export const StardustAllProjectsTopWorkbench = memo(function StardustAllProjects
           </div>
         ) : null}
 
-        {/* 3) 工作流 */}
+        {/* 2) 工作流 */}
         {liveWorkflowItems.length > 0 ? (
           <div className="rounded-lg border border-sidebar-border/60 bg-sidebar/40 py-1">
             <button
@@ -685,7 +515,60 @@ export const StardustAllProjectsTopWorkbench = memo(function StardustAllProjects
 });
 
 /**
- * Collapsible `置顶` Section Header in `所有项目` (sits cleanly between Top Workbench and `分类`)
+ * Unified Category / Section Status Indicators:
+ * - Blue dot (`bg-sky-400`): actively running (`运行中`)
+ * - Green dot (`bg-emerald-400`): completed & unread (`已完成未查看`)
+ * - Amber pen (`SquarePenIcon` `text-amber-400`): has unsent draft (`有未发送草稿`)
+ */
+function SectionStatusBadges(props: {
+  readonly hasRunning: boolean;
+  readonly hasUnreadCompleted: boolean;
+  readonly hasDraft: boolean;
+}) {
+  if (!props.hasRunning && !props.hasUnreadCompleted && !props.hasDraft) {
+    return null;
+  }
+  return (
+    <span className="inline-flex shrink-0 items-center gap-1.5">
+      {props.hasDraft ? (
+        <span title="含未发送草稿" className="inline-flex items-center text-amber-400">
+          <SquarePenIcon aria-hidden className="size-3 shrink-0" />
+        </span>
+      ) : null}
+      {props.hasUnreadCompleted ? (
+        <span
+          title="含已完成但未查看的会话"
+          className="size-2 shrink-0 rounded-full bg-emerald-400"
+        />
+      ) : null}
+      {props.hasRunning ? (
+        <span
+          title="含正在运行的会话"
+          className="size-2 shrink-0 rounded-full bg-sky-400"
+        />
+      ) : null}
+    </span>
+  );
+}
+
+function useUnsentDraftThreadKeySet(): ReadonlySet<string> {
+  const keys = useComposerDraftStore(
+    useShallow((store) => {
+      const matched: string[] = [];
+      for (const [key, draft] of Object.entries(store.draftsByThreadKey)) {
+        if (store.draftThreadsByThreadKey[key] !== undefined) continue;
+        if (composerDraftHasUserContent(draft)) {
+          matched.push(key);
+        }
+      }
+      return matched;
+    }),
+  );
+  return useMemo(() => new Set(keys), [keys]);
+}
+
+/**
+ * Collapsible `置顶` Section Header in `所有项目`
  */
 export const StardustAllProjectsPinnedHeader = memo(function StardustAllProjectsPinnedHeader({
   pinnedThreads,
@@ -695,6 +578,9 @@ export const StardustAllProjectsPinnedHeader = memo(function StardustAllProjects
   readonly routeRowThreadKey: string | null;
 }) {
   const isCollapsed = usePinnedSectionCollapsed();
+  const noAutoLocate = useSidebarNoAutoLocate();
+  const localLastVisitedAtById = useUiStateStore((state) => state.threadLastVisitedAtById);
+  const draftThreadKeys = useUnsentDraftThreadKeySet();
 
   const containsActiveRoute = useMemo(
     () =>
@@ -705,22 +591,33 @@ export const StardustAllProjectsPinnedHeader = memo(function StardustAllProjects
     [pinnedThreads, routeRowThreadKey],
   );
 
-  const hasRunning = useMemo(
-    () => pinnedThreads.some(isThreadActivelyRunning),
-    [pinnedThreads],
-  );
+  const { hasRunning, hasUnreadCompleted, hasDraft } = useMemo(() => {
+    let running = false;
+    let unread = false;
+    let draft = false;
+    for (const t of pinnedThreads) {
+      const key = scopedThreadKey(scopeThreadRef(t.environmentId, t.id));
+      if (!running && isThreadActivelyRunning(t)) running = true;
+      if (!unread && key !== routeRowThreadKey && isThreadUnreadCompleted(t, localLastVisitedAtById)) {
+        unread = true;
+      }
+      if (!draft && draftThreadKeys.has(key)) draft = true;
+    }
+    return { hasRunning: running, hasUnreadCompleted: unread, hasDraft: draft };
+  }, [pinnedThreads, routeRowThreadKey, localLastVisitedAtById, draftThreadKeys]);
 
-  // Auto-expand only when the user navigates to a *different* thread inside `置顶`,
-  // never overriding manual collapse on the current thread.
+  // Auto-expand only when the user navigates to a *different* thread inside `置顶`
+  // AND "Don't Auto-Locate" is OFF.
   const prevRouteKeyRef = useRef<string | null>(routeRowThreadKey);
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- reveals newly navigated pinned thread without blocking manual collapse
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- reveals newly navigated pinned thread unless sidebar auto-locate is locked
   useEffect(() => {
     if (prevRouteKeyRef.current === routeRowThreadKey) return;
     prevRouteKeyRef.current = routeRowThreadKey;
+    if (noAutoLocate) return;
     if (containsActiveRoute && isCollapsed) {
       setPinnedSectionCollapsed(false);
     }
-  }, [routeRowThreadKey, containsActiveRoute, isCollapsed]);
+  }, [routeRowThreadKey, containsActiveRoute, isCollapsed, noAutoLocate]);
 
   if (pinnedThreads.length === 0) return null;
 
@@ -746,16 +643,11 @@ export const StardustAllProjectsPinnedHeader = memo(function StardustAllProjects
           <PinIcon className="size-3" />
         </span>
         <span className="min-w-0 flex-1 truncate text-[13px] font-medium">置顶</span>
-        {isCollapsed && hasRunning ? (
-          <span
-            title="含运行中会话"
-            className="size-2 shrink-0 rounded-full bg-sky-400"
-          />
-        ) : null}
-        {isCollapsed && containsActiveRoute ? (
-          <span
-            title="当前打开会话在此分组"
-            className="size-1.5 shrink-0 rounded-full bg-primary"
+        {isCollapsed ? (
+          <SectionStatusBadges
+            hasRunning={hasRunning}
+            hasUnreadCompleted={hasUnreadCompleted}
+            hasDraft={hasDraft}
           />
         ) : null}
         <span className="shrink-0 text-xs text-sidebar-muted-foreground tabular-nums">
@@ -771,19 +663,26 @@ export const StardustAllProjectsPinnedHeader = memo(function StardustAllProjects
  */
 export const StardustAllProjectsCategories = memo(function StardustAllProjectsCategories({
   activeThreads,
+  workingThreads = [],
   routeRowThreadKey,
   projectDisplayNameByKey,
+  showLocateLockInToolbar = false,
   renderThreadRow,
 }: {
   readonly activeThreads: readonly EnvironmentThreadShell[];
+  readonly workingThreads?: readonly EnvironmentThreadShell[] | undefined;
   readonly routeRowThreadKey: string | null;
   readonly projectDisplayNameByKey: ReadonlyMap<string, string>;
+  readonly showLocateLockInToolbar?: boolean | undefined;
   readonly renderThreadRow: (thread: EnvironmentThreadShell) => ReactNode;
 }) {
   const settings = useStardustCategorySettings();
   const overrides = useThreadCategoryOverrides();
   const collapsedSet = useCollapsedCategories();
+  const noAutoLocate = useSidebarNoAutoLocate();
   const starredModels = useStarredSuggestionModels();
+  const localLastVisitedAtById = useUiStateStore((state) => state.threadLastVisitedAtById);
+  const draftThreadKeys = useUnsentDraftThreadKeySet();
 
   const [dismissedSuggestAtCount, setDismissedSuggestAtCount] = useState<number>(() => {
     try {
@@ -800,7 +699,21 @@ export const StardustAllProjectsCategories = memo(function StardustAllProjectsCa
 
   const { occupiedSections, emptyCategories, unsortedCount } = useMemo(() => {
     const buckets = new Map<string, EnvironmentThreadShell[]>();
+    const runningCatIds = new Set<string>();
     for (const cat of visibleCategories) buckets.set(cat.id, []);
+
+    for (const wt of workingThreads) {
+      const wtKey = scopedThreadKey(scopeThreadRef(wt.environmentId, wt.id));
+      const wtProj = projectDisplayNameByKey.get(`${wt.environmentId}:${wt.projectId}`) ?? null;
+      const wtCat = resolveStardustThreadCategory(
+        overrides,
+        wtKey,
+        { title: wt.title, projectName: wtProj },
+        settings,
+        visibleCategories,
+      );
+      runningCatIds.add(buckets.has(wtCat) ? wtCat : UNSORTED_CATEGORY_ID);
+    }
 
     for (const t of activeThreads) {
       const threadKey = scopedThreadKey(scopeThreadRef(t.environmentId, t.id));
@@ -821,6 +734,8 @@ export const StardustAllProjectsCategories = memo(function StardustAllProjectsCa
       readonly label: string;
       readonly threads: readonly EnvironmentThreadShell[];
       readonly hasRunning: boolean;
+      readonly hasUnreadCompleted: boolean;
+      readonly hasDraft: boolean;
     }> = [];
     const empty: Array<(typeof visibleCategories)[number]> = [];
 
@@ -832,11 +747,28 @@ export const StardustAllProjectsCategories = memo(function StardustAllProjectsCa
     for (const cat of orderedCats) {
       const list = buckets.get(cat.id) ?? [];
       if (list.length > 0) {
+        let hasRunning = runningCatIds.has(cat.id);
+        let hasUnreadCompleted = false;
+        let hasDraft = false;
+        for (const t of list) {
+          const key = scopedThreadKey(scopeThreadRef(t.environmentId, t.id));
+          if (!hasRunning && isThreadActivelyRunning(t)) hasRunning = true;
+          if (
+            !hasUnreadCompleted &&
+            key !== routeRowThreadKey &&
+            isThreadUnreadCompleted(t, localLastVisitedAtById)
+          ) {
+            hasUnreadCompleted = true;
+          }
+          if (!hasDraft && draftThreadKeys.has(key)) hasDraft = true;
+        }
         occupied.push({
           id: cat.id,
           label: cat.label,
           threads: list,
-          hasRunning: list.some(isThreadActivelyRunning),
+          hasRunning,
+          hasUnreadCompleted,
+          hasDraft,
         });
       } else if (cat.id !== UNSORTED_CATEGORY_ID && !settings.hideEmptyCategories) {
         empty.push(cat);
@@ -848,16 +780,26 @@ export const StardustAllProjectsCategories = memo(function StardustAllProjectsCa
       emptyCategories: empty,
       unsortedCount: (buckets.get(UNSORTED_CATEGORY_ID) ?? []).length,
     };
-  }, [activeThreads, overrides, projectDisplayNameByKey, settings, visibleCategories]);
+  }, [
+    activeThreads,
+    workingThreads,
+    overrides,
+    projectDisplayNameByKey,
+    settings,
+    visibleCategories,
+    routeRowThreadKey,
+    localLastVisitedAtById,
+    draftThreadKeys,
+  ]);
 
-  // Auto-uncollapse only when the user navigates to a *different* conversation inside a collapsed category.
-  // Manual clicks on any category header (including the one holding the active conversation) always fold/unfold deterministically.
+  // Auto-uncollapse only when navigating to a *different* conversation inside a collapsed category
+  // AND "Don't Auto-Locate" is OFF.
   const prevRouteKeyRef = useRef<string | null>(routeRowThreadKey);
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- reveals newly navigated thread without locking out manual category collapse
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- reveals newly navigated thread unless sidebar auto-locate is locked
   useEffect(() => {
     if (prevRouteKeyRef.current === routeRowThreadKey) return;
     prevRouteKeyRef.current = routeRowThreadKey;
-    if (!routeRowThreadKey) return;
+    if (!routeRowThreadKey || noAutoLocate) return;
     const hit = occupiedSections.find((sec) =>
       sec.threads.some(
         (t) => scopedThreadKey(scopeThreadRef(t.environmentId, t.id)) === routeRowThreadKey,
@@ -866,7 +808,7 @@ export const StardustAllProjectsCategories = memo(function StardustAllProjectsCa
     if (hit) {
       uncollapseCategory(hit.id);
     }
-  }, [routeRowThreadKey, occupiedSections]);
+  }, [routeRowThreadKey, occupiedSections, noAutoLocate]);
 
   if (!settings.enabled || settings.preset === "project") return null;
 
@@ -887,6 +829,7 @@ export const StardustAllProjectsCategories = memo(function StardustAllProjectsCa
             分类
           </span>
           <div className="flex items-center gap-1">
+            {showLocateLockInToolbar ? <StardustSidebarLocateLockButton /> : null}
             {occupiedSections.length > 0 ? (
               <button
                 type="button"
@@ -989,16 +932,11 @@ export const StardustAllProjectsCategories = memo(function StardustAllProjectsCa
                 />
               </span>
               <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{sec.label}</span>
-              {isCollapsed && sec.hasRunning ? (
-                <span
-                  title="含运行中会话"
-                  className="size-2 shrink-0 rounded-full bg-sky-400"
-                />
-              ) : null}
-              {isCollapsed && containsActiveRoute ? (
-                <span
-                  title="当前打开会话在此分类"
-                  className="size-1.5 shrink-0 rounded-full bg-primary"
+              {isCollapsed ? (
+                <SectionStatusBadges
+                  hasRunning={sec.hasRunning}
+                  hasUnreadCompleted={sec.hasUnreadCompleted}
+                  hasDraft={sec.hasDraft}
                 />
               ) : null}
               <span className="shrink-0 text-xs text-sidebar-muted-foreground tabular-nums">

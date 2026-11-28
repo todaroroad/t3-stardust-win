@@ -27,22 +27,22 @@ function panelWidthTransitions(element: HTMLElement) {
   );
 }
 
-// Sample only the layout panels; seeking unrelated transitions can change their lifecycle.
+// Compute narrowest chat width during layout panel transitions without seeking
+// CSSTransition.currentTime (seeking forces synchronous 4x reflows and restarts/bounces
+// width transitions in Chromium).
 function measureTransitionWidths(element: HTMLElement, transitions: CSSTransition[]) {
   if (transitions.length === 0) return null;
-  const times = transitions.map((animation) => animation.currentTime);
-  // Opposite panel transitions can reach their widest points at different times.
+  let extraFutureShrink = 0;
   for (const animation of transitions) {
-    const end = Number(animation.effect?.getComputedTiming().endTime ?? 0);
-    animation.currentTime = 0;
-    const startWidth = element.clientWidth;
-    animation.currentTime = end;
-    if (startWidth < element.clientWidth) animation.currentTime = 0;
+    const target = animation.effect instanceof KeyframeEffect ? animation.effect.target : null;
+    if (!(target instanceof HTMLElement)) continue;
+    const currentPanelWidth = target.getBoundingClientRect().width;
+    const committedCssWidth = Number.parseFloat(getComputedStyle(target).width);
+    if (Number.isFinite(committedCssWidth) && committedCssWidth > currentPanelWidth) {
+      extraFutureShrink += committedCssWidth - currentPanelWidth;
+    }
   }
-  const narrowestWidth = element.clientWidth;
-  transitions.forEach((animation, index) => {
-    animation.currentTime = times[index] ?? null;
-  });
+  const narrowestWidth = Math.max(0, element.clientWidth - extraFutureShrink);
   return { transitions, narrowestWidth };
 }
 

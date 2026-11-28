@@ -168,7 +168,7 @@ function ComboboxPopup({
           alignOffset={alignOffset}
           anchor={anchor}
           collisionAvoidance={collisionAvoidance}
-          className="pointer-events-none fixed! inset-0! z-[140] flex! h-dvh! w-screen! transform-none! flex-col items-center px-4 pt-[max(1rem,4vh,calc(var(--workspace-topbar-height,48px)+0.5rem))] pb-[4vh] select-none [-webkit-app-region:no-drag] sm:pt-[max(10vh,calc(var(--workspace-topbar-height,48px)+0.5rem))] sm:pb-[10vh]"
+          className="pointer-events-none fixed! inset-0! z-[140] flex! h-dvh! w-screen! transform-none! flex-col items-center px-4 pt-[max(1rem,4vh,calc(var(--workspace-topbar-height,48px)+0.5rem))] pb-[4vh] select-none sm:pt-[max(10vh,calc(var(--workspace-topbar-height,48px)+0.5rem))] sm:pb-[10vh]"
           data-slot="combobox-positioner"
           side={side}
           sideOffset={sideOffset}
@@ -176,7 +176,7 @@ function ComboboxPopup({
           <ComboboxPrimitive.Popup
             className={cn(
               DIALOG_POPUP_CLASS,
-              "pointer-events-auto max-h-105 w-full max-w-xl overflow-hidden text-foreground data-ending-style:pointer-events-none",
+              "pointer-events-auto max-h-105 w-full max-w-xl overflow-hidden text-foreground [-webkit-app-region:no-drag] data-ending-style:pointer-events-none",
               className,
             )}
             data-slot="combobox-popup"
