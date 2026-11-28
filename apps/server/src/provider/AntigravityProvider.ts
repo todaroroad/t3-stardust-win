@@ -332,16 +332,11 @@ export const makeAntigravityProvider = Effect.fn("makeAntigravityProvider")(func
       initialized !== undefined && options.usageProbe
         ? yield* options.usageProbe.probe
         : undefined;
-    const hasLiveQuotaWindows = Boolean(
-      probedUsageLimits &&
-        !probedUsageLimits.unavailable &&
-        probedUsageLimits.windows.length > 0,
-    );
     const updatedAt = DateTime.formatIso(yield* DateTime.now);
     const applyCheck = (state: AntigravityProviderState) => {
       if (state.authRevision !== before.authRevision) return state;
       const { message: _previousMessage, ...draft } = state.draft;
-      const authenticated = draft.auth.status === "authenticated" || (hasLiveQuotaWindows && draft.auth.status === "unknown");
+      const authenticated = draft.auth.status === "authenticated";
       const message =
         errorMessage ??
         (authenticated
@@ -358,15 +353,6 @@ export const makeAntigravityProvider = Effect.fn("makeAntigravityProvider")(func
           version: version === "unknown" ? draft.version : version || draft.version,
           status: errorMessage ? "error" : authenticated ? "ready" : "warning",
           checkedAt: updatedAt,
-          ...(hasLiveQuotaWindows && draft.auth.status === "unknown"
-            ? {
-                auth: {
-                  status: "authenticated" as const,
-                  type: options.auth?.type ?? "oauth-personal",
-                  label: options.auth?.label ?? "Google account",
-                },
-              }
-            : {}),
           ...(probedUsageLimits ? { usageLimits: probedUsageLimits } : {}),
           ...(missingInstallation
             ? {

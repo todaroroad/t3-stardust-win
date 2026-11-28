@@ -338,29 +338,11 @@ copyAsset("antigravityUsageLimits.ts", "apps/server/src/provider/antigravityUsag
       initialized !== undefined && options.usageProbe
         ? yield* options.usageProbe.probe
         : undefined;
-    const hasLiveQuotaWindows = Boolean(
-      probedUsageLimits &&
-        !probedUsageLimits.unavailable &&
-        probedUsageLimits.windows.length > 0,
-    );
     const updatedAt = DateTime.formatIso(yield* DateTime.now);`,
-    );
-    src = src.replace(
-      "      const authenticated = draft.auth.status === \"authenticated\";",
-      "      const authenticated = draft.auth.status === \"authenticated\" || (hasLiveQuotaWindows && draft.auth.status === \"unknown\");",
     );
     src = src.replace(
       "          checkedAt: updatedAt,",
       `          checkedAt: updatedAt,
-          ...(hasLiveQuotaWindows && draft.auth.status === "unknown"
-            ? {
-                auth: {
-                  status: "authenticated" as const,
-                  type: options.auth?.type ?? "oauth-personal",
-                  label: options.auth?.label ?? "Google account",
-                },
-              }
-            : {}),
           ...(probedUsageLimits ? { usageLimits: probedUsageLimits } : {}),`,
     );
     src = src.replace(
