@@ -72,6 +72,7 @@ import {
 import { makeAcpNativeLoggerFactory } from "@t3tools/provider-acp/server/nativeLogging";
 import { ProviderDriverError } from "../Errors.ts";
 import { makeAntigravityProvider } from "../AntigravityProvider.ts";
+import { makeAntigravityUsageProbe } from "../antigravityUsageLimits.ts";
 import * as ProviderEventLoggers from "@t3tools/provider-core/server/ProviderEventLoggers";
 import * as ModelCatalog from "@t3tools/provider-core/server/ModelCatalog";
 import {
@@ -571,7 +572,17 @@ export const AntigravityDriver: ProviderDriver<
       };
     });
 
+    const usageProbe = yield* makeAntigravityUsageProbe({
+      profileDirectory,
+      authMethod: settings.authMethod,
+    }).pipe(
+      Effect.provideService(FileSystem.FileSystem, fileSystem),
+      Effect.provideService(Path.Path, path),
+      Effect.provideService(Digest.Digest, digest),
+    );
+
     const provider = yield* makeAntigravityProvider(settings, {
+      usageProbe,
       environment: processEnvironment,
       stampIdentity: classifyModels,
       probe,

@@ -1095,6 +1095,10 @@ export const WSL_RUNTIME_EXTRA_RESOURCES = [
 ] as const;
 export const DESKTOP_EXTRA_RESOURCES = [
   {
+    from: "apps/desktop/resources/icon.ico",
+    to: "icon.ico",
+  },
+  {
     from: "apps/desktop/prod-resources/cursor-sdk",
     to: "node_modules/@cursor",
   },
@@ -3006,7 +3010,7 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
     buildConfig.nsis = {
       differentialPackage: true,
       include: "apps/desktop/resources/installer.nsh",
-      shortcutName: "T3星辰版",
+      shortcutName: "T3M版",
     };
     const winConfig: Record<string, unknown> = {
       target: [target],

@@ -1,3 +1,5 @@
+import { StardustLiveExecutionCapsule } from "./chat/StardustLiveExecutionCapsule";
+import { StardustSessionStatsBar } from "./chat/StardustSessionStatsBar";
 import { m } from "../i18n/messages";
 import { thrownErrorMessage } from "@t3tools/client-runtime/errors";
 import { useGT, useMessages } from "gt-react";
@@ -3826,6 +3828,11 @@ export default function ChatView(props: ChatViewProps) {
                         : undefined
                     }
                   >
+                    <StardustLiveExecutionCapsule
+                      projection={serverProjection}
+                      shell={activeThreadShell}
+                      isDraftHeroState={isDraftHeroState}
+                    />
                     <ChildThreadApprovals threadRef={activeThreadRef} />
                     <div className="relative">
                       <ComposerSurface.Shell contextRow={showComposerContextStrip}>
@@ -4097,6 +4104,12 @@ export default function ChatView(props: ChatViewProps) {
                           </div>
                         </div>
                       </ComposerSurface.Shell>
+                      {!isDraftHeroState ? (
+                        <StardustSessionStatsBar
+                          projection={serverProjection}
+                          disconnected={Boolean(activeEnvironmentUnavailableState)}
+                        />
+                      ) : null}
                       {isDraftHeroState && composerBannerItems.length > 0 ? (
                         // Out of flow, like the headline, so a notice never moves the centered composer.
                         // Short windows pin the composer to the bottom, where an out-of-flow notice

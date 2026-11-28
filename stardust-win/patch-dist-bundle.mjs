@@ -1134,35 +1134,8 @@ function patchChatBundle(src) {
     }
   }
 
-  // 3. Floating Session Telemetry Pill below composer (normal layout flow -> auto-measured inset, zero overlap)
-  if (!out.includes("__T3TelemetryPill")) {
-    const composerDockRe =
-      /let ([A-Za-z0-9_$]+);([A-Za-z0-9_$]+)\[(\d+)\]!==([A-Za-z0-9_$]+)\|\|\2\[(\d+)\]!==([A-Za-z0-9_$]+)\?\(\1=\(0,([A-Za-z0-9_$]+)\.jsxs\)\([`"']div[`"'],\{className:[`"']relative z-10[`"'],children:\[\4,\6\]\}\),\2\[\3\]=\4,\2\[\5\]=\6,\2\[(\d+)\]=\1\):\1=\2\[\8\];/;
-    const ctxMatch = chatScope.match(/usedTokens:([A-Za-z0-9_$]+)\.usedTokens,updatedAt:\1\.updatedAt/);
-    const runsMatch = chatScope.match(/activeThreadRuns:([A-Za-z0-9_$]+\?\.runs)\?\?/);
-    const entriesMatch = out.slice(topbarPos, topbarPos + 4000).match(/entriesInput:([A-Za-z0-9_$]+),/);
-    const workingMatch = out.slice(topbarPos, topbarPos + 4000).match(/isWorking:([A-Za-z0-9_$]+),/);
-    const emptyStateMatch =
-      chatScope.match(/composerOverlayElement:([A-Za-z0-9_$]+)\?null:/) ||
-      out.slice(topbarPos, topbarPos + 2000).match(/composerOverlayElement:([A-Za-z0-9_$]+)\?null:/);
-
-    if (composerDockRe.test(out) && ctxMatch && runsMatch && entriesMatch && workingMatch && emptyStateMatch) {
-      const ctxV = ctxMatch[1];
-      const runsV = runsMatch[1];
-      const entriesV = entriesMatch[1];
-      const workV = workingMatch[1];
-      const emptyV = emptyStateMatch[1];
-
-      out = out.replace(
-        composerDockRe,
-        (_, kVar, _tMemo, _s1, wVar, _s2, gVar, jNs) =>
-          `let ${kVar}=(0,${jNs}.jsxs)("div",{className:"relative z-10",children:[${wVar},${gVar},!${emptyV}?(0,${jNs}.jsx)(__T3TelemetryPill,{usage:${ctxV},runs:${runsV},entries:${entriesV},isWorking:${workV}}):null]});`,
-      );
-
-      const telemetryComp = `function __T3TelemetryPill({usage,runs,entries,isWorking}){const[,setTick]=(0,${reactNs}.useState)(0);(0,${reactNs}.useEffect)(()=>{if(!globalThis.__t3QuotaUi?.subscribe)return;return globalThis.__t3QuotaUi.subscribe(()=>setTick(x=>x+1))},[]);const zh=globalThis.__t3QuotaUi?globalThis.__t3QuotaUi.isZh():!0;const turns=Array.isArray(runs)?runs.length:0;let steps=0;if(Array.isArray(entries)){for(const item of entries){if(!item)continue;if(Array.isArray(item.toolCalls))steps+=item.toolCalls.length;else if(item.kind==="work"||item.kind==="tool"||item.type==="tool-call"||item.type==="tool")steps+=1;}}const tokRaw=usage?.usedTokens??null;const maxTok=usage?.maxTokens??null;const pct=Number.isFinite(usage?.usedPercentage)?Math.round(usage.usedPercentage):(Number.isFinite(tokRaw)&&Number.isFinite(maxTok)&&maxTok>0?Math.round(tokRaw/maxTok*100):null);const fmtTok=n=>{if(!Number.isFinite(n)||n<=0)return null;if(n>=1e6)return(n/1e6).toFixed(1)+"M";if(n>=1e3)return(n/1e3).toFixed(1)+"K";return String(Math.round(n))};const tokStr=fmtTok(tokRaw);if(turns<=0&&steps<=0&&!tokStr)return null;const leftTxt=zh?(turns+" 轮"+(steps>0?" "+steps+" 步":"")):(turns+"t"+(steps>0?" · "+steps+"s":""));const rightParts=[];if(tokStr)rightParts.push(tokStr+(zh?" 上下文":" ctx"));if(pct!==null)rightParts.push(pct+"%");return(0,${jsxNs}.jsx)("div",{className:"t3-telemetry-dock","data-quota-ui-managed":"true",children:(0,${jsxNs}.jsxs)("div",{className:"t3-telemetry-pill",children:[(0,${jsxNs}.jsx)("span",{className:"t3-telemetry-dot",style:isWorking?{opacity:1}:{opacity:0.72}}),(0,${jsxNs}.jsx)("span",{children:leftTxt}),rightParts.length>0?(0,${jsxNs}.jsx)("span",{className:"t3-telemetry-sep"}):null,rightParts.length>0?(0,${jsxNs}.jsx)("span",{className:"t3-telemetry-strong",children:rightParts.join(" · ")}):null]})})}`;
-      out += `\n${telemetryComp}\n`;
-    }
-  }
+  // 3. Session Stats Bar (`StardustSessionStatsBar.tsx`) is mounted natively in ChatView.tsx,
+  //    so legacy `__T3TelemetryPill` injection is intentionally omitted here.
 
   return out;
 }

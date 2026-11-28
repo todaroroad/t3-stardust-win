@@ -260,7 +260,7 @@ function bootstrapTitlePlugin(): Plugin {
         hostedAppChannel: configuredHostedAppChannel,
         development,
       });
-      const title = development ? formatAppDisplayName({ baseName: "T3星辰版", stageLabel }) : "T3星辰版";
+      const title = development ? formatAppDisplayName({ baseName: "T3M版", stageLabel }) : "T3M版";
       return html.replace(/<title>[^<]*<\/title>/, `<title>${title}</title>`);
     },
   };

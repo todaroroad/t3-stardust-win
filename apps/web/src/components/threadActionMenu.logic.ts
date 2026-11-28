@@ -8,6 +8,7 @@ export type ThreadActionMenuId =
   | "find"
   | "new-thread-on-branch"
   | "filter-by-project"
+  | "move-to-category"
   | "turn-into-project"
   | "project-settings"
   | "pin"
@@ -134,6 +135,7 @@ export function threadActionRequiresOperate(action: ThreadActionMenuId): boolean
   return ![
     "find",
     "new-thread-on-branch",
+    "move-to-category",
     "project-settings",
     "mark-unread",
     "share-guest",
@@ -179,6 +181,7 @@ export function buildThreadActionMenuItems(
             : { id: "pin" as const, label: resolve(msg("Pin thread")), icon: "pin" },
         ]
       : []),
+    { id: "move-to-category" as const, label: "归入分类…", icon: "folder-tree" },
     ...(state.supports.settlement
       ? [
           state.isSettled

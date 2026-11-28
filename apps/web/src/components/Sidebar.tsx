@@ -1,3 +1,12 @@
+import {
+  openStardustThreadCategoryPicker,
+  useStardustCategorySettings,
+} from "./sidebar/stardustCategories";
+import {
+  StardustAllProjectsCategories,
+  StardustAllProjectsTopWorkbench,
+} from "./sidebar/StardustAllProjectsWorkbench";
+import { StardustSidebarCategoryModals } from "./sidebar/StardustSidebarCategoryModals";
 import { thrownErrorMessage } from "@t3tools/client-runtime/errors";
 import { msg, T, useGT, useMessages } from "gt-react";
 import { m } from "../i18n/messages";
@@ -1332,6 +1341,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     },
   );
 
+  const stardustCatSettings = useStardustCategorySettings();
   const {
     workingShelfEnabled,
     pinnedThreads,
@@ -1378,7 +1388,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     delegatedUnderParent,
     routeRowThreadKey,
     departingThreadKey,
-    folderGroups: boringSidebarEnabled
+    folderGroups: (boringSidebarEnabled || (scopedProjectGroups.length === 0 && stardustCatSettings.enabled && stardustCatSettings.preset === "project"))
       ? scopedProjectGroups.length === 0
         ? // An archived project keeps a folder for its active threads, below the rest.
           [...scopeGroups, ...projectGroups.filter((project) => project.archived)]
@@ -2781,6 +2791,13 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
           return;
         }
         switch (clicked.value) {
+          case "move-to-category":
+            openStardustThreadCategoryPicker({
+              threadKey,
+              title: thread.title,
+              projectName: threadProjectGroup?.displayName ?? null,
+            });
+            return;
           case "filter-by-project":
             if (threadProjectGroup) {
               setProjectScopeKeys(
@@ -3174,6 +3191,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                   </ComboboxTrigger>
                   {/* Refocusing the trigger after a pointer close shows its focus ring and opens its tooltip. */}
                   <ComboboxPopup
+                    data-project-scope-popup="true"
                     align="start"
                     collisionAvoidance={{ side: "flip", align: "shift" }}
                     className="w-[min(18rem,var(--available-width))] overflow-hidden"
@@ -3609,6 +3627,12 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                       );
                     };
                     const from = isContextDrag ? null : (dragState?.activeSection ?? null);
+                    const isAllProjectsWorkbench = projectScopeKeys.length === 0 && !isSearchingThreads;
+                    const stardustCustomCatsActive =
+                      isAllProjectsWorkbench &&
+                      stardustCatSettings.enabled &&
+                      stardustCatSettings.preset !== "project" &&
+                      projectFolders === null;
                     const items: ReactNode[] = [
                       <SidebarDraftBlock
                         key="draft-sessions"
@@ -3622,11 +3646,32 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                         onNavigateToDraft={navigateToDraft}
                         onDraftContextMenu={handleDraftContextMenu}
                       />,
+                      ...(isAllProjectsWorkbench
+                        ? [
+                            <StardustAllProjectsTopWorkbench
+                              key="t3m-top-workbench"
+                              allThreads={listedThreads}
+                              connectedEnvironmentIds={connectedEnvironmentIds}
+                              routeRowThreadKey={routeRowThreadKey}
+                              projectDisplayNameByKey={projectDisplayNameByKey}
+                              onNavigateToThread={navigateToThread}
+                              onOpenWorkflows={(target) => {
+                                if (isMobile) setOpenMobile(false);
+                                void router.navigate({
+                                  to: "/workflows",
+                                  search: target ?? {},
+                                });
+                              }}
+                              onSettleThread={attemptSettle}
+                            />,
+                          ]
+                        : []),
                     ];
                     for (const item of sidebarListItems) {
                       if (item.kind === "thread") {
-                        // Folders draw active rows in their own place below.
-                        if (projectFolders !== null && item.section === "active") continue;
+                        // Folders or custom categories draw active rows in their own place below.
+                        if ((projectFolders !== null || stardustCustomCatsActive) && item.section === "active") continue;
+                        if (isAllProjectsWorkbench && item.section === "working") continue;
                         items.push(renderThreadRow(threadByKey.get(item.key)!, item.section));
                         continue;
                       }
@@ -3679,6 +3724,17 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                           );
                           break;
                         case "active-placeholder":
+                          if (stardustCustomCatsActive) {
+                            items.push(
+                              <StardustAllProjectsCategories
+                                key="t3m-categories-workbench"
+                                activeThreads={[...activeThreads, ...workingThreads]}
+                                routeRowThreadKey={routeRowThreadKey}
+                                projectDisplayNameByKey={projectDisplayNameByKey}
+                                renderThreadRow={(t) => renderThreadRow(t, "active")}
+                              />,
+                            );
+                          }
                           items.push(
                             <SidebarSectionPlaceholder
                               key="active-placeholder"
@@ -3697,6 +3753,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                           );
                           break;
                         case "working-header":
+                          if (isAllProjectsWorkbench) break;
                           items.push(
                             <SidebarSectionHeader
                               key="working-shelf-header"
@@ -3716,7 +3773,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                             <SidebarSectionHeader
                               key="snoozed-shelf-header"
                               marker="snoozed-header"
-                              className={cn(workingThreads.length === 0 && "mt-auto")}
+                              className={cn((workingThreads.length === 0 || isAllProjectsWorkbench) && "mt-auto")}
                               label={gt("Snoozed", { $context: "sidebar section" })}
                               count={snoozedThreads.length}
                               toggle={{
@@ -3732,7 +3789,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                               key="settled-shelf-header"
                               marker="settled-header"
                               className={cn(
-                                workingThreads.length + snoozedThreads.length === 0 && "mt-auto",
+                                (isAllProjectsWorkbench ? snoozedThreads.length === 0 : workingThreads.length + snoozedThreads.length === 0) && "mt-auto",
                               )}
                               label={gt("Settled", { $context: "sidebar section" })}
                               count={settledCount}
@@ -3803,6 +3860,13 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
         </SidebarGroup>
       </SidebarContent>
       <SidebarChromeFooter />
+      <StardustSidebarCategoryModals
+        activeThreads={[...activeThreads, ...workingThreads].map((t) => ({
+          key: scopedThreadKey(scopeThreadRef(t.environmentId, t.id)),
+          title: t.title,
+          projectName: projectDisplayNameByKey.get(`${t.environmentId}:${t.projectId}`) ?? null,
+        }))}
+      />
     </SidebarFolderDrop>
   );
 }

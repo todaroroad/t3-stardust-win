@@ -1,4 +1,9 @@
 import {
+  SidebarCategorySuggestionError,
+  SidebarCategorySuggestionInput,
+  SidebarCategorySuggestionOutput,
+} from "./sidebarCategories.ts";
+import {
   OrchestrationV2SearchThreadError,
   OrchestrationV2SearchThreadInput,
   OrchestrationV2SearchThreadResult,
@@ -637,6 +642,7 @@ export const WS_METHODS = {
   serverRetryResourceTelemetry: "server.retryResourceTelemetry",
   serverCheckOtlpEndpoint: "server.checkOtlpEndpoint",
   serverListTextGeneratorModels: "server.listTextGeneratorModels",
+  serverSuggestSidebarCategories: "server.suggestSidebarCategories",
   serverPrepareTriage: "server.prepareTriage",
   serverSignalProcess: "server.signalProcess",
   serverReportClientActivity: "server.reportClientActivity",
@@ -2313,6 +2319,12 @@ const WsSubscribeTerminalMetadataRpc = Rpc.make(WS_METHODS.subscribeTerminalMeta
   stream: true,
 });
 
+export const WsServerSuggestSidebarCategoriesRpc = Rpc.make(WS_METHODS.serverSuggestSidebarCategories, {
+  payload: SidebarCategorySuggestionInput,
+  success: SidebarCategorySuggestionOutput,
+  error: Schema.Union([SidebarCategorySuggestionError, EnvironmentAuthorizationError]),
+});
+
 export const WsSubscribeServerConfigRpc = Rpc.make(WS_METHODS.subscribeServerConfig, {
   payload: Schema.Struct({
     /** Opt-in protects older clients that reject unknown theme event types. */
@@ -2731,6 +2743,7 @@ export const WsRpcGroup = RpcGroup.make(
   WsDeviceDetailRpc,
   WsDeviceActionRpc,
   WsSubscribeDeviceStateRpc,
+  WsServerSuggestSidebarCategoriesRpc,
   WsSubscribeServerConfigRpc,
   WsSubscribeServerLifecycleRpc,
   WsSubscribeAuthAccessRpc,

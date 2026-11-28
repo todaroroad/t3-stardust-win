@@ -679,6 +679,26 @@ function PoolSection({ pool, now }: { readonly pool: LimitPool; readonly now: nu
   );
 }
 
+function collectMissingAntigravityQuotaReminders(
+  presentations: Parameters<typeof collectLimitAccounts>[0],
+): readonly string[] {
+  const out: string[] = [];
+  const multiEnv = presentations.size > 1;
+  for (const presentation of presentations.values()) {
+    const envLabel = presentation.entry.target.label;
+    for (const provider of presentation.serverConfig?.providers ?? []) {
+      if (provider.driver !== "antigravity" || !provider.enabled || !provider.installed) continue;
+      const ul = provider.usageLimits;
+      const hasValidWindows = Boolean(ul && !ul.unavailable && ul.windows.length > 0);
+      if (hasValidWindows) continue;
+      const instName = provider.displayName?.trim() || "Antigravity";
+      const prefix = multiEnv ? `${envLabel} · ${instName}` : instName;
+      out.push(`${prefix}：配额暂未同步或登录态已过期 · 请使用该模型发送消息以刷新使用量`);
+    }
+  }
+  return out;
+}
+
 export function UsageLimitsPooled({
   presentations,
   now,
@@ -692,7 +712,12 @@ export function UsageLimitsPooled({
   const segmentPopoverActions = useRef<PopoverPrimitive.Root.Actions | null>(null);
   const pools = collectLimitPools(collectLimitAccounts(presentations), now);
   const quotaSources = collectHttpQuotaSources(presentations);
-  const notices = collectLimitNotices(presentations, m);
+  const baseNotices = collectLimitNotices(presentations, m);
+  const agReminders = collectMissingAntigravityQuotaReminders(presentations);
+  const notices = [
+    ...baseNotices.filter((n) => !n.includes("请使用该模型发送消息以刷新使用量")),
+    ...agReminders,
+  ];
   const externalLinks = collectExternalUsageLinks(presentations, m);
   return (
     <div className="flex flex-col gap-8">

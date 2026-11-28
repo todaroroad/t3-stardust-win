@@ -1,13 +1,10 @@
 /**
- * T3星辰版 Built-in Enhancer Suite v3.3.0 (Desktop Electron + Web + Installed PWA)
+ * T3M版 Built-in Enhancer Suite v4.0.0 (Desktop Electron + Web + Installed PWA)
  *
- * Built-in port of `t3-web-enhancer.user.js` (5ec2f7e0):
  *  1) Telegram-style Left Vertical Project Folder Rail (68px, pinned divider, dual-color live badges)
- *  2) Multi-surface Task Completion / Needs-Confirmation Notifications + 0-refresh Direct Jump
- *     (OS Desktop Notification with 16-char FNV-1a tag + Top-Center Dynamic Island Toast + Soft Audio Chime
- *      + Electron/PWA Taskbar Badge + Left-Rail Bell Inbox)
- *  3) Turn-Fold & Live Working Row Model + Token Usage Pills
- *  4) Web Context Menu "Filter by Project" auto-pinned to #1 + Hi-Res Vinyl Glass Audio Preview Deck CSS
+ *  2) Bottom Utility Actions: 分组 (Custom Sidebar Categories Dialog) · 提醒 (Removable Completed List) · 管理 (Centered Project Popup) · 添加
+ *  3) Native OS Notification Passthrough (zero custom OS/toast notification duplication so Windows click-to-jump works natively)
+ *  4) Turn-Fold & Live Working Row Model + Token Usage Pills + Hi-Res Vinyl Glass Audio Preview Deck CSS
  */
 (() => {
   'use strict';
@@ -20,7 +17,7 @@
     }
 
     const RAIL_WIDTH = 68;
-    const NOTIF_PREF_KEY = 't3code:web-enhancer:notify:v1';
+    const COMPLETED_LIST_KEY = 't3m:completed-threads:v1';
     const IS_ELECTRON = Boolean(window.desktopBridge);
 
     const MODEL_NAMES = {
@@ -82,6 +79,8 @@
 
     const LUCIDE_SVGS = {
       all: '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M8 9h8"/><path d="M8 13h5"/>',
+      layers:
+        '<path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/>',
       'folder-code':
         '<path d="M10 10.5 8 13l2 2.5"/><path d="m14 10.5 2 2.5-2 2.5"/><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z"/>',
       server:
@@ -112,14 +111,8 @@
       'folder-plus':
         '<path d="M12 10v6"/><path d="M9 13h6"/><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>',
       bell: '<path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/>',
-      'bell-off':
-        '<path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M17 17H4a1 1 0 0 1-.74-1.673C4.59 13.956 6 12.499 6 8a6 6 0 0 1 .258-1.742"/><path d="m2 2 20 20"/><path d="M8.668 3.01A6 6 0 0 1 18 8c0 2.687.77 4.653 1.707 6.05"/>',
       'check-circle':
         '<circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/>',
-      'alert-circle':
-        '<circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/>',
-      'arrow-up-right':
-        '<path d="M7 7h10v10"/><path d="M7 17 17 7"/>',
       x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
     };
 
@@ -135,19 +128,6 @@
         h = Math.imul(h, 16777619);
       }
       return h >>> 0;
-    }
-
-    /** 16-char FNV-1a 64-bit tag matching official threadNotifications.ts so Windows never drops 73-char tags */
-    function threadTag16(environmentId, threadId) {
-      const key = `${environmentId}:${threadId}`;
-      let hash = 0xcbf29ce484222325n;
-      const prime = 0x100000001b3n;
-      const mask = 0xffffffffffffffffn;
-      for (let i = 0; i < key.length; i++) {
-        hash ^= BigInt(key.charCodeAt(i));
-        hash = (hash * prime) & mask;
-      }
-      return hash.toString(16).padStart(16, '0');
     }
 
     function pickMonogramGlyph(title) {
@@ -213,161 +193,59 @@
       return effort ? `${base} (${effort})` : base;
     }
 
-    // ==================== Notification Preferences & Audio Chime ====================
-    function loadNotifPrefs() {
-      const defaults = {
-        enabled: true,
-        osBanner: true,
-        inAppToast: true,
-        sound: true,
-      };
+    // ==================== Removable Completed-Sessions List (Pure Notice List, Zero OS/Toast Duplication) ====================
+    function loadCompletedList() {
       try {
-        const raw = localStorage.getItem(NOTIF_PREF_KEY);
-        if (!raw) return defaults;
-        return { ...defaults, ...JSON.parse(raw) };
+        const raw = localStorage.getItem(COMPLETED_LIST_KEY);
+        if (!raw) return [];
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed.slice(0, 30) : [];
       } catch {
-        return defaults;
+        return [];
       }
     }
 
-    let notifPrefs = loadNotifPrefs();
+    let completedHistory = loadCompletedList();
 
-    function saveNotifPrefs() {
+    function saveCompletedList() {
       try {
-        localStorage.setItem(NOTIF_PREF_KEY, JSON.stringify(notifPrefs));
+        localStorage.setItem(COMPLETED_LIST_KEY, JSON.stringify(completedHistory));
       } catch {}
     }
 
-    let sharedAudioCtx = null;
-    function getAudioCtx() {
-      const Ctx = window.AudioContext || window.webkitAudioContext;
-      if (!Ctx) return null;
-      if (!sharedAudioCtx) {
-        try {
-          sharedAudioCtx = new Ctx();
-        } catch {
-          return null;
-        }
-      }
-      if (sharedAudioCtx.state === 'suspended') {
-        sharedAudioCtx.resume().catch(() => {});
-      }
-      return sharedAudioCtx;
-    }
-
-    if (IS_ELECTRON) {
-      getAudioCtx();
-    } else {
-      const unlockAudioOnce = () => {
-        getAudioCtx();
-      };
-      window.addEventListener('pointerdown', unlockAudioOnce, { once: true, passive: true });
-      window.addEventListener('keydown', unlockAudioOnce, { once: true, passive: true });
-    }
-
-    function playNotificationChime(kind = 'completed') {
-      if (!notifPrefs.enabled || !notifPrefs.sound) return;
-      const ctx = getAudioCtx();
-      if (!ctx) return;
-      try {
-        const now = ctx.currentTime;
-        const notes =
-          kind === 'failed'
-            ? [
-                { freq: 440, start: 0, dur: 0.14, gain: 0.09 },
-                { freq: 349.23, start: 0.11, dur: 0.2, gain: 0.09 },
-              ]
-            : kind === 'attention'
-              ? [
-                  { freq: 587.33, start: 0, dur: 0.12, gain: 0.09 },
-                  { freq: 783.99, start: 0.1, dur: 0.12, gain: 0.09 },
-                  { freq: 987.77, start: 0.2, dur: 0.22, gain: 0.1 },
-                ]
-              : [
-                  { freq: 587.33, start: 0, dur: 0.16, gain: 0.095 },
-                  { freq: 880.0, start: 0.1, dur: 0.28, gain: 0.11 },
-                ];
-
-        for (const n of notes) {
-          const osc = ctx.createOscillator();
-          const gain = ctx.createGain();
-          osc.type = 'sine';
-          osc.frequency.setValueAtTime(n.freq, now + n.start);
-          gain.gain.setValueAtTime(0.0001, now + n.start);
-          gain.gain.linearRampToValueAtTime(n.gain, now + n.start + 0.015);
-          gain.gain.exponentialRampToValueAtTime(0.0001, now + n.start + n.dur);
-          osc.connect(gain);
-          gain.connect(ctx.destination);
-          osc.start(now + n.start);
-          osc.stop(now + n.start + n.dur + 0.02);
-        }
-      } catch {}
-    }
-
-    const iconCache = new Map();
-    function buildOsNotificationIcon(colorHex = '#10b981', kind = 'completed') {
-      const key = `${colorHex}:${kind}`;
-      if (iconCache.has(key)) return iconCache.get(key);
-      try {
-        const c = document.createElement('canvas');
-        c.width = 128;
-        c.height = 128;
-        const g = c.getContext('2d');
-        g.fillStyle = '#0f172a';
-        g.beginPath();
-        g.roundRect(8, 8, 112, 112, 28);
-        g.fill();
-
-        g.fillStyle = colorHex;
-        g.beginPath();
-        g.arc(64, 64, 34, 0, Math.PI * 2);
-        g.fill();
-
-        g.strokeStyle = '#ffffff';
-        g.lineWidth = 8;
-        g.lineCap = 'round';
-        g.lineJoin = 'round';
-        g.beginPath();
-        if (kind === 'failed') {
-          g.moveTo(64, 48);
-          g.lineTo(64, 68);
-          g.moveTo(64, 80);
-          g.lineTo(64.1, 80);
-        } else {
-          g.moveTo(49, 65);
-          g.lineTo(59, 75);
-          g.lineTo(80, 54);
-        }
-        g.stroke();
-
-        const url = c.toDataURL('image/png');
-        iconCache.set(key, url);
-        return url;
-      } catch {
-        return undefined;
+    function refreshCompletedUi() {
+      saveCompletedList();
+      lastRailSignature = '';
+      renderProjectRail();
+      if (document.getElementById('t3-notif-popover')?.getAttribute('data-open') === '1') {
+        renderNotifPopoverContent();
       }
     }
 
-    function buildWindowsOverlayBadge(count) {
-      if (count <= 0) return null;
-      try {
-        const canvas = document.createElement('canvas');
-        canvas.width = canvas.height = 64;
-        const context = canvas.getContext('2d');
-        if (!context) return null;
-        context.fillStyle = '#10b981';
-        context.beginPath();
-        context.arc(32, 32, 28, 0, Math.PI * 2);
-        context.fill();
-        context.fillStyle = '#ffffff';
-        context.font = `600 ${count > 9 ? 30 : 40}px "Segoe UI", sans-serif`;
-        context.textAlign = 'center';
-        context.textBaseline = 'middle';
-        context.fillText(count > 9 ? '9+' : String(count), 32, 34);
-        return canvas.toDataURL('image/png');
-      } catch {
-        return null;
+    function addCompletedRecord(entry) {
+      // Replace existing record for same thread so the list never stacks duplicates for one conversation
+      completedHistory = completedHistory.filter((item) => item.threadId !== entry.threadId);
+      completedHistory.unshift({
+        ...entry,
+        uid: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        createdAt: Date.now(),
+      });
+      if (completedHistory.length > 30) completedHistory.length = 30;
+      refreshCompletedUi();
+    }
+
+    function removeCompletedItem(uid) {
+      const before = completedHistory.length;
+      completedHistory = completedHistory.filter((item) => item.uid !== uid);
+      if (completedHistory.length !== before) {
+        refreshCompletedUi();
       }
+    }
+
+    function clearAllCompletedItems() {
+      if (!completedHistory.length) return;
+      completedHistory = [];
+      refreshCompletedUi();
     }
 
     // ==================== Router & Direct Thread Jump ====================
@@ -391,60 +269,6 @@
         if (n.sibling) q.push(n.sibling);
       }
       return null;
-    }
-
-    const notifHistory = [];
-    const activeOsNotifs = new Map();
-    let baseDocTitle = document.title.replace(/^\(\d+\s*条待查看\)\s*/, '');
-
-    function syncUnreadBadgesAndTitle() {
-      const unreadCount = notifHistory.filter((n) => n.unread).length;
-
-      // 1. Update Taskbar Icon Badge (Desktop Electron + Installed PWA)
-      try {
-        if (window.desktopBridge?.setNotificationBadge) {
-          const image = unreadCount > 0 ? buildWindowsOverlayBadge(unreadCount) : null;
-          window.desktopBridge.setNotificationBadge({ count: unreadCount, image }).catch(() => {});
-        } else if (unreadCount > 0 && typeof navigator.setAppBadge === 'function') {
-          navigator.setAppBadge(unreadCount).catch(() => {});
-        } else if (unreadCount === 0 && typeof navigator.clearAppBadge === 'function') {
-          navigator.clearAppBadge().catch(() => {});
-        }
-      } catch {}
-
-      // 2. Update Window / Tab title prefix
-      const cleanCurrent = document.title.replace(/^\(\d+\s*条待查看\)\s*/, '');
-      if (cleanCurrent) baseDocTitle = cleanCurrent;
-      const targetTitle = unreadCount > 0 ? `(${unreadCount} 条待查看) ${baseDocTitle}` : baseDocTitle;
-      if (targetTitle && document.title !== targetTitle) {
-        document.title = targetTitle;
-      }
-
-      // 3. Refresh left rail & open popover
-      lastRailSignature = '';
-      renderProjectRail();
-      if (document.getElementById('t3-notif-popover')?.getAttribute('data-open') === '1') {
-        renderNotifPopoverContent();
-      }
-    }
-
-    function markThreadNotificationsRead(threadId) {
-      if (!threadId) return;
-      let changed = false;
-      for (const n of notifHistory) {
-        if (n.threadId === threadId && n.unread) {
-          n.unread = false;
-          changed = true;
-        }
-      }
-      const osN = activeOsNotifs.get(threadId);
-      if (osN) {
-        try {
-          osN.close();
-        } catch {}
-        activeOsNotifs.delete(threadId);
-      }
-      if (changed) syncUnreadBadgesAndTitle();
     }
 
     function jumpToTask(environmentId, threadId, projectValue) {
@@ -475,7 +299,6 @@
         window.location.assign(targetPath);
       }
 
-      markThreadNotificationsRead(threadId);
       closeNotifPopover();
     }
 
@@ -641,194 +464,11 @@
       return { byProjectId, totalActive, totalRunning };
     }
 
-    // ==================== In-App Toast & OS Notification Dispatcher ====================
-    function ensureToastStack() {
-      let stack = document.getElementById('t3-task-toast-stack');
-      if (!stack) {
-        stack = document.createElement('div');
-        stack.id = 't3-task-toast-stack';
-        stack.setAttribute('data-quota-ui-managed', 'true');
-        stack.setAttribute('aria-live', 'polite');
-        document.body.appendChild(stack);
-      }
-      return stack;
-    }
-
-    function dismissToastCard(uid) {
-      const el = document.querySelector(`#t3-task-toast-stack [data-toast-uid="${uid}"]`);
-      if (!el) return;
-      el.setAttribute('data-leaving', '1');
-      setTimeout(() => el.remove(), 180);
-    }
-
-    function spawnInAppToast(entry) {
-      if (!notifPrefs.enabled || !notifPrefs.inAppToast) return;
-      const stack = ensureToastStack();
-
-      const existing = [...stack.querySelectorAll('.t3-task-toast')];
-      if (existing.length >= 3) {
-        existing[0].remove();
-      }
-
-      const card = document.createElement('div');
-      card.className = `t3-task-toast t3-task-toast--${entry.kind}`;
-      card.setAttribute('role', 'status');
-      card.setAttribute('tabindex', '0');
-      card.setAttribute('data-toast-uid', entry.uid);
-
-      const statusLabel =
-        entry.kind === 'failed'
-          ? '任务执行异常'
-          : entry.kind === 'attention'
-            ? '等待你的确认'
-            : '任务已完成';
-      const statusIcon =
-        entry.kind === 'failed'
-          ? svgIcon('alert-circle', 18)
-          : entry.kind === 'attention'
-            ? svgIcon('bell', 18)
-            : svgIcon('check-circle', 18);
-
-      card.innerHTML = `
-        <div class="t3-toast-status-icon">${statusIcon}</div>
-        <div class="t3-toast-body">
-          <div class="t3-toast-meta">
-            <span class="t3-toast-status-text">${statusLabel}</span>
-            <span class="t3-toast-proj" style="--proj-color:${entry.colorHex}"></span>
-            ${entry.durationStr ? `<span class="t3-toast-dur">${entry.durationStr}</span>` : ''}
-          </div>
-          <div class="t3-toast-title"></div>
-          <div class="t3-toast-cta">点击直达该任务 ${svgIcon('arrow-up-right', 12)}</div>
-        </div>
-        <button type="button" class="t3-toast-close" aria-label="关闭提醒">${svgIcon('x', 14)}</button>
-      `;
-
-      card.querySelector('.t3-toast-proj').textContent = entry.projectTitle;
-      card.querySelector('.t3-toast-title').textContent = entry.title || '未命名会话';
-
-      card.querySelector('.t3-toast-close').addEventListener('click', (e) => {
-        e.stopPropagation();
-        dismissToastCard(entry.uid);
-      });
-
-      const handleJump = () => {
-        dismissToastCard(entry.uid);
-        jumpToTask(entry.environmentId, entry.threadId, entry.projectValue);
-      };
-      card.addEventListener('click', handleJump);
-      card.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          handleJump();
-        }
-      });
-
-      stack.appendChild(card);
-
-      let timer = setTimeout(() => dismissToastCard(entry.uid), 12000);
-      card.addEventListener('pointerenter', () => clearTimeout(timer));
-      card.addEventListener('pointerleave', () => {
-        clearTimeout(timer);
-        timer = setTimeout(() => dismissToastCard(entry.uid), 6000);
-      });
-    }
-
-    function spawnOsNotification(entry, forceEvenFocused = false) {
-      if (!notifPrefs.enabled || !notifPrefs.osBanner) return;
-      if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
-
-      const isViewingExactSameThread =
-        document.visibilityState === 'visible' &&
-        document.hasFocus() &&
-        window.location.pathname.includes(entry.threadId);
-
-      if (isViewingExactSameThread && !forceEvenFocused) return;
-
-      const statusPrefix =
-        entry.kind === 'failed'
-          ? '任务异常'
-          : entry.kind === 'attention'
-            ? '等待确认'
-            : '任务已完成';
-
-      try {
-        const prev = activeOsNotifs.get(entry.threadId);
-        if (prev) {
-          try {
-            prev.close();
-          } catch {}
-        }
-
-        const n = new Notification(`${statusPrefix} · ${entry.projectTitle}`, {
-          body: `${entry.title || '未命名会话'}${entry.durationStr ? `（耗时 ${entry.durationStr}）` : ''}\n点击直接跳转到该任务`,
-          tag: threadTag16(entry.environmentId, entry.threadId),
-          renotify: true,
-          icon: buildOsNotificationIcon(
-            entry.kind === 'failed' ? '#ef4444' : entry.kind === 'attention' ? '#f59e0b' : entry.colorHex,
-            entry.kind
-          ),
-        });
-
-        activeOsNotifs.set(entry.threadId, n);
-        n.onclick = (ev) => {
-          try {
-            ev.preventDefault();
-          } catch {}
-          try {
-            window.focus();
-          } catch {}
-          dismissToastCard(entry.uid);
-          jumpToTask(entry.environmentId, entry.threadId, entry.projectValue);
-          try {
-            n.close();
-          } catch {}
-        };
-        n.onclose = () => {
-          if (activeOsNotifs.get(entry.threadId) === n) {
-            activeOsNotifs.delete(entry.threadId);
-          }
-        };
-      } catch {}
-    }
-
-    function emitTaskNotification(entry, opts = {}) {
-      if (!notifPrefs.enabled && !opts.force) return;
-
-      const isViewingSame =
-        !opts.force &&
-        document.visibilityState === 'visible' &&
-        document.hasFocus() &&
-        window.location.pathname.includes(entry.threadId);
-
-      const record = {
-        ...entry,
-        uid: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-        createdAt: Date.now(),
-        unread: !isViewingSame,
-      };
-
-      notifHistory.unshift(record);
-      if (notifHistory.length > 20) notifHistory.length = 20;
-
-      playNotificationChime(record.kind);
-      spawnInAppToast(record);
-      spawnOsNotification(record, Boolean(opts.forceOs));
-      syncUnreadBadgesAndTitle();
-    }
-
-    // ==================== Background-Safe Task Completion Watcher ====================
+    // ==================== Completed-Session Recorder ====================
     const threadSnapshotMap = new Map();
     let hasBootstrappedThreads = false;
 
     function checkTaskTransitions() {
-      if (document.visibilityState === 'visible') {
-        for (const n of notifHistory) {
-          if (n.unread && window.location.pathname.includes(n.threadId)) {
-            markThreadNotificationsRead(n.threadId);
-          }
-        }
-      }
-
       const ctx = findSidebarState() || latestSidebarCtx;
       if (!ctx || !ctx.threads?.length) return;
       const { threads, projects, cbProps } = ctx;
@@ -844,35 +484,15 @@
           runStatus === 'running' ||
           runStatus === 'starting' ||
           t.runtime?.activeRunId != null;
-        const needsAttention = Boolean(
-          t.hasPendingApprovals || t.hasPendingUserInput || t.hasActionableProposedPlan
-        );
 
         const prev = threadSnapshotMap.get(t.id);
-        threadSnapshotMap.set(t.id, { isRunning, runId, runStatus, needsAttention });
+        threadSnapshotMap.set(t.id, { isRunning, runId, runStatus });
 
         if (!hasBootstrappedThreads) continue;
         if (!prev) continue;
 
-        const projVis = resolveProjectVisual(t.projectId, projects, cbItems);
-        const durationStr = fmtDuration(t.latestRun?.startedAt, t.latestRun?.completedAt);
-
-        if (!prev.needsAttention && needsAttention) {
-          emitTaskNotification({
-            kind: 'attention',
-            environmentId: t.environmentId,
-            threadId: t.id,
-            title: t.title || '未命名会话',
-            projectTitle: projVis.projectTitle,
-            projectValue: projVis.projectValue,
-            colorHex: '#f59e0b',
-            durationStr: '',
-          });
-          continue;
-        }
-
-        const finishedJustNow =
-          (prev.isRunning && !isRunning && (runStatus === 'completed' || runStatus === 'failed')) ||
+        const completedJustNow =
+          (prev.isRunning && !isRunning && runStatus === 'completed') ||
           (!prev.isRunning &&
             !isRunning &&
             runId &&
@@ -881,9 +501,10 @@
             t.latestRun?.completedAt &&
             Date.now() - Date.parse(t.latestRun.completedAt) < 15000);
 
-        if (finishedJustNow) {
-          emitTaskNotification({
-            kind: runStatus === 'failed' ? 'failed' : 'completed',
+        if (completedJustNow) {
+          const projVis = resolveProjectVisual(t.projectId, projects, cbItems);
+          const durationStr = fmtDuration(t.latestRun?.startedAt, t.latestRun?.completedAt);
+          addCompletedRecord({
             environmentId: t.environmentId,
             threadId: t.id,
             title: t.title || '未命名会话',
@@ -898,7 +519,7 @@
       hasBootstrappedThreads = true;
     }
 
-    // ==================== Notification Center Popover (Left Rail Bell) ====================
+    // ==================== Completed List Popover (Left Rail Bell) ====================
     const onDocPointerDown = (e) => {
       const pop = document.getElementById('t3-notif-popover');
       if (!pop || pop.getAttribute('data-open') !== '1') return;
@@ -913,7 +534,7 @@
         pop = document.createElement('div');
         pop.id = 't3-notif-popover';
         pop.setAttribute('data-quota-ui-managed', 'true');
-        pop.setAttribute('aria-label', '任务完成提醒中心');
+        pop.setAttribute('aria-label', '已完成对话列表');
         pop.setAttribute('data-open', '0');
         document.body.appendChild(pop);
       }
@@ -925,152 +546,61 @@
       if (pop) pop.setAttribute('data-open', '0');
     }
 
-    function triggerSampleTestNotification() {
-      const ctx = findSidebarState() || latestSidebarCtx;
-      const threads = ctx?.threads || [];
-      const projects = ctx?.projects || [];
-      const cbItems = Array.isArray(ctx?.cbProps?.items) ? ctx.cbProps.items : [];
-
-      const candidate =
-        threads.find(
-          (t) =>
-            t &&
-            !t.deletedAt &&
-            !t.archivedAt &&
-            !t.lineage?.parentThreadId &&
-            !window.location.pathname.includes(t.id)
-        ) ||
-        threads.find((t) => t && !t.deletedAt && !t.archivedAt && !t.lineage?.parentThreadId);
-
-      if (!candidate) return;
-      const projVis = resolveProjectVisual(candidate.projectId, projects, cbItems);
-      closeNotifPopover();
-      emitTaskNotification(
-        {
-          kind: 'completed',
-          environmentId: candidate.environmentId,
-          threadId: candidate.id,
-          title: candidate.title || '示例任务',
-          projectTitle: projVis.projectTitle,
-          projectValue: projVis.projectValue,
-          colorHex: projVis.colorHex,
-          durationStr: '18s',
-        },
-        { force: true, forceOs: true }
-      );
-    }
-
     function renderNotifPopoverContent() {
       const pop = ensureNotifPopover();
-      const perm = typeof Notification !== 'undefined' ? Notification.permission : 'unsupported';
-      const isStandalonePwa =
-        IS_ELECTRON ||
-        window.matchMedia?.('(display-mode: standalone), (display-mode: window-controls-overlay)')?.matches ||
-        false;
-
       pop.innerHTML = '';
 
       const header = document.createElement('div');
       header.className = 't3-np-header';
       header.innerHTML = `
         <div class="t3-np-title-wrap">
-          <span class="t3-np-title">任务完成提醒</span>
-          ${isStandalonePwa ? `<span class="t3-np-pwa-tag">${IS_ELECTRON ? '桌面端' : '应用模式'}</span>` : ''}
+          <span class="t3-np-title">已完成列表</span>
+          <span class="t3-np-pwa-tag">${completedHistory.length}</span>
         </div>
         <div class="t3-np-actions">
-          <button type="button" class="t3-np-link-btn" data-act="test">测试跳转</button>
-          <button type="button" class="t3-np-link-btn" data-act="clear">全部已读</button>
+          ${completedHistory.length > 0 ? '<button type="button" class="t3-np-link-btn" data-act="clear">清空全部</button>' : ''}
         </div>
       `;
-      header.querySelector('[data-act="test"]').addEventListener('click', () => {
-        triggerSampleTestNotification();
-      });
-      header.querySelector('[data-act="clear"]').addEventListener('click', () => {
-        notifHistory.forEach((n) => {
-          n.unread = false;
+      const clearBtn = header.querySelector('[data-act="clear"]');
+      if (clearBtn) {
+        clearBtn.addEventListener('click', () => {
+          clearAllCompletedItems();
         });
-        syncUnreadBadgesAndTitle();
-      });
+      }
       pop.appendChild(header);
-
-      if (perm === 'default') {
-        const permBar = document.createElement('button');
-        permBar.type = 'button';
-        permBar.className = 't3-np-perm-btn';
-        permBar.innerHTML = `${svgIcon('bell', 14)} <span>点击开启 Windows 系统桌面弹窗通知（网页与应用通用）</span>`;
-        permBar.addEventListener('click', async () => {
-          try {
-            await Notification.requestPermission();
-          } catch {}
-          renderNotifPopoverContent();
-        });
-        pop.appendChild(permBar);
-      } else if (perm === 'denied') {
-        const deniedBar = document.createElement('div');
-        deniedBar.className = 't3-np-perm-hint';
-        deniedBar.textContent = '系统通知已被禁用，请在设置中允许通知（页内横幅与提示音仍正常生效）。';
-        pop.appendChild(deniedBar);
-      }
-
-      const toggles = document.createElement('div');
-      toggles.className = 't3-np-toggles';
-      const defs = [
-        { key: 'enabled', label: '总开关' },
-        { key: 'inAppToast', label: '页内浮窗' },
-        { key: 'osBanner', label: '系统弹窗' },
-        { key: 'sound', label: '提示音' },
-      ];
-      for (const d of defs) {
-        const chip = document.createElement('button');
-        chip.type = 'button';
-        chip.className = `t3-np-chip${notifPrefs[d.key] ? ' is-on' : ''}`;
-        chip.setAttribute('aria-pressed', notifPrefs[d.key] ? 'true' : 'false');
-        chip.textContent = d.label;
-        chip.addEventListener('click', async () => {
-          notifPrefs[d.key] = !notifPrefs[d.key];
-          saveNotifPrefs();
-          if (d.key === 'osBanner' && notifPrefs.osBanner && typeof Notification !== 'undefined' && Notification.permission === 'default') {
-            try {
-              await Notification.requestPermission();
-            } catch {}
-          }
-          if (d.key === 'sound' && notifPrefs.sound) {
-            playNotificationChime('completed');
-          }
-          lastRailSignature = '';
-          renderProjectRail();
-          renderNotifPopoverContent();
-        });
-        toggles.appendChild(chip);
-      }
-      pop.appendChild(toggles);
 
       const list = document.createElement('div');
       list.className = 't3-np-list';
-      if (!notifHistory.length) {
+      if (!completedHistory.length) {
         const empty = document.createElement('div');
         empty.className = 't3-np-empty';
-        empty.textContent = '暂无最近完成记录 · 任务完成后将在此汇总，点击任意条目即可直达会话';
+        empty.textContent = '暂无已完成的对话记录 · 对话完成后将在此列出，可点击跳转或单独移除';
         list.appendChild(empty);
       } else {
-        for (const item of notifHistory) {
-          const row = document.createElement('button');
-          row.type = 'button';
-          row.className = `t3-np-item${item.unread ? ' is-unread' : ''}`;
+        for (const item of completedHistory) {
+          const row = document.createElement('div');
+          row.className = 't3-np-item';
           row.innerHTML = `
-            <span class="t3-np-item-dot" style="--dot-color:${item.kind === 'failed' ? '#ef4444' : item.colorHex}"></span>
-            <span class="t3-np-item-main">
-              <span class="t3-np-item-top">
-                <span class="t3-np-item-proj">${item.projectTitle}</span>
-                <span class="t3-np-item-time">${item.durationStr ? `${item.durationStr} · ` : ''}${fmtClockTime(item.createdAt)}</span>
+            <button type="button" class="t3-np-item-jump">
+              <span class="t3-np-item-dot" style="--dot-color:${item.colorHex || '#10b981'}"></span>
+              <span class="t3-np-item-main">
+                <span class="t3-np-item-top">
+                  <span class="t3-np-item-proj"></span>
+                  <span class="t3-np-item-time">${item.durationStr ? `${item.durationStr} · ` : ''}${fmtClockTime(item.createdAt)}</span>
+                </span>
+                <span class="t3-np-item-title"></span>
               </span>
-              <span class="t3-np-item-title"></span>
-            </span>
-            <span class="t3-np-item-go">${svgIcon('arrow-up-right', 14)}</span>
+            </button>
+            <button type="button" class="t3-np-item-remove" aria-label="移除该记录" title="从列表移除">${svgIcon('x', 13)}</button>
           `;
-          row.querySelector('.t3-np-item-title').textContent = item.title;
-          row.addEventListener('click', () => {
+          row.querySelector('.t3-np-item-proj').textContent = item.projectTitle || '未归类';
+          row.querySelector('.t3-np-item-title').textContent = item.title || '未命名会话';
+          row.querySelector('.t3-np-item-jump').addEventListener('click', () => {
             jumpToTask(item.environmentId, item.threadId, item.projectValue);
+          });
+          row.querySelector('.t3-np-item-remove').addEventListener('click', (e) => {
+            e.stopPropagation();
+            removeCompletedItem(item.uid);
           });
           list.appendChild(row);
         }
@@ -1205,9 +735,9 @@
 
     // ==================== Styles ====================
     function ensureStyles() {
-      if (document.getElementById('t3-stardust-enhancer-v330-style')) return;
+      if (document.getElementById('t3-stardust-enhancer-v400-style')) return;
       const style = document.createElement('style');
-      style.id = 't3-stardust-enhancer-v330-style';
+      style.id = 't3-stardust-enhancer-v400-style';
       style.textContent = `
         :root {
           --t3-rail-width: ${RAIL_WIDTH}px;
@@ -1228,6 +758,31 @@
           --t3-rail-badge-muted-bg: color-mix(in srgb, var(--sidebar-foreground, #e2e8f0) 20%, #0f172a);
           --t3-float-bg: #131d31;
           --t3-float-border: rgba(255, 255, 255, 0.15);
+        }
+
+        /* Centered Project Management Combobox Popup */
+        [data-slot="combobox-positioner"]:has([data-project-scope-popup="true"]) {
+          position: fixed !important;
+          inset: 0 !important;
+          transform: none !important;
+          width: 100vw !important;
+          height: 100vh !important;
+          display: flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+          padding: 20px !important;
+          background: rgba(2, 6, 23, 0.38) !important;
+          -webkit-backdrop-filter: blur(4px) !important;
+          backdrop-filter: blur(4px) !important;
+          pointer-events: none !important;
+          z-index: 60 !important;
+        }
+        [data-slot="combobox-positioner"]:has([data-project-scope-popup="true"]) > [data-project-scope-popup="true"] {
+          pointer-events: auto !important;
+          width: min(26rem, calc(100vw - 32px)) !important;
+          max-height: min(32rem, calc(100vh - 64px)) !important;
+          border-radius: 16px !important;
+          box-shadow: 0 24px 64px -12px rgba(0, 0, 0, 0.62) !important;
         }
 
         @media (min-width: 768px) {
@@ -1350,8 +905,8 @@
         }
 
         .t3-rail-btn.t3-rail-btn--compact {
-          min-height: 40px;
-          padding: 4px 2px 3px;
+          min-height: 38px;
+          padding: 3px 2px 3px;
           gap: 2px;
         }
 
@@ -1401,8 +956,8 @@
         }
 
         .t3-rail-btn--utility .t3-rail-icon-wrap {
-          width: 21px;
-          height: 21px;
+          width: 20px;
+          height: 20px;
           background: transparent;
           box-shadow: none;
           color: inherit;
@@ -1425,13 +980,16 @@
           letter-spacing: -0.02em;
         }
 
+        /* Prevent horizontal clipping on mixed English/Chinese labels like Summary... */
         .t3-rail-label {
           display: block;
           flex-shrink: 0;
-          width: 74px;
+          width: 72px;
+          max-width: 72px;
+          padding: 0 3px 1px;
+          box-sizing: border-box;
           font-size: 12px;
           line-height: 1.42;
-          padding-bottom: 1px;
           font-weight: 500;
           letter-spacing: -0.01em;
           white-space: nowrap;
@@ -1513,155 +1071,11 @@
           color: var(--muted-foreground);
         }
 
-        #t3-task-toast-stack {
-          position: fixed;
-          top: 12px;
-          left: 50%;
-          transform: translateX(-50%);
-          z-index: 2147483644;
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-          width: min(356px, calc(100vw - 32px));
-          pointer-events: none;
-          -webkit-app-region: no-drag;
-        }
-
-        .t3-task-toast {
-          pointer-events: auto;
-          display: flex;
-          align-items: flex-start;
-          gap: 10px;
-          padding: 11px 13px;
-          border-radius: 15px;
-          background: var(--t3-float-bg);
-          border: 1px solid var(--t3-float-border);
-          box-shadow: 0 16px 40px -8px rgba(0, 0, 0, 0.52), inset 0 1px 0 rgba(255, 255, 255, 0.08);
-          -webkit-backdrop-filter: blur(24px) saturate(1.5);
-          backdrop-filter: blur(24px) saturate(1.5);
-          cursor: pointer;
-          outline: none;
-          animation: t3ToastIn 210ms cubic-bezier(0.23, 1, 0.32, 1) both;
-          transition: transform 140ms cubic-bezier(0.23, 1, 0.32, 1), opacity 160ms ease, border-color 140ms ease;
-        }
-        .t3-task-toast:hover {
-          transform: translateY(-1px);
-          border-color: color-mix(in srgb, var(--primary) 50%, var(--t3-float-border));
-        }
-        .t3-task-toast:active {
-          transform: scale(0.98);
-        }
-        .t3-task-toast:focus-visible {
-          box-shadow: 0 0 0 2px var(--focus, var(--primary)), 0 16px 40px -8px rgba(0, 0, 0, 0.52);
-        }
-        .t3-task-toast[data-leaving="1"] {
-          opacity: 0;
-          transform: translateY(-8px) scale(0.97);
-        }
-
-        @keyframes t3ToastIn {
-          from { transform: translateY(-8px) scale(0.97); }
-          to { transform: translateY(0) scale(1); }
-        }
-
-        .t3-toast-status-icon {
-          width: 30px;
-          height: 30px;
-          border-radius: 9px;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          flex-shrink: 0;
-          color: #10b981;
-          background: color-mix(in srgb, #10b981 15%, transparent);
-        }
-        .t3-task-toast--attention .t3-toast-status-icon {
-          color: #f59e0b;
-          background: color-mix(in srgb, #f59e0b 16%, transparent);
-        }
-        .t3-task-toast--failed .t3-toast-status-icon {
-          color: #ef4444;
-          background: color-mix(in srgb, #ef4444 16%, transparent);
-        }
-
-        .t3-toast-body {
-          flex: 1 1 0%;
-          min-width: 0;
-          display: flex;
-          flex-direction: column;
-          gap: 3px;
-        }
-        .t3-toast-meta {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          font-size: 11px;
-          line-height: 1.3;
-        }
-        .t3-toast-status-text {
-          font-weight: 650;
-          color: var(--foreground);
-        }
-        .t3-toast-proj {
-          padding: 1px 6px;
-          border-radius: 999px;
-          font-size: 10.5px;
-          font-weight: 500;
-          color: var(--proj-color, var(--primary));
-          background: color-mix(in srgb, var(--proj-color, var(--primary)) 14%, transparent);
-          max-width: 120px;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-        }
-        .t3-toast-dur {
-          margin-left: auto;
-          font-size: 10.5px;
-          color: var(--muted-foreground);
-          font-variant-numeric: tabular-nums;
-        }
-        .t3-toast-title {
-          font-size: 12.5px;
-          line-height: 1.38;
-          font-weight: 500;
-          color: var(--foreground);
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-        }
-        .t3-toast-cta {
-          display: inline-flex;
-          align-items: center;
-          gap: 3px;
-          font-size: 11px;
-          font-weight: 500;
-          color: var(--primary);
-          margin-top: 1px;
-        }
-        .t3-toast-close {
-          width: 22px;
-          height: 22px;
-          border: 0;
-          border-radius: 6px;
-          background: transparent;
-          color: var(--muted-foreground);
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          cursor: pointer;
-          flex-shrink: 0;
-          padding: 0;
-        }
-        .t3-toast-close:hover {
-          background: color-mix(in srgb, var(--foreground) 10%, transparent);
-          color: var(--foreground);
-        }
-
         #t3-notif-popover {
           position: fixed;
           z-index: 2147483643;
-          width: 326px;
-          max-height: min(460px, calc(100vh - 32px));
+          width: 320px;
+          max-height: min(440px, calc(100vh - 32px));
           display: none;
           flex-direction: column;
           border-radius: 15px;
@@ -1693,8 +1107,9 @@
           font-weight: 650;
         }
         .t3-np-pwa-tag {
-          font-size: 10px;
-          font-weight: 600;
+          font-size: 10.5px;
+          font-weight: 650;
+          font-variant-numeric: tabular-nums;
           padding: 1px 6px;
           border-radius: 999px;
           color: #10b981;
@@ -1708,65 +1123,17 @@
         .t3-np-link-btn {
           border: 0;
           background: transparent;
-          padding: 2px 4px;
+          padding: 2px 6px;
           border-radius: 5px;
           font-size: 11.5px;
           font-weight: 500;
-          color: var(--primary);
+          color: var(--muted-foreground);
           cursor: pointer;
+          transition: background-color 120ms ease, color 120ms ease;
         }
         .t3-np-link-btn:hover {
-          background: color-mix(in srgb, var(--primary) 12%, transparent);
-        }
-
-        .t3-np-perm-btn {
-          margin: 8px 10px 2px;
-          padding: 7px 10px;
-          border-radius: 9px;
-          border: 1px solid color-mix(in srgb, var(--primary) 35%, transparent);
-          background: color-mix(in srgb, var(--primary) 12%, transparent);
           color: var(--foreground);
-          font-size: 11.5px;
-          font-weight: 500;
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          cursor: pointer;
-          text-align: left;
-        }
-        .t3-np-perm-btn:hover {
-          background: color-mix(in srgb, var(--primary) 18%, transparent);
-        }
-        .t3-np-perm-hint {
-          margin: 8px 12px 2px;
-          font-size: 11px;
-          line-height: 1.4;
-          color: var(--muted-foreground);
-        }
-
-        .t3-np-toggles {
-          display: grid;
-          grid-template-columns: repeat(4, 1fr);
-          gap: 5px;
-          padding: 8px 10px;
-          border-bottom: 1px solid color-mix(in srgb, var(--border) 65%, transparent);
-        }
-        .t3-np-chip {
-          padding: 5px 4px;
-          border-radius: 8px;
-          border: 1px solid color-mix(in srgb, var(--foreground) 10%, transparent);
-          background: color-mix(in srgb, var(--foreground) 4%, transparent);
-          color: var(--muted-foreground);
-          font-size: 11px;
-          font-weight: 500;
-          cursor: pointer;
-          transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
-        }
-        .t3-np-chip.is-on {
-          color: var(--foreground);
-          background: color-mix(in srgb, var(--primary) 16%, transparent);
-          border-color: color-mix(in srgb, var(--primary) 42%, transparent);
-          font-weight: 600;
+          background: color-mix(in srgb, var(--foreground) 8%, transparent);
         }
 
         .t3-np-list {
@@ -1789,24 +1156,26 @@
           width: 100%;
           display: flex;
           align-items: center;
-          gap: 9px;
-          padding: 8px 9px;
-          border: 0;
+          gap: 4px;
+          padding: 4px 6px 4px 8px;
           border-radius: 10px;
-          background: transparent;
-          color: var(--foreground);
-          text-align: left;
-          cursor: pointer;
-          transition: background-color 120ms ease, transform 90ms ease;
+          transition: background-color 120ms ease;
         }
         .t3-np-item:hover {
           background: color-mix(in srgb, var(--foreground) 7%, transparent);
         }
-        .t3-np-item:active {
-          transform: scale(0.985);
-        }
-        .t3-np-item.is-unread {
-          background: color-mix(in srgb, #10b981 8%, transparent);
+        .t3-np-item-jump {
+          flex: 1 1 0%;
+          min-width: 0;
+          display: flex;
+          align-items: center;
+          gap: 9px;
+          padding: 4px 2px;
+          border: 0;
+          background: transparent;
+          color: var(--foreground);
+          text-align: left;
+          cursor: pointer;
         }
         .t3-np-item-dot {
           width: 7px;
@@ -1814,11 +1183,6 @@
           border-radius: 999px;
           flex-shrink: 0;
           background: var(--dot-color, #10b981);
-          opacity: 0.35;
-        }
-        .t3-np-item.is-unread .t3-np-item-dot {
-          opacity: 1;
-          box-shadow: 0 0 0 3px color-mix(in srgb, var(--dot-color, #10b981) 22%, transparent);
         }
         .t3-np-item-main {
           flex: 1 1 0%;
@@ -1855,19 +1219,33 @@
           text-overflow: ellipsis;
           white-space: nowrap;
         }
-        .t3-np-item-go {
+        .t3-np-item-remove {
+          width: 24px;
+          height: 24px;
+          border: 0;
+          border-radius: 6px;
+          background: transparent;
           color: var(--muted-foreground);
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
           flex-shrink: 0;
+          cursor: pointer;
+          opacity: 0.65;
+          transition: opacity 120ms ease, background-color 120ms ease, color 120ms ease;
         }
-        .t3-np-item:hover .t3-np-item-go {
-          color: var(--primary);
+        .t3-np-item:hover .t3-np-item-remove {
+          opacity: 1;
+        }
+        .t3-np-item-remove:hover {
+          background: color-mix(in srgb, var(--foreground) 12%, transparent);
+          color: var(--foreground);
         }
 
         @media (prefers-reduced-motion: reduce) {
           .t3-rail-btn,
           .t3-rail-icon-wrap,
           #t3-rail-tooltip,
-          .t3-task-toast,
           #t3-notif-popover {
             transition: none !important;
             animation: none !important;
@@ -2212,7 +1590,7 @@
       if (selectedSet.size === 0) selectedSet.add('all');
 
       const stats = computeProjectStats(projects, threads);
-      const unreadNotifCount = notifHistory.filter((n) => n.unread).length;
+      const completedCount = completedHistory.length;
 
       const enriched = projectItems.map((it) => {
         const rec = matchProjectRecord(it, projects);
@@ -2245,8 +1623,7 @@
         sel: [...selectedSet],
         totalA: stats.totalActive,
         totalR: stats.totalRunning,
-        unreadN: unreadNotifCount,
-        notifOn: notifPrefs.enabled,
+        doneN: completedCount,
         list: enriched.map((e) => [e.value, e.label, e.pinned ? 1 : 0, e.colorHex, e.activeCount, e.runningCount]),
       });
 
@@ -2372,32 +1749,41 @@
       rail.appendChild(scrollBox);
       if (prevScrollTop > 0) scrollBox.scrollTop = prevScrollTop;
 
-      // 3. Bottom sticky utility actions ("提醒" + "管理" + "添加")
+      // 3. Bottom sticky utility actions ("分组" + "提醒" + "管理" + "添加")
       const bottomBox = document.createElement('div');
       bottomBox.className = 't3-rail-bottom';
 
-      const permState = typeof Notification !== 'undefined' ? Notification.permission : 'unsupported';
-      const notifTipSub = !notifPrefs.enabled
-        ? '已关闭 · 点击配置'
-        : unreadNotifCount > 0
-          ? `${unreadNotifCount} 条新完成 · 点击查看并直达`
-          : permState === 'default'
-            ? '点击开启系统桌面弹窗通知'
-            : '已开启 · 完成后点击通知直达任务';
+      bottomBox.appendChild(
+        createRailButton({
+          value: '__group__',
+          label: '分组',
+          shortLabel: '分组',
+          ariaLabel: '自定义侧边栏分类与关键词',
+          tipTitle: '侧边栏分类设置',
+          tipSub: '自定义标签 · 关键词 · 星标模型建议',
+          compact: true,
+          utility: true,
+          iconSvg: svgIcon('layers', 16),
+          badgeCount: 0,
+          onClick: () => {
+            window.dispatchEvent(new CustomEvent('t3m:open-category-settings'));
+          },
+        })
+      );
 
       bottomBox.appendChild(
         createRailButton({
           value: '__notify__',
           label: '提醒',
           shortLabel: '提醒',
-          ariaLabel: `任务完成提醒${unreadNotifCount > 0 ? `，${unreadNotifCount} 条未读` : ''}`,
-          tipTitle: '任务完成提醒',
-          tipSub: notifTipSub,
+          ariaLabel: `已完成对话列表${completedCount > 0 ? `，共 ${completedCount} 条` : ''}`,
+          tipTitle: '已完成对话列表',
+          tipSub: completedCount > 0 ? `${completedCount} 条记录 · 点击查看或移除` : '仅汇总已完成会话，可随时移除',
           compact: true,
           utility: true,
-          notifActive: notifPrefs.enabled && unreadNotifCount > 0,
-          iconSvg: svgIcon(notifPrefs.enabled ? 'bell' : 'bell-off', 16),
-          badgeCount: unreadNotifCount,
+          notifActive: completedCount > 0,
+          iconSvg: svgIcon('bell', 16),
+          badgeCount: completedCount,
           badgeVariant: 'done',
           onClick: (_e, btnEl) => toggleNotifPopover(btnEl),
         })

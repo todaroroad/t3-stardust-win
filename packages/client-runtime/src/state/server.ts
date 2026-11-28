@@ -2067,6 +2067,14 @@ export function createServerEnvironmentAtoms<R, E>(
       label: "environment-data:server:check-secret-source",
       tag: WS_METHODS.serverCheckSecretSource,
     }),
+    suggestSidebarCategories: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:server:suggest-sidebar-categories",
+      tag: WS_METHODS.serverSuggestSidebarCategories,
+      concurrency: {
+        mode: "singleFlight",
+        key: ({ environmentId }) => environmentId,
+      },
+    }),
     listTextGeneratorModels: createEnvironmentRpcCommand(runtime, {
       label: "environment-data:server:list-text-generator-models",
       tag: WS_METHODS.serverListTextGeneratorModels,

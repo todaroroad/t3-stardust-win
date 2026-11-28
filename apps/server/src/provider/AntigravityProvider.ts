@@ -201,6 +201,10 @@ interface AntigravityProviderOptions {
   /** Modes the last session advertised, saved because initialize alone does not report them. */
   readonly rememberedRuntimeModes?: ReadonlyArray<RuntimeMode>;
   readonly rememberRuntimeModes?: (modes: ReadonlyArray<RuntimeMode>) => Effect.Effect<void>;
+  readonly usageProbe?: {
+    readonly probe: Effect.Effect<ServerProvider["usageLimits"]>;
+    readonly clear: Effect.Effect<void>;
+  };
 }
 
 const RUNTIME_MODES_WITHOUT_AUTO = [
@@ -324,11 +328,20 @@ export const makeAntigravityProvider = Effect.fn("makeAntigravityProvider")(func
               : `Antigravity did not respond to its local health check within ${timeoutMs / 1_000} seconds.`;
     const supportsTextGeneration =
       initialized !== undefined ? yield* options.supportsTextGeneration : false;
+    const probedUsageLimits =
+      initialized !== undefined && options.usageProbe
+        ? yield* options.usageProbe.probe
+        : undefined;
+    const hasLiveQuotaWindows = Boolean(
+      probedUsageLimits &&
+        !probedUsageLimits.unavailable &&
+        probedUsageLimits.windows.length > 0,
+    );
     const updatedAt = DateTime.formatIso(yield* DateTime.now);
     const applyCheck = (state: AntigravityProviderState) => {
       if (state.authRevision !== before.authRevision) return state;
       const { message: _previousMessage, ...draft } = state.draft;
-      const authenticated = draft.auth.status === "authenticated";
+      const authenticated = draft.auth.status === "authenticated" || (hasLiveQuotaWindows && draft.auth.status === "unknown");
       const message =
         errorMessage ??
         (authenticated
@@ -345,6 +358,16 @@ export const makeAntigravityProvider = Effect.fn("makeAntigravityProvider")(func
           version: version === "unknown" ? draft.version : version || draft.version,
           status: errorMessage ? "error" : authenticated ? "ready" : "warning",
           checkedAt: updatedAt,
+          ...(hasLiveQuotaWindows && draft.auth.status === "unknown"
+            ? {
+                auth: {
+                  status: "authenticated" as const,
+                  type: options.auth?.type ?? "oauth-personal",
+                  label: options.auth?.label ?? "Google account",
+                },
+              }
+            : {}),
+          ...(probedUsageLimits ? { usageLimits: probedUsageLimits } : {}),
           ...(missingInstallation
             ? {
                 models: [],
@@ -387,6 +410,12 @@ export const makeAntigravityProvider = Effect.fn("makeAntigravityProvider")(func
     haveSettingsChanged: () => false,
     initialSnapshot: () => getSnapshot,
     checkProvider: checkProvider(),
+    ...(options.usageProbe
+      ? {
+          checkUsageLimits: options.usageProbe.probe,
+          invalidateUsageCache: options.usageProbe.clear,
+        }
+      : {}),
     enrichSnapshot: ({ publishSnapshot }) =>
       SubscriptionRef.changes(metadata).pipe(
         Stream.runForEach((state) =>
@@ -461,6 +490,20 @@ export const makeAntigravityProvider = Effect.fn("makeAntigravityProvider")(func
       return [draft.supportedRuntimeModes, next] as const;
     });
     yield* rememberRuntimeModes(previousModes, supportedRuntimeModes);
+    if (options.usageProbe) {
+      yield* options.usageProbe.clear.pipe(
+        Effect.andThen(options.usageProbe.probe),
+        Effect.flatMap((limits) =>
+          limits
+            ? SubscriptionRef.update(metadata, (st) => ({
+                ...st,
+                draft: { ...st.draft, usageLimits: limits },
+              }))
+            : Effect.void,
+        ),
+        Effect.forkDetach,
+      );
+    }
   });
 
   const onConfigOptionsUpdated = Effect.fn("AntigravityProvider.onConfigOptionsUpdated")(function* (
@@ -495,7 +538,7 @@ export const makeAntigravityProvider = Effect.fn("makeAntigravityProvider")(func
       return {
         ...state,
         draft: {
-          ...state.draft,
+          ...clearedDraft,
           slashCommands,
           ...(cwd
             ? {
@@ -521,8 +564,13 @@ export const makeAntigravityProvider = Effect.fn("makeAntigravityProvider")(func
 
   const clearAccountMetadata = Effect.fn("AntigravityProvider.clearAccountMetadata")(function* () {
     if (!settings.enabled) return;
+    if (options.usageProbe) {
+      yield* options.usageProbe.clear;
+    }
     const updatedAt = DateTime.formatIso(yield* DateTime.now);
-    const previousModes = yield* SubscriptionRef.modify(metadata, (state) => [
+    const previousModes = yield* SubscriptionRef.modify(metadata, (state) => {
+      const { usageLimits: _prevUsageLimits, ...clearedDraft } = state.draft;
+      return [
       state.draft.supportedRuntimeModes,
       {
         authRevision: state.authRevision + 1,
@@ -543,7 +591,8 @@ export const makeAntigravityProvider = Effect.fn("makeAntigravityProvider")(func
           supportsTextGeneration: false,
         },
       } satisfies AntigravityProviderState,
-    ]);
+      ] as const;
+    });
     yield* rememberRuntimeModes(previousModes, RUNTIME_MODES_WITHOUT_AUTO);
     discoveredSkills.clear();
     workspaceCommands.clear();

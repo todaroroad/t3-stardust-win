@@ -489,22 +489,22 @@ jobs:
         run: |
           set -euo pipefail
           tag="v${RELEASE_VERSION}"
-          notes="T3星辰版 v${RELEASE_VERSION} Windows x64 纯净增强版（100% 基于 T3 官方正式版 pingdotgg/t3code@${OFFICIAL_TAG} / ${OFFICIAL_SHA:0:7}，移除旧第三方分支冗余代码）：
-          - 左侧 Telegram 式竖排项目导航栏（68px，置顶分割线 + 彩色图标 + 双色实时会话角标 + 管理/添加快捷入口）
-          - 任务完成 / 待确认多端提醒直达（Windows 桌面通知 + 顶部毛玻璃灵动浮窗 + 柔和提示音 + 任务栏角标 + 历史收件箱，点击毫秒级直达会话，桌面端与 Web/PWA 通用）
-          - 全链路用量与配额美化：星舰曲速推理滑块、顶栏多账号常驻额度胶囊、模型选择器剩 XX% 徽章、耗时行模型与 Token 胶囊、三芒星思考徽章、双列限额燃尽预测与 ¥/$ 实时换算
-          - 独立安装共存（com.todaroroad.t3stardust）：与官方 T3 Code (Beta) 并排共存互不覆盖，支持应用内 electron-updater 差分热更新"
+          notes="T3M版 v${RELEASE_VERSION} Windows x64 纯净增强版（基于 T3 官方正式版 pingdotgg/t3code@${OFFICIAL_TAG} / ${OFFICIAL_SHA:0:7}）：
+          - 品牌焕新为 T3M版 + 完整恢复深蓝炫彩 T3✦ 窗口/任务栏/应用图标（解包独立 icon.ico）
+          - 「所有项目」三段式工作台（顶部运行中/待处理/工作流 + 中部自定义分类 + 底部已收尾）与左侧「分组」弹窗（预设/关键词编辑/仅列星标模型建议归类）
+          - 管理项目弹窗视口正中显示；移除重复自定义桌面通知，恢复原生通知点击直达，「提醒」精简为可逐条移除的已完成列表
+          - 恢复 Antigravity（反重力）实时配额探针与过期刷新提示；底部双段交互统计栏（会话概览 + 令牌与缓存）与不挡字的实时执行动态胶囊"
 
           if ! gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release create "$tag" release-publish/* \
               --repo "$GITHUB_REPOSITORY" \
-              --title "T3星辰版 v${RELEASE_VERSION} for Windows (x64) [纯净官方 ${OFFICIAL_TAG} 增强版]" \
+              --title "T3M版 v${RELEASE_VERSION} for Windows (x64) [纯净官方 ${OFFICIAL_TAG} 增强版]" \
               --notes "$notes" \
               --latest
           else
             gh release upload "$tag" release-publish/* --repo "$GITHUB_REPOSITORY" --clobber
             gh release edit "$tag" --repo "$GITHUB_REPOSITORY" \
-              --title "T3星辰版 v${RELEASE_VERSION} for Windows (x64) [纯净官方 ${OFFICIAL_TAG} 增强版]" \
+              --title "T3M版 v${RELEASE_VERSION} for Windows (x64) [纯净官方 ${OFFICIAL_TAG} 增强版]" \
               --notes "$notes" \
               --latest
           fi
