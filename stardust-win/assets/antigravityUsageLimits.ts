@@ -299,6 +299,38 @@ export const antigravityAccountFingerprint = (userInfo: unknown) =>
 export const antigravitySummaryWindows = (response: unknown, requestedAt: number) =>
   decodeSummary(response).pipe(Effect.map((summary) => summaryWindows(summary, requestedAt)));
 
+function antigravityFamilyOrder(window: ServerProviderUsageWindow): number {
+  const id = window.id.toLowerCase();
+  const label = window.label.toLowerCase();
+  if (id === "gemini-5h" || id === "gemini-weekly" || label.startsWith("gemini ·")) return 0;
+  if (id.startsWith("gemini") || label.startsWith("gemini")) return 1;
+  if (
+    id.startsWith("3p-") ||
+    id.startsWith("claude") ||
+    id.startsWith("gpt") ||
+    label.includes("claude") ||
+    label.includes("gpt")
+  ) {
+    return 2;
+  }
+  return 3;
+}
+
+function antigravityPeriodOrder(window: ServerProviderUsageWindow): number {
+  if (window.kind === "session" || /5[- ]?hour|\b5h\b/i.test(window.label)) return 0;
+  if (window.kind === "weekly" || /weekly|7[- ]?day/i.test(window.label)) return 1;
+  if (window.kind === "monthly") return 2;
+  return 3;
+}
+
+function sortAntigravityWindows(windows: ServerProviderUsageWindow[]): ServerProviderUsageWindow[] {
+  return [...windows].sort(
+    (a, b) =>
+      antigravityFamilyOrder(a) - antigravityFamilyOrder(b) ||
+      antigravityPeriodOrder(a) - antigravityPeriodOrder(b),
+  );
+}
+
 function summaryWindows(summary: typeof Summary.Type, requestedAt: number) {
   const windows = new Map<string, ServerProviderUsageWindow>();
   const groups = summary.groups?.some((group) => group.buckets?.length)
@@ -329,7 +361,7 @@ function summaryWindows(summary: typeof Summary.Type, requestedAt: number) {
       if (window) windows.set(window.id, window);
     }
   }
-  return [...windows.values()];
+  return sortAntigravityWindows([...windows.values()]);
 }
 
 function modelWindows(models: typeof Models.Type) {
@@ -361,7 +393,7 @@ function modelWindows(models: typeof Models.Type) {
       if (!previous || window.usedPercent > previous.usedPercent) windows.set(window.id, window);
     }
   }
-  return [...windows.values()];
+  return sortAntigravityWindows([...windows.values()]);
 }
 
 export const makeAntigravityUsageProbe = Effect.fn("makeAntigravityUsageProbe")(function* (input: {

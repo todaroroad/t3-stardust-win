@@ -804,6 +804,55 @@ export const prepareAntigravityProfile = Effect.fn("prepareAntigravityProfile")(
   assertIncludes(src, "if (!ul) continue;", rel);
 }
 
+// 4c-2. packages/shared/src/usageLimits.ts -> Keep Antigravity windows grouped by family (Gemini [5h, Weekly] -> Claude/GPT [5h, Weekly])
+{
+  const rel = "packages/shared/src/usageLimits.ts";
+  let src = readText(rel);
+  if (!src.includes("antigravityPoolWindowRank")) {
+    assertIncludes(src, 'export function displayLimitWindows(pool: LimitPool) {\n  if (pool.driver !== "cursor") return pool.windows;', rel);
+    src = src.replace(
+      'export function displayLimitWindows(pool: LimitPool) {\n  if (pool.driver !== "cursor") return pool.windows;',
+      `function antigravityPoolWindowRank(
+  window: Pick<LimitPoolWindow, "id" | "kind" | "label">,
+): number {
+  const id = window.id.toLowerCase();
+  const label = window.label.toLowerCase();
+  const familyRank =
+    id === "gemini-5h" || id === "gemini-weekly" || label.startsWith("gemini ·")
+      ? 0
+      : id.startsWith("gemini") || label.startsWith("gemini")
+        ? 1
+        : id.startsWith("3p-") ||
+            id.startsWith("claude") ||
+            id.startsWith("gpt") ||
+            label.includes("claude") ||
+            label.includes("gpt")
+          ? 2
+          : 3;
+  const periodRank =
+    window.kind === "session"
+      ? 0
+      : window.kind === "weekly"
+        ? 1
+        : window.kind === "monthly"
+          ? 2
+          : 3;
+  return familyRank * 10 + periodRank;
+}
+
+export function displayLimitWindows(pool: LimitPool) {
+  if (pool.driver === "antigravity") {
+    return [...pool.windows].sort(
+      (left, right) => antigravityPoolWindowRank(left) - antigravityPoolWindowRank(right),
+    );
+  }
+  if (pool.driver !== "cursor") return pool.windows;`,
+    );
+    writeText(rel, src);
+  }
+  assertIncludes(src, "antigravityPoolWindowRank", rel);
+}
+
 // ---------------------------------------------------------------------------
 // 5. Starred-Model Sidebar Category Suggestion RPC (`server.suggestSidebarCategories`)
 // ---------------------------------------------------------------------------
@@ -1578,7 +1627,7 @@ copyAsset(
   assertIncludes(src, "trimmedMono", rel);
 }
 
-// 7d. apps/web/src/components/chat/ThreadDetailsCard.tsx & ThreadDetailsPanel.tsx -> Inline scrollable Artifacts section
+// 7d. apps/web/src/components/chat/ThreadDetailsCard.tsx & ThreadDetailsPanel.tsx -> Inline scrollable Artifacts section & keep-open guard
 {
   const cardRel = "apps/web/src/components/chat/ThreadDetailsCard.tsx";
   let cardSrc = readText(cardRel);
@@ -1590,7 +1639,30 @@ copyAsset(
     );
     writeText(cardRel, cardSrc);
   }
+  if (!cardSrc.includes("__t3mKeepDetailsPopoverUntil")) {
+    assertIncludes(
+      cardSrc,
+      '        if (!open && target instanceof Element && target.closest("[data-thread-find-bar]")) {\n          details.cancel();\n          return;\n        }',
+      cardRel,
+    );
+    cardSrc = cardSrc.replace(
+      '        if (!open && target instanceof Element && target.closest("[data-thread-find-bar]")) {\n          details.cancel();\n          return;\n        }',
+      `        const keepUntil =
+          (window as unknown as { __t3mKeepDetailsPopoverUntil?: number })
+            .__t3mKeepDetailsPopoverUntil ?? 0;
+        if (
+          !open &&
+          ((target instanceof Element && target.closest("[data-thread-find-bar]")) ||
+            (details.reason === "focus-out" && keepUntil > Date.now()))
+        ) {
+          details.cancel();
+          return;
+        }`,
+    );
+    writeText(cardRel, cardSrc);
+  }
   assertIncludes(cardSrc, "[data-thread-artifacts-list]", cardRel);
+  assertIncludes(cardSrc, "__t3mKeepDetailsPopoverUntil", cardRel);
 
   const panelRel = "apps/web/src/components/chat/ThreadDetailsPanel.tsx";
   let panelSrc = readText(panelRel);

@@ -541,7 +541,40 @@ function hasDuplicateCursorTotal(pool: LimitPool): boolean {
   );
 }
 
+function antigravityPoolWindowRank(
+  window: Pick<LimitPoolWindow, "id" | "kind" | "label">,
+): number {
+  const id = window.id.toLowerCase();
+  const label = window.label.toLowerCase();
+  const familyRank =
+    id === "gemini-5h" || id === "gemini-weekly" || label.startsWith("gemini ·")
+      ? 0
+      : id.startsWith("gemini") || label.startsWith("gemini")
+        ? 1
+        : id.startsWith("3p-") ||
+            id.startsWith("claude") ||
+            id.startsWith("gpt") ||
+            label.includes("claude") ||
+            label.includes("gpt")
+          ? 2
+          : 3;
+  const periodRank =
+    window.kind === "session"
+      ? 0
+      : window.kind === "weekly"
+        ? 1
+        : window.kind === "monthly"
+          ? 2
+          : 3;
+  return familyRank * 10 + periodRank;
+}
+
 export function displayLimitWindows(pool: LimitPool) {
+  if (pool.driver === "antigravity") {
+    return [...pool.windows].sort(
+      (left, right) => antigravityPoolWindowRank(left) - antigravityPoolWindowRank(right),
+    );
+  }
   if (pool.driver !== "cursor") return pool.windows;
   const hasAuto = pool.windows.some((window) => window.id === "autoPercentUsed");
   const hasApi = pool.windows.some((window) => window.id === "apiPercentUsed");

@@ -141,7 +141,14 @@ export function ThreadDetailsCard({
             : details.reason === "outside-press"
               ? details.event.target
               : null;
-        if (!open && target instanceof Element && target.closest("[data-thread-find-bar]")) {
+        const keepUntil =
+          (window as unknown as { __t3mKeepDetailsPopoverUntil?: number })
+            .__t3mKeepDetailsPopoverUntil ?? 0;
+        if (
+          !open &&
+          ((target instanceof Element && target.closest("[data-thread-find-bar]")) ||
+            (details.reason === "focus-out" && keepUntil > Date.now()))
+        ) {
           details.cancel();
           return;
         }

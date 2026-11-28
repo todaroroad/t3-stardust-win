@@ -18,7 +18,7 @@ import { memo, useMemo, useState } from "react";
 
 import { useCopyToClipboard } from "~/hooks/useCopyToClipboard";
 import { cn } from "~/lib/utils";
-import { useRightPanelStore } from "~/rightPanelStore";
+import { selectThreadPanelOpen, useRightPanelStore } from "~/rightPanelStore";
 import { useQuietThreadProjection } from "~/state/entities";
 import { useProjectPathSearch } from "~/state/queries";
 import type { ChatFileAttachment } from "~/types";
@@ -428,14 +428,34 @@ export const StardustThreadArtifactsSection = memo(function StardustThreadArtifa
     [activeItems, effectiveFilter],
   );
 
-  const handleOpenArtifact = (item: StardustArtifactItem) => {
+  const handleOpenArtifact = (
+    item: StardustArtifactItem,
+    buttonEl?: HTMLButtonElement | null,
+  ) => {
     const store = useRightPanelStore.getState();
-    // Close floating popover details card if open so it does not cover the file preview panel
-    store.setThreadPanelOpen(threadRef, "popover", false);
+    const wasOpen =
+      selectThreadPanelOpen(store.threadPanelVisibilityByThreadKey, threadRef, "inline") ||
+      selectThreadPanelOpen(store.threadPanelVisibilityByThreadKey, threadRef, "popover");
+    if (wasOpen) {
+      (
+        window as unknown as { __t3mKeepDetailsPopoverUntil?: number }
+      ).__t3mKeepDetailsPopoverUntil = Date.now() + 650;
+    }
     if (item.attachment) {
       store.openAttachment(threadRef, item.attachment);
     } else {
       store.openFile(threadRef, item.openPath);
+    }
+    if (wasOpen) {
+      // Keep the details card open if opening the preview transitions it from inline -> popover
+      store.setThreadPanelOpen(threadRef, "popover", true);
+      if (buttonEl) {
+        window.requestAnimationFrame(() => {
+          if (buttonEl.isConnected) {
+            buttonEl.focus({ preventScroll: true });
+          }
+        });
+      }
     }
   };
 
@@ -559,7 +579,7 @@ export const StardustThreadArtifactsSection = memo(function StardustThreadArtifa
                       )}
                       <button
                         type="button"
-                        onClick={() => handleOpenArtifact(item)}
+                        onClick={(e) => handleOpenArtifact(item, e.currentTarget)}
                         title={item.displayPath}
                         className="min-w-0 flex-1 cursor-pointer text-left"
                       >

@@ -91,19 +91,32 @@ function buildInjectedHeadBlock(defaultLang = "zh") {
 .t3-usage-xaxis {
   padding-left: 4.75rem !important;
 }
+[data-chat-header]:has(> .t3-topbar-quota-strip) > div.flex-1 {
+  padding-right: 0.375rem !important;
+}
 .t3-topbar-quota-strip {
   -webkit-app-region: no-drag;
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  justify-content: flex-end;
-  gap: 0.25rem;
-  margin-left: 0.5rem;
+  justify-content: flex-start;
+  gap: 0.28rem;
+  margin-left: 0.375rem;
   margin-right: 0.5rem;
-  flex: 0 1 auto;
+  flex: 0 0 auto;
   min-width: 0;
-  max-width: 46%;
+  width: max-content;
+  max-width: min(420px, calc(100% - 13rem));
   overflow-x: auto;
+  overflow-y: hidden;
   scrollbar-width: none;
+  overscroll-behavior-x: contain;
+  padding: 1px 2px;
+}
+.t3-topbar-quota-strip[data-overflowing="1"] {
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 8px, #000 calc(100% - 8px), transparent 100%);
+  mask-image: linear-gradient(to right, transparent 0, #000 8px, #000 calc(100% - 8px), transparent 100%);
+  padding-left: 6px;
+  padding-right: 6px;
 }
 .t3-topbar-quota-strip::-webkit-scrollbar {
   display: none;
@@ -114,7 +127,7 @@ function buildInjectedHeadBlock(defaultLang = "zh") {
   align-items: center;
   gap: 0.24rem;
   height: 1.35rem;
-  padding: 0 0.42rem;
+  padding: 0 0.44rem;
   border-radius: 9999px;
   border: 1px solid color-mix(in oklab, var(--border) 82%, transparent);
   background: color-mix(in oklab, var(--muted) 56%, transparent);
@@ -139,11 +152,19 @@ function buildInjectedHeadBlock(defaultLang = "zh") {
   flex-shrink: 0;
 }
 .t3-topbar-pill-name {
-  opacity: 0.82;
+  opacity: 0.85;
   font-weight: 600;
 }
 .t3-topbar-pill-pct {
+  display: inline-flex;
+  align-items: center;
   font-weight: 700;
+}
+.t3-topbar-pill-sep {
+  opacity: 0.45;
+  margin: 0 1px;
+  font-weight: 500;
+  color: var(--muted-foreground);
 }
 .t3-topbar-pill-reset {
   opacity: 0.62;
@@ -701,7 +722,14 @@ button[data-chat-composer-transition-actions="true"]:not(:disabled):hover {
   function buildTopbarPills(providers, nowInput) {
     if (!Array.isArray(providers) || providers.length === 0) return [];
     const now = Number.isFinite(nowInput) ? nowInput : Date.now();
-    const active = providers.filter((p) => p && extractWindows(p).length > 0);
+    const active = providers
+      .filter((p) => p && extractWindows(p).length > 0)
+      .slice()
+      .sort((a, b) => {
+        const da = /antigravity/i.test(String(a.driverKind || a.driver || a.provider || "")) ? 1 : 0;
+        const db = /antigravity/i.test(String(b.driverKind || b.driver || b.provider || "")) ? 1 : 0;
+        return da - db;
+      });
     if (active.length === 0) return [];
     const driverTotals = {};
     const driverSeen = {};
@@ -715,8 +743,9 @@ button[data-chat-composer-transition-actions="true"]:not(:disabled):hover {
       driverSeen[dk] = (driverSeen[dk] || 0) + 1;
       const idx = driverSeen[dk];
       const total = driverTotals[dk];
+      const isAg = /antigravity/i.test(dk);
       let base = dk;
-      if (/antigravity/i.test(dk)) base = "AG";
+      if (isAg) base = "AG";
       else if (/claude/i.test(dk)) base = "Claude";
       else if (/codex|openai/i.test(dk)) base = "Codex";
       else if (/cursor/i.test(dk)) base = "Cursor";
@@ -726,14 +755,52 @@ button[data-chat-composer-transition-actions="true"]:not(:disabled):hover {
       const shortLabel = total > 1 ? base + idx : base;
       const q = getProviderQuota(p, null, now);
       if (!q) continue;
-      pills.push({
-        id: p.instanceId || p.id || (dk + ":" + idx),
-        shortLabel,
-        remaining: q.remaining,
-        tone: q.tone,
-        resetShort: q.resetShort,
-        tooltip: q.tooltip
-      });
+
+      const wins = extractWindows(p);
+      const geminiWins = isAg
+        ? wins.filter((w) => /^gemini/i.test(String(w.id || "")) || /^gemini/i.test(String(w.label || "")))
+        : [];
+      const poolWins = geminiWins.length > 0 ? geminiWins : wins;
+      const sessionWin =
+        poolWins.find((w) => w.kind === "session" || /5[- ]?hour|\\b5h\\b|session/i.test(String(w.label || ""))) ||
+        null;
+      const weeklyWin =
+        poolWins.find((w) => w.kind === "weekly" || /weekly|7[- ]?day|\\b7d\\b/i.test(String(w.label || ""))) ||
+        null;
+
+      if (sessionWin && weeklyWin) {
+        const rem5h = Math.max(0, Math.min(100, Math.round(100 - sessionWin.usedPercent)));
+        const remWk = Math.max(0, Math.min(100, Math.round(100 - weeklyWin.usedPercent)));
+        const minRem = Math.min(rem5h, remWk);
+        const ms5h = sessionWin.resetsAt ? Date.parse(sessionWin.resetsAt) - now : NaN;
+        const msWk = weeklyWin.resetsAt ? Date.parse(weeklyWin.resetsAt) - now : NaN;
+        const rst5h = Number.isFinite(ms5h) && ms5h > 0 ? fmtDurShort(ms5h) : "";
+        const rstWk = Number.isFinite(msWk) && msWk > 0 ? fmtDurShort(msWk) : "";
+        const resetDual = rst5h || rstWk ? (rst5h || "-") + "/" + (rstWk || "-") : "";
+        pills.push({
+          id: p.instanceId || p.id || dk + ":" + idx,
+          shortLabel,
+          dual: true,
+          rem5h,
+          remWk,
+          tone5h: toneForRemaining(rem5h),
+          toneWk: toneForRemaining(remWk),
+          remaining: minRem,
+          tone: toneForRemaining(minRem),
+          resetShort: resetDual,
+          tooltip: q.tooltip
+        });
+      } else {
+        pills.push({
+          id: p.instanceId || p.id || dk + ":" + idx,
+          shortLabel,
+          dual: false,
+          remaining: q.remaining,
+          tone: q.tone,
+          resetShort: q.resetShort,
+          tooltip: q.tooltip
+        });
+      }
     }
     return pills;
   }
@@ -813,7 +880,7 @@ function patchUsageLimitsShared(src) {
     out = out.replace(
       /return\[\.\.\.([A-Za-z0-9_$]+)\]\.map\(\(\[([A-Za-z0-9_$]+),([A-Za-z0-9_$]+)\]\)(\s*=>\s*\{[\s\S]*?)return\{driver:\2,accounts:([A-Za-z0-9_$]+),windows:([A-Za-z0-9_$]+)\(\5,([A-Za-z0-9_$]+)\)\}\}\)/,
       (_, mapVar, drvVar, listVar, bodyPrefix, accsVar, zFn, nowArg) =>
-        `return[...${mapVar}].flatMap(([${drvVar},${listVar}])${bodyPrefix}const __ordered=[...${accsVar}].sort((x,y)=>{const xp=x.key.endsWith(":"+${drvVar})&&!x.displayName?0:1,yp=y.key.endsWith(":"+${drvVar})&&!y.displayName?0:1;return xp-yp||(x.displayName??x.key).localeCompare(y.displayName??y.key,void 0,{numeric:!0})});if(__ordered.length>1)return __ordered.map((__acc,__idx)=>({poolKey:\`\${${drvVar}}:\${__acc.key}\`,driver:${drvVar},splitAccount:__acc,splitIndex:__idx+1,splitTotal:__ordered.length,accounts:[__acc],windows:${zFn}([__acc],${nowArg})}));return[{poolKey:${drvVar},driver:${drvVar},accounts:__ordered,windows:${zFn}(__ordered,${nowArg})}]})`,
+        `return[...${mapVar}].sort(([__da],[__db])=>(__da==="antigravity"?1:0)-(__db==="antigravity"?1:0)).flatMap(([${drvVar},${listVar}])${bodyPrefix}const __ordered=[...${accsVar}].sort((x,y)=>{const xp=x.key.endsWith(":"+${drvVar})&&!x.displayName?0:1,yp=y.key.endsWith(":"+${drvVar})&&!y.displayName?0:1;return xp-yp||(x.displayName??x.key).localeCompare(y.displayName??y.key,void 0,{numeric:!0})});if(__ordered.length>1)return __ordered.map((__acc,__idx)=>({poolKey:\`\${${drvVar}}:\${__acc.key}\`,driver:${drvVar},splitAccount:__acc,splitIndex:__idx+1,splitTotal:__ordered.length,accounts:[__acc],windows:${zFn}([__acc],${nowArg})}));return[{poolKey:${drvVar},driver:${drvVar},accounts:__ordered,windows:${zFn}(__ordered,${nowArg})}]})`,
     );
   }
   return out;
@@ -863,7 +930,7 @@ function patchUsageLimitsView(src) {
           pH2,
           hCards,
         ) =>
-          `function ${fnName}(${eArg}){let ${tMemo}=(0,${uNs}.c)(18),{pool:${nPool},now:${rNow}}=${eArg};let ${aColor}=${nPool}.splitAccount?.accentColor||${yeFn}(${nPool}.driver);const __baseLbl=${dMap}.get(${nPool}.driver)?.label??String(${nPool}.driver);let ${sLbl}=${nPool}.splitAccount?(${nPool}.splitAccount.displayName||(${nPool}.splitTotal>1?\`\${__baseLbl} \${${nPool}.splitIndex}\`:__baseLbl)):__baseLbl;let ${lWins}=${zFn}(${nPool}),${uLocale}=${cHook}();const __col1=Boolean(${nPool}.splitAccount)||${lWins}.length<=1;let ${fIcon}=(0,${jsxNs}.jsx)(${ceIcon},{driverKind:${nPool}.driver,displayName:${sLbl},accentColor:${nPool}.splitAccount?.accentColor,showBadge:Boolean(${nPool}.splitAccount?.accentColor),indicatorBackground:"var(--background)",className:"size-5",iconClassName:"size-4 text-foreground/80"});${midBlock}return(0,${jsxNs}.jsxs)("section",{className:__col1?"t3-quota-section t3-quota-col-1 flex flex-col gap-1.5":"t3-quota-section t3-quota-col-2 flex flex-col gap-1.5",children:[${pH2},(0,${jsxNs}.jsx)("div",{className:__col1?"t3-quota-grid-1 grid grid-cols-1 gap-2":"t3-quota-grid grid grid-cols-1 gap-2 md:grid-cols-2",children:${hCards}})]})}`,
+          `function ${fnName}(${eArg}){let ${tMemo}=(0,${uNs}.c)(18),{pool:${nPool},now:${rNow}}=${eArg};let ${aColor}=${nPool}.splitAccount?.accentColor||${yeFn}(${nPool}.driver);const __baseLbl=${dMap}.get(${nPool}.driver)?.label??String(${nPool}.driver);let ${sLbl}=${nPool}.splitAccount?(${nPool}.splitAccount.displayName||(${nPool}.splitTotal>1?\`\${__baseLbl} \${${nPool}.splitIndex}\`:__baseLbl)):__baseLbl;let ${lWins}=${zFn}(${nPool}),${uLocale}=${cHook}();const __col1=!0;let ${fIcon}=(0,${jsxNs}.jsx)(${ceIcon},{driverKind:${nPool}.driver,displayName:${sLbl},accentColor:${nPool}.splitAccount?.accentColor,showBadge:Boolean(${nPool}.splitAccount?.accentColor),indicatorBackground:"var(--background)",className:"size-5",iconClassName:"size-4 text-foreground/80"});${midBlock}return(0,${jsxNs}.jsxs)("section",{className:__col1?"t3-quota-section t3-quota-col-1 flex flex-col gap-1.5":"t3-quota-section t3-quota-col-2 flex flex-col gap-1.5",children:[${pH2},(0,${jsxNs}.jsx)("div",{className:__col1?"t3-quota-grid-1 grid grid-cols-1 gap-2":"t3-quota-grid grid grid-cols-1 gap-2 md:grid-cols-2",children:${hCards}})]})}`,
       );
     }
 
@@ -1115,7 +1182,7 @@ function patchChatBundle(src) {
       `${topbarCallMatch[1]},(0,${jsxNs}.jsx)(__T3TopbarQuotaPills,{providers:${providersVar},onOpenUsageLimits:${openUsageExpr},rightPanelOpen:${rightPanelVar}})]})`,
     );
 
-    const topbarComp = `function __T3TopbarQuotaPills({providers,onOpenUsageLimits,rightPanelOpen}){const[now,setNow]=(0,${reactNs}.useState)(()=>Date.now());const[,setTick]=(0,${reactNs}.useState)(0);(0,${reactNs}.useEffect)(()=>{const id=setInterval(()=>setNow(Date.now()),60000);const unsub=globalThis.__t3QuotaUi?.subscribe?.(()=>setTick(x=>x+1));return()=>{clearInterval(id);if(typeof unsub==="function")unsub()}},[]);const pills=globalThis.__t3QuotaUi?.buildTopbarPills?.(providers,now)||[];if(pills.length===0)return null;const zh=globalThis.__t3QuotaUi?globalThis.__t3QuotaUi.isZh():!0;return(0,${jsxNs}.jsx)("div",{className:"t3-topbar-quota-strip",style:{marginRight:rightPanelOpen?"52px":"128px"},"data-quota-ui-managed":"true","aria-label":zh?"模型额度状态":"Model quota status",children:pills.map(p=>(0,${jsxNs}.jsxs)("button",{type:"button",className:"t3-topbar-pill",title:p.tooltip+(onOpenUsageLimits?(zh?"\\n点击查看完整配额面板":"\\nClick to open Usage -> Limits"):""),onClick:()=>{if(typeof onOpenUsageLimits==="function")onOpenUsageLimits()},children:[(0,${jsxNs}.jsx)("span",{className:"t3-topbar-pill-dot t3-q-dot-"+p.tone}),(0,${jsxNs}.jsx)("span",{className:"t3-topbar-pill-name",children:p.shortLabel}),(0,${jsxNs}.jsx)("span",{className:"t3-topbar-pill-pct t3-q-"+p.tone,children:p.remaining+"%"}),p.resetShort?(0,${jsxNs}.jsx)("span",{className:"t3-topbar-pill-reset",children:"· "+p.resetShort}):null]},p.id))})}`;
+    const topbarComp = `function __T3TopbarQuotaPills({providers,onOpenUsageLimits,rightPanelOpen}){const[now,setNow]=(0,${reactNs}.useState)(()=>Date.now());const[,setTick]=(0,${reactNs}.useState)(0);const[overflowing,setOverflowing]=(0,${reactNs}.useState)(!1);const stripRef=(0,${reactNs}.useRef)(null);(0,${reactNs}.useEffect)(()=>{const id=setInterval(()=>setNow(Date.now()),60000);const unsub=globalThis.__t3QuotaUi?.subscribe?.(()=>setTick(x=>x+1));return()=>{clearInterval(id);if(typeof unsub==="function")unsub()}},[]);const pills=globalThis.__t3QuotaUi?.buildTopbarPills?.(providers,now)||[];const pillsSig=pills.map(p=>p.id+":"+p.remaining+":"+(p.resetShort||"")).join("|");(0,${reactNs}.useEffect)(()=>{const el=stripRef.current;if(!el)return;const measure=()=>{setOverflowing(el.scrollWidth>el.clientWidth+2)};measure();const ro=typeof ResizeObserver==="function"?new ResizeObserver(measure):null;if(ro)ro.observe(el);const onWheel=ev=>{if(el.scrollWidth<=el.clientWidth+1)return;const delta=Math.abs(ev.deltaY)>=Math.abs(ev.deltaX)?ev.deltaY:ev.deltaX;if(delta===0)return;ev.preventDefault();el.scrollLeft+=delta};el.addEventListener("wheel",onWheel,{passive:!1});return()=>{if(ro)ro.disconnect();el.removeEventListener("wheel",onWheel)}},[pillsSig,rightPanelOpen]);if(pills.length===0)return null;const zh=globalThis.__t3QuotaUi?globalThis.__t3QuotaUi.isZh():!0;return(0,${jsxNs}.jsx)("div",{ref:stripRef,className:"t3-topbar-quota-strip","data-overflowing":overflowing?"1":"0",style:{marginRight:rightPanelOpen?"44px":"104px"},"data-quota-ui-managed":"true","aria-label":zh?"模型额度状态":"Model quota status",children:pills.map(p=>(0,${jsxNs}.jsxs)("button",{type:"button",className:"t3-topbar-pill",title:p.tooltip+(onOpenUsageLimits?(zh?"\\n点击查看完整配额面板":"\\nClick to open Usage -> Limits"):""),onClick:()=>{if(typeof onOpenUsageLimits==="function")onOpenUsageLimits()},children:[(0,${jsxNs}.jsx)("span",{className:"t3-topbar-pill-dot t3-q-dot-"+p.tone}),(0,${jsxNs}.jsx)("span",{className:"t3-topbar-pill-name",children:p.shortLabel}),p.dual?(0,${jsxNs}.jsxs)("span",{className:"t3-topbar-pill-pct",children:[(0,${jsxNs}.jsx)("span",{className:"t3-q-"+p.tone5h,children:p.rem5h+"%"}),(0,${jsxNs}.jsx)("span",{className:"t3-topbar-pill-sep",children:"/"}),(0,${jsxNs}.jsx)("span",{className:"t3-q-"+p.toneWk,children:p.remWk+"%"})]}):(0,${jsxNs}.jsx)("span",{className:"t3-topbar-pill-pct t3-q-"+p.tone,children:p.remaining+"%"}),p.resetShort?(0,${jsxNs}.jsx)("span",{className:"t3-topbar-pill-reset",children:"· "+p.resetShort}):null]},p.id))})}`;
     out += `\n${topbarComp}\n`;
   }
 
