@@ -538,7 +538,7 @@ export const makeAntigravityProvider = Effect.fn("makeAntigravityProvider")(func
       return {
         ...state,
         draft: {
-          ...clearedDraft,
+          ...state.draft,
           slashCommands,
           ...(cwd
             ? {
@@ -575,7 +575,7 @@ export const makeAntigravityProvider = Effect.fn("makeAntigravityProvider")(func
       {
         authRevision: state.authRevision + 1,
         draft: {
-          ...state.draft,
+          ...clearedDraft,
           auth: {
             status: "unauthenticated",
             ...(usesCredentials ? options.auth : {}),

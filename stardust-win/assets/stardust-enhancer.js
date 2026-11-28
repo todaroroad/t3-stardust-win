@@ -767,22 +767,41 @@
           transform: none !important;
           width: 100vw !important;
           height: 100vh !important;
+          --available-width: calc(100vw - 32px) !important;
+          --available-height: min(34rem, calc(100vh - 64px)) !important;
           display: flex !important;
           align-items: center !important;
           justify-content: center !important;
           padding: 20px !important;
-          background: rgba(2, 6, 23, 0.38) !important;
+          background: rgba(2, 6, 23, 0.42) !important;
           -webkit-backdrop-filter: blur(4px) !important;
           backdrop-filter: blur(4px) !important;
           pointer-events: none !important;
-          z-index: 60 !important;
+          -webkit-app-region: no-drag !important;
+          z-index: 140 !important;
         }
-        [data-slot="combobox-positioner"]:has([data-project-scope-popup="true"]) > [data-project-scope-popup="true"] {
+        [data-slot="combobox-positioner"]:has([data-project-scope-popup="true"]) > span {
           pointer-events: auto !important;
+          -webkit-app-region: no-drag !important;
           width: min(26rem, calc(100vw - 32px)) !important;
-          max-height: min(32rem, calc(100vh - 64px)) !important;
+          max-width: min(26rem, calc(100vw - 32px)) !important;
+          max-height: min(34rem, calc(100vh - 64px)) !important;
           border-radius: 16px !important;
           box-shadow: 0 24px 64px -12px rgba(0, 0, 0, 0.62) !important;
+        }
+        [data-slot="combobox-positioner"]:has([data-project-scope-popup="true"]) [data-project-scope-popup="true"] {
+          pointer-events: auto !important;
+          -webkit-app-region: no-drag !important;
+          width: 100% !important;
+          max-height: min(34rem, calc(100vh - 64px)) !important;
+        }
+        [data-slot="combobox-positioner"]:has([data-project-scope-popup="true"]) [data-slot="scroll-area"] {
+          flex: 1 1 auto !important;
+          min-height: 0 !important;
+        }
+        [data-slot="combobox-positioner"]:has([data-project-scope-popup="true"]) [data-slot="scroll-area-viewport"] {
+          max-height: calc(min(34rem, calc(100vh - 64px)) - 48px) !important;
+          overflow-y: auto !important;
         }
 
         @media (min-width: 768px) {

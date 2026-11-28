@@ -403,8 +403,8 @@ copyAsset("antigravityUsageLimits.ts", "apps/server/src/provider/antigravityUsag
       return [`,
     );
     src = src.replace(
-      "        draft: {\n          ...state.draft,",
-      "        draft: {\n          ...clearedDraft,",
+      "        authRevision: state.authRevision + 1,\n        draft: {\n          ...state.draft,",
+      "        authRevision: state.authRevision + 1,\n        draft: {\n          ...clearedDraft,",
     );
     src = src.replace(
       "          supportsTextGeneration: false,\n        },\n      } satisfies AntigravityProviderState,\n    ]);",
