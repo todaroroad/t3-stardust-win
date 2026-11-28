@@ -907,7 +907,21 @@ export const checkClaudeProviderStatus = Effect.fn("checkClaudeProviderStatus")(
         ...(authMetadata ? authMetadata : {}),
       },
       ...(versionUpgradeMessage ? { message: versionUpgradeMessage } : {}),
-      usageLimits: resetCredits ? { ...usageLimits, resetCredits } : usageLimits,
+      usageLimits: resetCredits
+        ? { ...usageLimits, resetCredits }
+        : customApiEndpoint && usageLimits.unavailable
+          ? {
+              checkedAt: usageCheckedAt,
+              windows: [
+                {
+                  id: "custom_api",
+                  kind: "other",
+                  label: endpoint ? "API · " + endpoint.replace(/^https?:\/\//, "") : "Custom API",
+                  usedPercent: 0,
+                },
+              ],
+            }
+          : usageLimits,
     },
   });
   // Claude Code lists gateway models only while its one gateway cache holds this base URL, and

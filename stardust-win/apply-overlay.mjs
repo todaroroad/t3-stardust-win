@@ -2068,6 +2068,22 @@ function countMarkdownWords(text: string | null | undefined): number | null {
   writeText(rel, src);
 }
 
+// ---------------------------------------------------------------------------
+// 7. ClaudeProvider custom API endpoint usageLimits fallback (for SEA CLI parity)
+// ---------------------------------------------------------------------------
+{
+  const rel = "apps/server/src/provider/ClaudeProvider.ts";
+  let src = readText(rel);
+  if (!src.includes('id: "custom_api"')) {
+    src = src.replace(
+      "usageLimits: resetCredits ? { ...usageLimits, resetCredits } : usageLimits,",
+      `usageLimits: resetCredits\n        ? { ...usageLimits, resetCredits }\n        : customApiEndpoint && usageLimits.unavailable\n          ? {\n              checkedAt: usageCheckedAt,\n              windows: [\n                {\n                  id: "custom_api",\n                  kind: "other",\n                  label: endpoint ? "API · " + endpoint.replace(/^https?:\\/\\//, "") : "Custom API",\n                  usedPercent: 0,\n                },\n              ],\n            }\n          : usageLimits,`,
+    );
+    writeText(rel, src);
+  }
+  assertIncludes(src, 'id: "custom_api"', rel);
+}
+
 console.log(
   `[apply-overlay] Successfully applied & verified ${DISPLAY_BRAND_NAME} overlay on pure official base (${TARGET_REPO}).`,
 );

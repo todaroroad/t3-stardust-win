@@ -1,4 +1,4 @@
-name: Sync Official T3 & Release T3星辰版 Windows
+name: Sync Official T3 & Release T3M版 (Windows & Linux)
 
 on:
   schedule:
@@ -19,6 +19,20 @@ on:
         required: false
         default: ""
         type: string
+      platform_scope:
+        description: "Platforms to build & publish: all (Windows + Linux), linux-only, or windows-only"
+        required: false
+        default: "all"
+        type: choice
+        options:
+          - all
+          - linux-only
+          - windows-only
+      reuse_release_version:
+        description: "Optional existing release version (e.g. 1.13.12) to attach/rebuild without bumping semver"
+        required: false
+        default: ""
+        type: string
 
 concurrency:
   group: stardust-windows-release
@@ -31,11 +45,13 @@ permissions:
 
 jobs:
   prepare_and_build_bundle:
-    name: Merge Official T3, Verify & Build JS Bundle
+    name: Merge Official T3, Build Bundle & Package Linux x64
     runs-on: ubuntu-24.04
-    timeout-minutes: 35
+    timeout-minutes: 40
     outputs:
       should_build: ${{ steps.sync.outputs.should_build }}
+      build_windows: ${{ steps.sync.outputs.build_windows }}
+      build_linux: ${{ steps.sync.outputs.build_linux }}
       checkout_sha: ${{ steps.finalize.outputs.checkout_sha }}
       release_version: ${{ steps.sync.outputs.release_version }}
       official_tag: ${{ steps.sync.outputs.official_tag }}
@@ -53,8 +69,22 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
           FORCE_REBUILD: ${{ inputs.force_rebuild == true && 'true' || 'false' }}
           INPUT_TAG: ${{ inputs.official_tag || '' }}
+          PLATFORM_SCOPE: ${{ inputs.platform_scope || 'all' }}
+          REUSE_RELEASE_VERSION: ${{ inputs.reuse_release_version || '' }}
         run: |
           set -euo pipefail
+
+          REUSE_VER="${REUSE_RELEASE_VERSION#v}"
+          BUILD_WINDOWS="false"
+          BUILD_LINUX="false"
+          if [[ "${PLATFORM_SCOPE}" == "all" || "${PLATFORM_SCOPE}" == "windows-only" ]]; then
+            BUILD_WINDOWS="true"
+          fi
+          if [[ "${PLATFORM_SCOPE}" == "all" || "${PLATFORM_SCOPE}" == "linux-only" ]]; then
+            BUILD_LINUX="true"
+          fi
+          echo "build_windows=${BUILD_WINDOWS}" >> "$GITHUB_OUTPUT"
+          echo "build_linux=${BUILD_LINUX}" >> "$GITHUB_OUTPUT"
 
           OFFICIAL_REPO="pingdotgg/t3code"
           RECORDED_TAG=""
@@ -68,6 +98,8 @@ jobs:
 
           if [[ -n "${INPUT_TAG}" ]]; then
             TARGET_TAG="${INPUT_TAG}"
+          elif [[ -n "${REUSE_VER}" && -n "${RECORDED_TAG}" ]]; then
+            TARGET_TAG="${RECORDED_TAG}"
           else
             TARGET_TAG="$(gh api "repos/${OFFICIAL_REPO}/releases?per_page=30" --jq '
               [.[] | select((.draft | not) and (.prerelease | not) and (.tag_name | test("^v[0-9]+\\.[0-9]+\\.[0-9]+$")))] | .[0].tag_name // empty
@@ -80,9 +112,10 @@ jobs:
 
           echo "Official latest stable : ${TARGET_TAG} (${TARGET_SHA})"
           echo "Recorded local base    : ${RECORDED_TAG:-<none>} (${RECORDED_SHA:-<none>})"
+          echo "Platform scope         : ${PLATFORM_SCOPE} (win=${BUILD_WINDOWS}, linux=${BUILD_LINUX})"
 
           NEEDS_MERGE="false"
-          if [[ "${EVENT_NAME}" == "schedule" || "${EVENT_NAME}" == "workflow_dispatch" ]]; then
+          if [[ -z "${REUSE_VER}" && ( "${EVENT_NAME}" == "schedule" || "${EVENT_NAME}" == "workflow_dispatch" ) ]]; then
             if [[ "${TARGET_TAG}" != "${RECORDED_TAG}" ]]; then
               NEEDS_MERGE="true"
             elif [[ "${EVENT_NAME}" == "schedule" ]]; then
@@ -186,53 +219,58 @@ jobs:
             printf '%s\n' "$TARGET_SHA" > .official-upstream-sha
           fi
 
-          # Compute strictly monotonic semver 1.<official_minor>.<patch> for electron-updater
-          RELEASE_VERSION="$(OFFICIAL_TAG_VAL="${TARGET_TAG}" node -e '
-            const { execFileSync } = require("node:child_process");
+          if [[ -n "${REUSE_VER}" ]]; then
+            RELEASE_VERSION="${REUSE_VER}"
+            echo "Reusing explicit release version: ${RELEASE_VERSION}"
+          else
+            # Compute strictly monotonic semver 1.<official_minor>.<patch> for electron-updater
+            RELEASE_VERSION="$(OFFICIAL_TAG_VAL="${TARGET_TAG}" node -e '
+              const { execFileSync } = require("node:child_process");
 
-            function parseVer(v) {
-              const m = /^v?(\d+)\.(\d+)\.(\d+)$/.exec(String(v).trim());
-              return m ? [Number(m[1]), Number(m[2]), Number(m[3])] : null;
-            }
-            function cmp(a, b) {
-              for (let i = 0; i < 3; i++) {
-                if (a[i] !== b[i]) return a[i] - b[i];
+              function parseVer(v) {
+                const m = /^v?(\d+)\.(\d+)\.(\d+)$/.exec(String(v).trim());
+                return m ? [Number(m[1]), Number(m[2]), Number(m[3])] : null;
               }
-              return 0;
-            }
+              function cmp(a, b) {
+                for (let i = 0; i < 3; i++) {
+                  if (a[i] !== b[i]) return a[i] - b[i];
+                }
+                return 0;
+              }
 
-            const off = parseVer(process.env.OFFICIAL_TAG_VAL || "v0.1.13") || [0, 1, 13];
-            const mappedMajor = off[0] >= 1 ? off[0] + 1 : 1;
-            const mappedMinor = off[0] === 0 && off[1] === 1 ? off[2] : off[1] * 100 + off[2];
-            const base = [mappedMajor, mappedMinor, 0];
+              const off = parseVer(process.env.OFFICIAL_TAG_VAL || "v0.1.13") || [0, 1, 13];
+              const mappedMajor = off[0] >= 1 ? off[0] + 1 : 1;
+              const mappedMinor = off[0] === 0 && off[1] === 1 ? off[2] : off[1] * 100 + off[2];
+              const base = [mappedMajor, mappedMinor, 0];
 
-            let tags = [];
-            try {
-              const out = execFileSync(
-                "gh",
-                ["release", "list", "--repo", process.env.GITHUB_REPOSITORY, "--limit", "50", "--json", "tagName,isDraft"],
-                { encoding: "utf8" }
-              );
-              tags = JSON.parse(out)
-                .filter((r) => !r.isDraft)
-                .map((r) => parseVer(r.tagName))
-                .filter(Boolean);
-            } catch {}
+              let tags = [];
+              try {
+                const out = execFileSync(
+                  "gh",
+                  ["release", "list", "--repo", process.env.GITHUB_REPOSITORY, "--limit", "50", "--json", "tagName,isDraft"],
+                  { encoding: "utf8" }
+                );
+                tags = JSON.parse(out)
+                  .filter((r) => !r.isDraft)
+                  .map((r) => parseVer(r.tagName))
+                  .filter(Boolean);
+              } catch {}
 
-            tags.sort(cmp);
-            const highest = tags.length > 0 ? tags[tags.length - 1] : null;
-            let next = base;
-            if (highest && cmp(next, highest) <= 0) {
-              next = [highest[0], highest[1], highest[2] + 1];
-            }
-            process.stdout.write(next.join("."));
-          ')"
+              tags.sort(cmp);
+              const highest = tags.length > 0 ? tags[tags.length - 1] : null;
+              let next = base;
+              if (highest && cmp(next, highest) <= 0) {
+                next = [highest[0], highest[1], highest[2] + 1];
+              }
+              process.stdout.write(next.join("."));
+            ')"
+            echo "Resolved monotonic release version: ${RELEASE_VERSION}"
+          fi
 
-          echo "Resolved monotonic release version: ${RELEASE_VERSION}"
           echo "should_build=true" >> "$GITHUB_OUTPUT"
           echo "release_version=${RELEASE_VERSION}" >> "$GITHUB_OUTPUT"
 
-      - name: Apply & verify T3星辰版 pure-official overlay
+      - name: Apply & verify T3M版 pure-official overlay
         if: steps.sync.outputs.should_build == 'true'
         run: node stardust-win/apply-overlay.mjs
 
@@ -257,9 +295,9 @@ jobs:
           cache: true
           run-install: false
 
-      - name: Install Linux build headers
+      - name: Install Linux build headers & patchelf
         if: steps.sync.outputs.should_build == 'true'
-        run: sudo apt-get update && sudo apt-get install -y libsecret-1-dev pkg-config
+        run: sudo apt-get update && sudo apt-get install -y libsecret-1-dev pkg-config patchelf libatomic1
 
       - name: Install bundle dependencies
         if: steps.sync.outputs.should_build == 'true'
@@ -270,12 +308,32 @@ jobs:
             vp install --filter=t3... --filter=@t3tools/web... --filter=@t3tools/desktop... --filter=@t3tools/scripts...
           fi
 
-      - name: Align package versions, Build JS bundle & Inject Stardust Quota + Web Enhancer Suite
+      - name: Cache Linux resource monitor
+        id: linux_resource_monitor_cache
+        if: steps.sync.outputs.should_build == 'true' && steps.sync.outputs.build_linux == 'true'
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: native/resource-monitor/target/x86_64-unknown-linux-gnu/release/t3-resource-monitor
+          key: resource-monitor-x86_64-unknown-linux-gnu-${{ hashFiles('native/resource-monitor/Cargo.lock', 'native/resource-monitor/Cargo.toml', 'native/resource-monitor/src/**') }}
+
+      - name: Setup Rust (Linux resource monitor)
+        if: steps.sync.outputs.should_build == 'true' && steps.sync.outputs.build_linux == 'true' && steps.linux_resource_monitor_cache.outputs.cache-hit != 'true'
+        uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87
+        with:
+          toolchain: stable
+          targets: x86_64-unknown-linux-gnu
+
+      - name: Build Linux resource monitor
+        if: steps.sync.outputs.should_build == 'true' && steps.sync.outputs.build_linux == 'true' && steps.linux_resource_monitor_cache.outputs.cache-hit != 'true'
+        run: cargo build --locked --release --manifest-path native/resource-monitor/Cargo.toml --target x86_64-unknown-linux-gnu
+
+      - name: Align package versions, Build JS bundle, Inject Stardust Suite & Package Linux x64 Archive
         id: build_verify
         if: steps.sync.outputs.should_build == 'true'
         continue-on-error: true
         env:
           RELEASE_VERSION: ${{ steps.sync.outputs.release_version }}
+          BUILD_LINUX: ${{ steps.sync.outputs.build_linux }}
         run: |
           set -euo pipefail
           node scripts/update-release-package-versions.ts "${RELEASE_VERSION}"
@@ -285,7 +343,45 @@ jobs:
             echo "ERROR: Unexpected third-party endpoint found in compiled bundle!"
             exit 1
           fi
-          echo "Build, bundle enhancement & syntax verification passed!"
+
+          if [[ "${BUILD_LINUX}" == "true" ]]; then
+            echo "=== Building Linux x64 Standalone Server/CLI Release Package ==="
+            mkdir -p apps/server/dist/resource-monitor/linux-x64
+            cp native/resource-monitor/target/x86_64-unknown-linux-gnu/release/t3-resource-monitor \
+               apps/server/dist/resource-monitor/linux-x64/t3-resource-monitor
+            chmod +x apps/server/dist/resource-monitor/linux-x64/t3-resource-monitor
+
+            APP_VERSION="${RELEASE_VERSION}" node apps/server/scripts/cli.ts build-exe --verbose
+
+            rm -rf release-linux release-linux-publish
+            node scripts/build-cli-archive.ts \
+              --platform linux \
+              --arch x64 \
+              --version "${RELEASE_VERSION}" \
+              --output-dir release-linux
+
+            WORK_LINUX="$(mktemp -d)"
+            tar -xzf "release-linux/t3-${RELEASE_VERSION}-linux-x64.tar.gz" -C "$WORK_LINUX"
+            mv "$WORK_LINUX/t3-${RELEASE_VERSION}-linux-x64" "$WORK_LINUX/T3-Stardust-${RELEASE_VERSION}-linux-x64"
+            ln -sf t3 "$WORK_LINUX/T3-Stardust-${RELEASE_VERSION}-linux-x64/t3m"
+            printf '%s\n' "${RELEASE_VERSION}" > "$WORK_LINUX/T3-Stardust-${RELEASE_VERSION}-linux-x64/.install-complete"
+
+            SMOKE_OUT="$("$WORK_LINUX/T3-Stardust-${RELEASE_VERSION}-linux-x64/t3m" --version)"
+            echo "Linux standalone SEA smoke-test: ${SMOKE_OUT}"
+            if [[ "${SMOKE_OUT}" != *"${RELEASE_VERSION}"* ]]; then
+              echo "ERROR: Unexpected Linux SEA version output: ${SMOKE_OUT}"
+              exit 1
+            fi
+            grep -q "stardust-enhancer.js" "$WORK_LINUX/T3-Stardust-${RELEASE_VERSION}-linux-x64/client/index.html"
+
+            mkdir -p release-linux-publish
+            tar --hard-dereference -czf "release-linux-publish/T3-Stardust-${RELEASE_VERSION}-linux-x64.tar.gz" \
+              -C "$WORK_LINUX" "T3-Stardust-${RELEASE_VERSION}-linux-x64"
+            rm -rf "$WORK_LINUX" release-linux apps/server/dist/resource-monitor
+            ls -lh release-linux-publish/
+          fi
+
+          echo "Build, bundle enhancement & verification passed!"
 
       - name: Handle build failure on automated merge without breaking main
         if: steps.sync.outputs.should_build == 'true' && steps.build_verify.outcome == 'failure'
@@ -325,8 +421,8 @@ jobs:
           CHECKOUT_SHA="$(git rev-parse HEAD)"
           echo "checkout_sha=${CHECKOUT_SHA}" >> "$GITHUB_OUTPUT"
 
-      - name: Upload verified JS bundle
-        if: steps.sync.outputs.should_build == 'true' && steps.build_verify.outcome == 'success'
+      - name: Upload verified JS bundle (for Windows job)
+        if: steps.sync.outputs.should_build == 'true' && steps.build_verify.outcome == 'success' && steps.sync.outputs.build_windows == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: js-bundle
@@ -336,10 +432,18 @@ jobs:
           if-no-files-found: error
           retention-days: 3
 
+      - name: Upload Linux x64 Release Archive
+        if: steps.sync.outputs.should_build == 'true' && steps.build_verify.outcome == 'success' && steps.sync.outputs.build_linux == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: "T3-Stardust-${{ steps.sync.outputs.release_version }}-Linux-x64"
+          path: release-linux-publish/*
+          if-no-files-found: error
+
   package_windows:
     name: Package Windows x64 Installer & Update Feed
     needs: [prepare_and_build_bundle]
-    if: needs.prepare_and_build_bundle.outputs.should_build == 'true'
+    if: needs.prepare_and_build_bundle.outputs.should_build == 'true' && needs.prepare_and_build_bundle.outputs.build_windows == 'true'
     runs-on: windows-2025
     timeout-minutes: 60
     steps:
@@ -438,13 +542,13 @@ jobs:
             --skip-build \
             --verbose
 
-      - name: Verify electron-updater feed (latest.yml + blockmap + installer) & compute SHA256
+      - name: Stage Windows Installer & electron-updater Feed
         shell: pwsh
         env:
           RELEASE_VERSION: ${{ needs.prepare_and_build_bundle.outputs.release_version }}
         run: |
           $ErrorActionPreference = "Stop"
-          New-Item -ItemType Directory -Force -Path release-publish | Out-Null
+          New-Item -ItemType Directory -Force -Path release-win-publish | Out-Null
 
           $exeName = "T3-Stardust-${env:RELEASE_VERSION}-x64.exe"
           $requiredFiles = @(
@@ -457,29 +561,45 @@ jobs:
               Get-ChildItem release | Select-Object Name, Length
               throw "Required auto-update artifact missing: $f"
             }
-            Copy-Item $f -Destination "release-publish\$(Split-Path $f -Leaf)"
+            Copy-Item $f -Destination "release-win-publish\$(Split-Path $f -Leaf)"
           }
 
           Write-Output "=== Generated latest.yml ==="
-          Get-Content "release-publish\latest.yml"
-
-          Push-Location release-publish
-          $lines = Get-ChildItem -File | Where-Object { $_.Name -ne "SHA256SUMS.txt" } | Sort-Object Name | ForEach-Object {
-            $h = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower()
-            "$h  $($_.Name)"
-          }
-          [System.IO.File]::WriteAllLines((Join-Path $PWD "SHA256SUMS.txt"), $lines, (New-Object System.Text.UTF8Encoding($false)))
-          Get-Content SHA256SUMS.txt
-          Pop-Location
+          Get-Content "release-win-publish\latest.yml"
 
       - name: Upload Windows Installer Artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: "T3-Stardust-${{ needs.prepare_and_build_bundle.outputs.release_version }}-Windows-x64"
-          path: release-publish/*
+          path: release-win-publish/*
           if-no-files-found: error
 
-      - name: Publish GitHub Release with electron-updater Feed
+  publish_release:
+    name: Publish GitHub Release (Windows + Linux)
+    needs: [prepare_and_build_bundle, package_windows]
+    if: >-
+      always() &&
+      needs.prepare_and_build_bundle.result == 'success' &&
+      needs.prepare_and_build_bundle.outputs.should_build == 'true' &&
+      (needs.package_windows.result == 'success' || needs.package_windows.result == 'skipped')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Download Windows Release Artifacts
+        if: needs.prepare_and_build_bundle.outputs.build_windows == 'true'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: "T3-Stardust-${{ needs.prepare_and_build_bundle.outputs.release_version }}-Windows-x64"
+          path: release-publish
+
+      - name: Download Linux Release Artifacts
+        if: needs.prepare_and_build_bundle.outputs.build_linux == 'true'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: "T3-Stardust-${{ needs.prepare_and_build_bundle.outputs.release_version }}-Linux-x64"
+          path: release-publish
+
+      - name: Compute unified SHA256SUMS.txt & Publish GitHub Release
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -488,23 +608,50 @@ jobs:
           OFFICIAL_SHA: ${{ needs.prepare_and_build_bundle.outputs.official_sha }}
         run: |
           set -euo pipefail
+          mkdir -p release-publish
           tag="v${RELEASE_VERSION}"
-          notes="T3M版 v${RELEASE_VERSION} Windows x64 纯净增强版（基于 T3 官方正式版 pingdotgg/t3code@${OFFICIAL_TAG} / ${OFFICIAL_SHA:0:7}）：
-          - 品牌焕新为 T3M版 + 完整恢复深蓝炫彩 T3✦ 窗口/任务栏/应用图标（解包独立 icon.ico）
-          - 「所有项目」三段式工作台（顶部运行中/待处理/工作流 + 中部自定义分类 + 底部已收尾）与左侧「分组」弹窗（预设/关键词编辑/仅列星标模型建议归类）
-          - 管理项目弹窗视口正中显示；移除重复自定义桌面通知，恢复原生通知点击直达，「提醒」精简为可逐条移除的已完成列表
-          - 恢复 Antigravity（反重力）实时配额探针与过期刷新提示；底部双段交互统计栏（会话概览 + 令牌与缓存）与不挡字的实时执行动态胶囊"
+
+          EXISTING_SUMS="$(mktemp)"
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release download "$tag" --repo "$GITHUB_REPOSITORY" --pattern "SHA256SUMS.txt" --output "$EXISTING_SUMS" --clobber 2>/dev/null || true
+          fi
+
+          (
+            cd release-publish
+            rm -f SHA256SUMS.txt
+            NEW_SUMS="$(mktemp)"
+            sha256sum * > "$NEW_SUMS"
+            if [[ -s "$EXISTING_SUMS" ]]; then
+              awk '
+                NR==FNR { seen[$2]=$0; next }
+                !($2 in seen) { seen[$2]=$0 }
+                END { for (k in seen) print seen[k] }
+              ' "$NEW_SUMS" "$EXISTING_SUMS" | sort -k2 > SHA256SUMS.txt
+            else
+              sort -k2 "$NEW_SUMS" > SHA256SUMS.txt
+            fi
+            rm -f "$NEW_SUMS" "$EXISTING_SUMS"
+            echo "=== Unified SHA256SUMS.txt ==="
+            cat SHA256SUMS.txt
+          )
+
+          title="T3M版 v${RELEASE_VERSION} for Windows & Linux (x64) [纯净官方 ${OFFICIAL_TAG} 增强版]"
+          notes="T3M版 v${RELEASE_VERSION} Windows & Linux x64 纯净增强版（基于 T3 官方正式版 pingdotgg/t3code@${OFFICIAL_TAG} / ${OFFICIAL_SHA:0:7}）：
+          - **Windows 桌面安装包**：\`T3-Stardust-${RELEASE_VERSION}-x64.exe\`（支持 \`latest.yml\` 自动检查更新）
+          - **Linux 服务端/CLI 独立发行包**：\`T3-Stardust-${RELEASE_VERSION}-linux-x64.tar.gz\`（内置 Node SEA 单二进制 \`t3m\`/\`t3\`、完整增强版网页端、Linux 原生依赖与 \`libatomic.so.1\`，免环境解压即跑，适配 Debian / Ubuntu / GCP / AWS 等云服务器）
+          - 品牌焕新为 T3M版 + 深蓝炫彩 T3✦ 图标；「所有项目」三段式工作台与自定义分类分组弹窗
+          - Antigravity（反重力）实时配额探针、顶栏 5h/周双指标横向滚轮胶囊、底部双段统计栏与不挡字的实时执行动态胶囊"
 
           if ! gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release create "$tag" release-publish/* \
               --repo "$GITHUB_REPOSITORY" \
-              --title "T3M版 v${RELEASE_VERSION} for Windows (x64) [纯净官方 ${OFFICIAL_TAG} 增强版]" \
+              --title "$title" \
               --notes "$notes" \
               --latest
           else
             gh release upload "$tag" release-publish/* --repo "$GITHUB_REPOSITORY" --clobber
             gh release edit "$tag" --repo "$GITHUB_REPOSITORY" \
-              --title "T3M版 v${RELEASE_VERSION} for Windows (x64) [纯净官方 ${OFFICIAL_TAG} 增强版]" \
+              --title "$title" \
               --notes "$notes" \
               --latest
           fi
