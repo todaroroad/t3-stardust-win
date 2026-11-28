@@ -689,7 +689,8 @@ function collectMissingAntigravityQuotaReminders(
     for (const provider of presentation.serverConfig?.providers ?? []) {
       if (provider.driver !== "antigravity" || !provider.enabled || !provider.installed) continue;
       const ul = provider.usageLimits;
-      const hasValidWindows = Boolean(ul && !ul.unavailable && ul.windows.length > 0);
+      if (!ul) continue;
+      const hasValidWindows = !ul.unavailable && ul.windows.length > 0;
       if (hasValidWindows) continue;
       const instName = provider.displayName?.trim() || "Antigravity";
       const prefix = multiEnv ? `${envLabel} · ${instName}` : instName;

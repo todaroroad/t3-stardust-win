@@ -180,6 +180,8 @@ export interface AntigravityInstanceDirectories {
   readonly profile: string;
   /** Keep beside the profile: 120-character archive members under its longer name would exceed Windows' 260-character limit. */
   readonly runtimeTemp: string;
+  /** Clean lightweight GEMINI_HOME for headless JSON textGeneration without MCP subprocesses or user rules. */
+  readonly textHelperProfile: string;
 }
 
 /** Hashes the instance ID so case-only differences stay separate on case-insensitive filesystems. */
@@ -192,6 +194,7 @@ export const resolveAntigravityInstanceDirectories = Effect.fn(
   return {
     profile: path.join(stateDir, "providers", "antigravity", key),
     runtimeTemp: path.join(stateDir, "antigravity-tmp", key.slice(0, 12)),
+    textHelperProfile: path.join(stateDir, "antigravity-text", key.slice(0, 12)),
   } satisfies AntigravityInstanceDirectories;
 });
 
@@ -391,6 +394,68 @@ const copyAntigravityUserConfigFiles = Effect.fn("copyAntigravityUserConfigFiles
   },
 );
 
+export const syncAntigravityTextHelperProfile = Effect.fn("syncAntigravityTextHelperProfile")(
+  function* (input: {
+    readonly sourceProfileDirectory: string;
+    readonly helperProfileDirectory: string;
+  }): Effect.fn.Return<void, never, FileSystem.FileSystem | Path.Path> {
+    const fs = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+    const copyIfNewer = (srcFile: string, dstFile: string) =>
+      Effect.tryPromise(async () => {
+        const srcStat = await NodeFSP.stat(srcFile).catch(() => undefined);
+        if (!srcStat || !srcStat.isFile()) return;
+        const dstStat = await NodeFSP.stat(dstFile).catch(() => undefined);
+        if (dstStat && dstStat.isFile() && dstStat.mtimeMs >= srcStat.mtimeMs) return;
+        await NodeFSP.mkdir(path.dirname(dstFile), { recursive: true, mode: 0o700 });
+        await NodeFSP.copyFile(srcFile, dstFile);
+      }).pipe(Effect.ignore);
+
+    const configDir = path.join(input.helperProfileDirectory, "config");
+    const acpDir = path.join(input.helperProfileDirectory, "antigravity-acp");
+    yield* fs.makeDirectory(configDir, { recursive: true, mode: 0o700 }).pipe(Effect.ignore);
+    yield* fs.makeDirectory(acpDir, { recursive: true, mode: 0o700 }).pipe(Effect.ignore);
+    yield* fs.writeFileString(path.join(configDir, ".migrated"), "").pipe(Effect.ignore);
+    yield* fs
+      .writeFileString(path.join(configDir, "mcp_config.json"), '{"mcpServers":{}}\n')
+      .pipe(Effect.ignore);
+    yield* fs
+      .writeFileString(path.join(configDir, "hooks.json"), '{"hooks":{}}\n')
+      .pipe(Effect.ignore);
+    for (const unwanted of [
+      path.join(input.helperProfileDirectory, "GEMINI.md"),
+      path.join(input.helperProfileDirectory, "AGENTS.md"),
+      path.join(configDir, "skills"),
+      path.join(configDir, "skills.json"),
+    ]) {
+      yield* fs.remove(unwanted, { recursive: true, force: true }).pipe(Effect.ignore);
+    }
+
+    for (const rel of [
+      ["antigravity-acp", "antigravity-oauth-token"],
+      ["antigravity-acp", "acp_token.json"],
+      ["antigravity-acp", "installation_id"],
+      ["antigravity-acp", "jetski_state.pbtxt"],
+    ] as const) {
+      yield* copyIfNewer(
+        path.join(input.sourceProfileDirectory, ...rel),
+        path.join(input.helperProfileDirectory, ...rel),
+      );
+    }
+
+    const srcCliDir = path.join(input.sourceProfileDirectory, "antigravity-cli");
+    if (yield* fs.exists(srcCliDir).pipe(Effect.orElseSucceed(() => false))) {
+      const entries = yield* fs.readDirectory(srcCliDir).pipe(Effect.orElseSucceed(() => []));
+      for (const name of entries) {
+        yield* copyIfNewer(
+          path.join(srcCliDir, name),
+          path.join(input.helperProfileDirectory, "antigravity-cli", name),
+        );
+      }
+    }
+  },
+);
+
 export const prepareAntigravityProfile = Effect.fn("prepareAntigravityProfile")(function* (input: {
   readonly profileDirectory: string;
   readonly baseEnv?: NodeJS.ProcessEnv;
@@ -399,6 +464,7 @@ export const prepareAntigravityProfile = Effect.fn("prepareAntigravityProfile")(
   readonly auth?: AntigravityAuthConfig;
   readonly userHome?: string;
   readonly tempDirectory?: string;
+  readonly skipUserConfig?: boolean;
 }) {
   const auth = input.auth ?? ANTIGRAVITY_PERSONAL_AUTH;
   const fs = yield* FileSystem.FileSystem;
@@ -537,9 +603,11 @@ export const prepareAntigravityProfile = Effect.fn("prepareAntigravityProfile")(
         authSupportError("The Antigravity profile settings could not be written."),
       ),
     );
-  yield* linkAntigravityUserConfig({ profileDirectory: geminiHome, userHome, platform });
-  if (platform === "win32") {
-    yield* copyAntigravityUserConfigFiles({ profileDirectory: geminiHome, userHome });
+  if (!input.skipUserConfig) {
+    yield* linkAntigravityUserConfig({ profileDirectory: geminiHome, userHome, platform });
+    if (platform === "win32") {
+      yield* copyAntigravityUserConfigFiles({ profileDirectory: geminiHome, userHome });
+    }
   }
   return profile;
 });

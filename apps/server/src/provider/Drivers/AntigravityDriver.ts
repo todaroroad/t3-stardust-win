@@ -46,6 +46,7 @@ import {
   isAntigravitySignInRequiredError,
   prepareAntigravityProfile,
   resolveAntigravityInstanceDirectories,
+  syncAntigravityTextHelperProfile,
   type AntigravityAuthConfig,
 } from "../antigravityAuthSupport.ts";
 import {
@@ -200,6 +201,7 @@ export const AntigravityDriver: ProviderDriver<
     for (const directory of [
       directories.runtimeTemp,
       path.join(profileDirectory, "antigravity-acp", "tmp"),
+      path.join(directories.textHelperProfile, "antigravity-acp", "tmp"),
     ]) {
       const removeRetired = yield* retireAntigravityRuntimeTempDirs(directory).pipe(
         Effect.provideService(FileSystem.FileSystem, fileSystem),
@@ -226,6 +228,10 @@ export const AntigravityDriver: ProviderDriver<
     const prepareSpawn = Effect.fn("AntigravityDriver.prepareSpawn")(function* (
       cwd: string,
       baseEnv: NodeJS.ProcessEnv,
+      spawnOptions?: {
+        readonly profileDirectory?: string;
+        readonly skipUserConfig?: boolean;
+      },
     ): Effect.fn.Return<
       {
         readonly executable: AntigravityInstallation.AntigravityExecutable;
@@ -252,12 +258,23 @@ export const AntigravityDriver: ProviderDriver<
             }),
         ),
       );
+      const targetProfileDirectory = spawnOptions?.profileDirectory ?? profileDirectory;
+      if (spawnOptions?.skipUserConfig) {
+        yield* syncAntigravityTextHelperProfile({
+          sourceProfileDirectory: profileDirectory,
+          helperProfileDirectory: targetProfileDirectory,
+        }).pipe(
+          Effect.provideService(FileSystem.FileSystem, fileSystem),
+          Effect.provideService(Path.Path, path),
+        );
+      }
       const profile = yield* prepareAntigravityProfile({
-        profileDirectory,
+        profileDirectory: targetProfileDirectory,
         baseEnv: processEnvironment,
         auth,
         userHome,
         tempDirectory: directories.runtimeTemp,
+        ...(spawnOptions?.skipUserConfig ? { skipUserConfig: true } : {}),
       }).pipe(
         Effect.provideService(FileSystem.FileSystem, fileSystem),
         Effect.provideService(Path.Path, path),
@@ -312,6 +329,10 @@ export const AntigravityDriver: ProviderDriver<
 
     const makeRuntime = Effect.fn("AntigravityDriver.makeRuntime")(function* (
       input: AntigravityAdapterV2RuntimeInput,
+      spawnOptions?: {
+        readonly profileDirectory?: string;
+        readonly skipUserConfig?: boolean;
+      },
     ): Effect.fn.Return<
       AcpSessionRuntime.AcpSessionRuntime["Service"],
       AcpErrors.AcpError | ProviderSetupError,
@@ -325,6 +346,7 @@ export const AntigravityDriver: ProviderDriver<
         threadEnvironment === undefined
           ? processEnvironment
           : { ...processEnvironment, ...threadEnvironment },
+        spawnOptions,
       );
       const runtime = yield* makeAntigravityAcpRuntime({
         ...runtimeInput,
@@ -528,7 +550,13 @@ export const AntigravityDriver: ProviderDriver<
       instanceId,
       makeRuntime: makeDisposableRuntime,
       onAuthenticated: publishCatalog,
-      onSignedOut: Effect.suspend(() => provider.onSignedOut),
+      onSignedOut: Effect.suspend(() => provider.onSignedOut).pipe(
+        Effect.andThen(
+          fileSystem
+            .remove(directories.textHelperProfile, { recursive: true, force: true })
+            .pipe(Effect.ignore),
+        ),
+      ),
       usesBrowser: antigravityAuthUsesBrowser(auth.authMethod),
       codeLogin,
     });
@@ -647,14 +675,20 @@ export const AntigravityDriver: ProviderDriver<
         }),
     });
     const textGeneration = yield* makeAntigravityTextGeneration({
-      profileDirectory,
+      profileDirectory: directories.textHelperProfile,
       defaultModel,
       withProcess: authFlow.withProcess,
       makeRuntime: (cwd) =>
-        makeRuntime({
-          cwd,
-          mcpServers: [],
-        }),
+        makeRuntime(
+          {
+            cwd,
+            mcpServers: [],
+          },
+          {
+            profileDirectory: directories.textHelperProfile,
+            skipUserConfig: true,
+          },
+        ),
     });
 
     const refreshModels = Effect.fn("AntigravityDriver.refreshModels")(

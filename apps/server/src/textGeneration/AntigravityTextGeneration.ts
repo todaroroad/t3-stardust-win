@@ -265,14 +265,18 @@ export const makeAntigravityTextGeneration = Effect.fn("makeAntigravityTextGener
                 }),
             });
             const savedOptions = input.modelSelection.options;
-            if (savedOptions?.length) {
-              const thinking = antigravityThinkingConfig(yield* runtime.getConfigOptions);
-              const selected = savedOptions.find((option) => option.id === thinking?.id)?.value;
+            const thinking = antigravityThinkingConfig(yield* runtime.getConfigOptions);
+            if (thinking !== undefined) {
+              const allowedValues = collectSessionConfigOptionValues(thinking);
+              const explicit = savedOptions?.find((option) => option.id === thinking.id)?.value;
+              const preferredLight = ["minimal", "low", "none", "medium"].find((candidate) =>
+                allowedValues.includes(candidate),
+              );
+              const selected = typeof explicit === "string" ? explicit : preferredLight;
               if (
-                thinking !== undefined &&
                 typeof selected === "string" &&
                 selected !== thinking.currentValue &&
-                collectSessionConfigOptionValues(thinking).includes(selected)
+                allowedValues.includes(selected)
               ) {
                 yield* runtime.setConfigOption(thinking.id, selected).pipe(
                   Effect.catchTags({

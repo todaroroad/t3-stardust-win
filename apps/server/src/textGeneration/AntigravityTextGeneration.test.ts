@@ -560,7 +560,7 @@ it.layer(NodeServices.layer)("AntigravityTextGeneration", (it) => {
   );
 
   it.effect.each([
-    { name: "native default", selected: undefined, expected: "high", updates: [] },
+    { name: "lightweight default", selected: undefined, expected: "low", updates: ["low"] },
     {
       name: "after switching models",
       selected: "low",

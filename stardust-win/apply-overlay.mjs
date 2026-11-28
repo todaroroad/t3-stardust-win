@@ -401,6 +401,136 @@ copyAsset("antigravityUsageLimits.ts", "apps/server/src/provider/antigravityUsag
   assertIncludes(src, "usageProbe?:", rel);
 }
 
+// 4a-2. apps/server/src/provider/antigravityAuthSupport.ts -> Clean lightweight GEMINI_HOME for textGeneration
+{
+  const rel = "apps/server/src/provider/antigravityAuthSupport.ts";
+  let src = readText(rel);
+  if (!src.includes("syncAntigravityTextHelperProfile")) {
+    src = src.replace(
+      `export interface AntigravityInstanceDirectories {
+  readonly profile: string;
+  /** Keep beside the profile: 120-character archive members under its longer name would exceed Windows' 260-character limit. */
+  readonly runtimeTemp: string;
+}`,
+      `export interface AntigravityInstanceDirectories {
+  readonly profile: string;
+  /** Keep beside the profile: 120-character archive members under its longer name would exceed Windows' 260-character limit. */
+  readonly runtimeTemp: string;
+  /** Clean lightweight GEMINI_HOME for headless JSON textGeneration without MCP subprocesses or user rules. */
+  readonly textHelperProfile: string;
+}`,
+    );
+    src = src.replace(
+      `    profile: path.join(stateDir, "providers", "antigravity", key),
+    runtimeTemp: path.join(stateDir, "antigravity-tmp", key.slice(0, 12)),
+  } satisfies AntigravityInstanceDirectories;`,
+      `    profile: path.join(stateDir, "providers", "antigravity", key),
+    runtimeTemp: path.join(stateDir, "antigravity-tmp", key.slice(0, 12)),
+    textHelperProfile: path.join(stateDir, "antigravity-text", key.slice(0, 12)),
+  } satisfies AntigravityInstanceDirectories;`,
+    );
+    src = src.replace(
+      `export const prepareAntigravityProfile = Effect.fn("prepareAntigravityProfile")(function* (input: {
+  readonly profileDirectory: string;
+  readonly baseEnv?: NodeJS.ProcessEnv;
+  readonly runtimeExecutablePath?: string;
+  readonly platform?: NodeJS.Platform;
+  readonly auth?: AntigravityAuthConfig;
+  readonly userHome?: string;
+  readonly tempDirectory?: string;
+}) {`,
+      `export const syncAntigravityTextHelperProfile = Effect.fn("syncAntigravityTextHelperProfile")(
+  function* (input: {
+    readonly sourceProfileDirectory: string;
+    readonly helperProfileDirectory: string;
+  }): Effect.fn.Return<void, never, FileSystem.FileSystem | Path.Path> {
+    const fs = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+    const copyIfNewer = (srcFile: string, dstFile: string) =>
+      Effect.tryPromise(async () => {
+        const srcStat = await NodeFSP.stat(srcFile).catch(() => undefined);
+        if (!srcStat || !srcStat.isFile()) return;
+        const dstStat = await NodeFSP.stat(dstFile).catch(() => undefined);
+        if (dstStat && dstStat.isFile() && dstStat.mtimeMs >= srcStat.mtimeMs) return;
+        await NodeFSP.mkdir(path.dirname(dstFile), { recursive: true, mode: 0o700 });
+        await NodeFSP.copyFile(srcFile, dstFile);
+      }).pipe(Effect.ignore);
+
+    const configDir = path.join(input.helperProfileDirectory, "config");
+    const acpDir = path.join(input.helperProfileDirectory, "antigravity-acp");
+    yield* fs.makeDirectory(configDir, { recursive: true, mode: 0o700 }).pipe(Effect.ignore);
+    yield* fs.makeDirectory(acpDir, { recursive: true, mode: 0o700 }).pipe(Effect.ignore);
+    yield* fs.writeFileString(path.join(configDir, ".migrated"), "").pipe(Effect.ignore);
+    yield* fs
+      .writeFileString(path.join(configDir, "mcp_config.json"), '{"mcpServers":{}}\\n')
+      .pipe(Effect.ignore);
+    yield* fs
+      .writeFileString(path.join(configDir, "hooks.json"), '{"hooks":{}}\\n')
+      .pipe(Effect.ignore);
+    for (const unwanted of [
+      path.join(input.helperProfileDirectory, "GEMINI.md"),
+      path.join(input.helperProfileDirectory, "AGENTS.md"),
+      path.join(configDir, "skills"),
+      path.join(configDir, "skills.json"),
+    ]) {
+      yield* fs.remove(unwanted, { recursive: true, force: true }).pipe(Effect.ignore);
+    }
+
+    for (const rel of [
+      ["antigravity-acp", "antigravity-oauth-token"],
+      ["antigravity-acp", "acp_token.json"],
+      ["antigravity-acp", "installation_id"],
+      ["antigravity-acp", "jetski_state.pbtxt"],
+    ] as const) {
+      yield* copyIfNewer(
+        path.join(input.sourceProfileDirectory, ...rel),
+        path.join(input.helperProfileDirectory, ...rel),
+      );
+    }
+
+    const srcCliDir = path.join(input.sourceProfileDirectory, "antigravity-cli");
+    if (yield* fs.exists(srcCliDir).pipe(Effect.orElseSucceed(() => false))) {
+      const entries = yield* fs.readDirectory(srcCliDir).pipe(Effect.orElseSucceed(() => []));
+      for (const name of entries) {
+        yield* copyIfNewer(
+          path.join(srcCliDir, name),
+          path.join(input.helperProfileDirectory, "antigravity-cli", name),
+        );
+      }
+    }
+  },
+);
+
+export const prepareAntigravityProfile = Effect.fn("prepareAntigravityProfile")(function* (input: {
+  readonly profileDirectory: string;
+  readonly baseEnv?: NodeJS.ProcessEnv;
+  readonly runtimeExecutablePath?: string;
+  readonly platform?: NodeJS.Platform;
+  readonly auth?: AntigravityAuthConfig;
+  readonly userHome?: string;
+  readonly tempDirectory?: string;
+  readonly skipUserConfig?: boolean;
+}) {`,
+    );
+    src = src.replace(
+      `  yield* linkAntigravityUserConfig({ profileDirectory: geminiHome, userHome, platform });
+  if (platform === "win32") {
+    yield* copyAntigravityUserConfigFiles({ profileDirectory: geminiHome, userHome });
+  }
+  return profile;`,
+      `  if (!input.skipUserConfig) {
+    yield* linkAntigravityUserConfig({ profileDirectory: geminiHome, userHome, platform });
+    if (platform === "win32") {
+      yield* copyAntigravityUserConfigFiles({ profileDirectory: geminiHome, userHome });
+    }
+  }
+  return profile;`,
+    );
+    writeText(rel, src);
+  }
+  assertIncludes(src, "syncAntigravityTextHelperProfile", rel);
+}
+
 // 4b. apps/server/src/provider/Drivers/AntigravityDriver.ts
 {
   const rel = "apps/server/src/provider/Drivers/AntigravityDriver.ts";
@@ -426,10 +556,135 @@ copyAsset("antigravityUsageLimits.ts", "apps/server/src/provider/antigravityUsag
     );
     writeText(rel, src);
   }
+  if (!src.includes("syncAntigravityTextHelperProfile")) {
+    src = src.replace(
+      "  resolveAntigravityInstanceDirectories,\n  type AntigravityAuthConfig,",
+      "  resolveAntigravityInstanceDirectories,\n  syncAntigravityTextHelperProfile,\n  type AntigravityAuthConfig,",
+    );
+    src = src.replace(
+      `    for (const directory of [
+      directories.runtimeTemp,
+      path.join(profileDirectory, "antigravity-acp", "tmp"),
+    ]) {`,
+      `    for (const directory of [
+      directories.runtimeTemp,
+      path.join(profileDirectory, "antigravity-acp", "tmp"),
+      path.join(directories.textHelperProfile, "antigravity-acp", "tmp"),
+    ]) {`,
+    );
+    src = src.replace(
+      `    const prepareSpawn = Effect.fn("AntigravityDriver.prepareSpawn")(function* (
+      cwd: string,
+      baseEnv: NodeJS.ProcessEnv,
+    ): Effect.fn.Return<`,
+      `    const prepareSpawn = Effect.fn("AntigravityDriver.prepareSpawn")(function* (
+      cwd: string,
+      baseEnv: NodeJS.ProcessEnv,
+      spawnOptions?: {
+        readonly profileDirectory?: string;
+        readonly skipUserConfig?: boolean;
+      },
+    ): Effect.fn.Return<`,
+    );
+    src = src.replace(
+      `      const profile = yield* prepareAntigravityProfile({
+        profileDirectory,
+        baseEnv: processEnvironment,
+        auth,
+        userHome,
+        tempDirectory: directories.runtimeTemp,
+      }).pipe(`,
+      `      const targetProfileDirectory = spawnOptions?.profileDirectory ?? profileDirectory;
+      if (spawnOptions?.skipUserConfig) {
+        yield* syncAntigravityTextHelperProfile({
+          sourceProfileDirectory: profileDirectory,
+          helperProfileDirectory: targetProfileDirectory,
+        }).pipe(
+          Effect.provideService(FileSystem.FileSystem, fileSystem),
+          Effect.provideService(Path.Path, path),
+        );
+      }
+      const profile = yield* prepareAntigravityProfile({
+        profileDirectory: targetProfileDirectory,
+        baseEnv: processEnvironment,
+        auth,
+        userHome,
+        tempDirectory: directories.runtimeTemp,
+        ...(spawnOptions?.skipUserConfig ? { skipUserConfig: true } : {}),
+      }).pipe(`,
+    );
+    src = src.replace(
+      `    const makeRuntime = Effect.fn("AntigravityDriver.makeRuntime")(function* (
+      input: AntigravityAdapterV2RuntimeInput,
+    ): Effect.fn.Return<`,
+      `    const makeRuntime = Effect.fn("AntigravityDriver.makeRuntime")(function* (
+      input: AntigravityAdapterV2RuntimeInput,
+      spawnOptions?: {
+        readonly profileDirectory?: string;
+        readonly skipUserConfig?: boolean;
+      },
+    ): Effect.fn.Return<`,
+    );
+    src = src.replace(
+      `      const { executable, spawn } = yield* prepareSpawn(
+        runtimeInput.cwd,
+        threadEnvironment === undefined
+          ? processEnvironment
+          : { ...processEnvironment, ...threadEnvironment },
+      );`,
+      `      const { executable, spawn } = yield* prepareSpawn(
+        runtimeInput.cwd,
+        threadEnvironment === undefined
+          ? processEnvironment
+          : { ...processEnvironment, ...threadEnvironment },
+        spawnOptions,
+      );`,
+    );
+    src = src.replace(
+      "      onSignedOut: Effect.suspend(() => provider.onSignedOut),",
+      `      onSignedOut: Effect.suspend(() => provider.onSignedOut).pipe(
+        Effect.andThen(
+          fileSystem
+            .remove(directories.textHelperProfile, { recursive: true, force: true })
+            .pipe(Effect.ignore),
+        ),
+      ),`,
+    );
+    src = src.replace(
+      `    const textGeneration = yield* makeAntigravityTextGeneration({
+      profileDirectory,
+      defaultModel,
+      withProcess: authFlow.withProcess,
+      makeRuntime: (cwd) =>
+        makeRuntime({
+          cwd,
+          mcpServers: [],
+        }),
+    });`,
+      `    const textGeneration = yield* makeAntigravityTextGeneration({
+      profileDirectory: directories.textHelperProfile,
+      defaultModel,
+      withProcess: authFlow.withProcess,
+      makeRuntime: (cwd) =>
+        makeRuntime(
+          {
+            cwd,
+            mcpServers: [],
+          },
+          {
+            profileDirectory: directories.textHelperProfile,
+            skipUserConfig: true,
+          },
+        ),
+    });`,
+    );
+    writeText(rel, src);
+  }
   assertIncludes(src, "makeAntigravityUsageProbe", rel);
+  assertIncludes(src, "directories.textHelperProfile", rel);
 }
 
-// 4b-2. apps/server/src/textGeneration/AntigravityTextGeneration.ts -> Allow Antigravity profiles with MCP servers (tool calls remain strictly cancelled in default mode)
+// 4b-2. apps/server/src/textGeneration/AntigravityTextGeneration.ts -> Allow Antigravity profiles with MCP servers & default to lightweight thinking effort
 {
   const rel = "apps/server/src/textGeneration/AntigravityTextGeneration.ts";
   let src = readText(rel);
@@ -437,7 +692,62 @@ copyAsset("antigravityUsageLimits.ts", "apps/server/src/provider/antigravityUsag
     'for (const name of ["hooks.json", "mcp_config.json"]) {',
     'for (const name of ["hooks.json"]) {',
   );
+  if (!src.includes("preferredLight")) {
+    src = src.replace(
+      `            const savedOptions = input.modelSelection.options;
+            if (savedOptions?.length) {
+              const thinking = antigravityThinkingConfig(yield* runtime.getConfigOptions);
+              const selected = savedOptions.find((option) => option.id === thinking?.id)?.value;
+              if (
+                thinking !== undefined &&
+                typeof selected === "string" &&
+                selected !== thinking.currentValue &&
+                collectSessionConfigOptionValues(thinking).includes(selected)
+              ) {
+                yield* runtime.setConfigOption(thinking.id, selected).pipe(
+                  Effect.catchTags({
+                    AcpRequestError: (error) =>
+                      error.code === -32602
+                        ? Effect.logDebug("Antigravity rejected the saved thinking level", {
+                            optionId: thinking.id,
+                            value: selected,
+                          })
+                        : Effect.fail(error),
+                  }),
+                );
+              }
+            }`,
+      `            const savedOptions = input.modelSelection.options;
+            const thinking = antigravityThinkingConfig(yield* runtime.getConfigOptions);
+            if (thinking !== undefined) {
+              const allowedValues = collectSessionConfigOptionValues(thinking);
+              const explicit = savedOptions?.find((option) => option.id === thinking.id)?.value;
+              const preferredLight = ["minimal", "low", "none", "medium"].find((candidate) =>
+                allowedValues.includes(candidate),
+              );
+              const selected = typeof explicit === "string" ? explicit : preferredLight;
+              if (
+                typeof selected === "string" &&
+                selected !== thinking.currentValue &&
+                allowedValues.includes(selected)
+              ) {
+                yield* runtime.setConfigOption(thinking.id, selected).pipe(
+                  Effect.catchTags({
+                    AcpRequestError: (error) =>
+                      error.code === -32602
+                        ? Effect.logDebug("Antigravity rejected the saved thinking level", {
+                            optionId: thinking.id,
+                            value: selected,
+                          })
+                        : Effect.fail(error),
+                  }),
+                );
+              }
+            }`,
+    );
+  }
   assertIncludes(src, 'for (const name of ["hooks.json"]) {', rel);
+  assertIncludes(src, "preferredLight", rel);
   writeText(rel, src);
 }
 
@@ -456,7 +766,8 @@ copyAsset("antigravityUsageLimits.ts", "apps/server/src/provider/antigravityUsag
     for (const provider of presentation.serverConfig?.providers ?? []) {
       if (provider.driver !== "antigravity" || !provider.enabled || !provider.installed) continue;
       const ul = provider.usageLimits;
-      const hasValidWindows = Boolean(ul && !ul.unavailable && ul.windows.length > 0);
+      if (!ul) continue;
+      const hasValidWindows = !ul.unavailable && ul.windows.length > 0;
       if (hasValidWindows) continue;
       const instName = provider.displayName?.trim() || "Antigravity";
       const prefix = multiEnv ? \`\${envLabel} · \${instName}\` : instName;
@@ -482,8 +793,15 @@ copyAsset("antigravityUsageLimits.ts", "apps/server/src/provider/antigravityUsag
   ];`,
     );
     writeText(rel, src);
+  } else if (src.includes("const hasValidWindows = Boolean(ul && !ul.unavailable && ul.windows.length > 0);")) {
+    src = src.replace(
+      "      const hasValidWindows = Boolean(ul && !ul.unavailable && ul.windows.length > 0);",
+      "      if (!ul) continue;\n      const hasValidWindows = !ul.unavailable && ul.windows.length > 0;",
+    );
+    writeText(rel, src);
   }
   assertIncludes(src, "collectMissingAntigravityQuotaReminders", rel);
+  assertIncludes(src, "if (!ul) continue;", rel);
 }
 
 // ---------------------------------------------------------------------------
