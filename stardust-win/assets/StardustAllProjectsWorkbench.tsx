@@ -3,7 +3,6 @@ import { scopeThreadRef, scopedThreadKey } from "@t3tools/client-runtime/environ
 import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/models";
 import {
   effectiveSnoozed,
-  hasUnseenCompletion,
   hasUnseenRunFailure,
 } from "@t3tools/client-runtime/state/thread-settled";
 import type { ContextMenuSource, EnvironmentId, ScopedThreadRef } from "@t3tools/contracts";
@@ -43,6 +42,7 @@ import {
 import { serverEnvironment } from "~/state/server";
 import { useUiStateStore } from "~/uiStateStore";
 import {
+  hasUnseenCompletion,
   resolveSidebarRowStatus,
   resolveThreadLastVisitedAt,
 } from "../Sidebar.logic";
