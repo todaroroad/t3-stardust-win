@@ -19,6 +19,10 @@ import {
 import { memo, useMemo, useState } from "react";
 
 import { useEnvironmentModelPreferences } from "~/hooks/useSettings";
+import {
+  resolveSemanticCategoryIcon,
+  StardustSemanticIcon,
+} from "~/lib/stardustSemanticIcons";
 import { cn } from "~/lib/utils";
 import {
   useEnvironmentIdentities,
@@ -515,6 +519,18 @@ export const StardustSidebarCategoryModals = memo(function StardustSidebarCatego
                             >
                               <GripVerticalIcon className="size-4" />
                             </span>
+                            {(() => {
+                              const spec = resolveSemanticCategoryIcon(cat.label, cat.id);
+                              return (
+                                <span className="inline-flex size-7 shrink-0 items-center justify-center rounded-lg bg-muted/70">
+                                  <StardustSemanticIcon
+                                    name={spec.name}
+                                    color={spec.color}
+                                    className="size-4"
+                                  />
+                                </span>
+                              );
+                            })()}
                             <Input
                               aria-label="分类名称"
                               value={cat.label}
@@ -741,6 +757,7 @@ export const StardustSidebarCategoryModals = memo(function StardustSidebarCatego
             </button>
             {visibleCategories.map((cat) => {
               const selected = pickerCurrentCategory === cat.id;
+              const spec = resolveSemanticCategoryIcon(cat.label, cat.id);
               return (
                 <button
                   key={cat.id}
@@ -756,8 +773,15 @@ export const StardustSidebarCategoryModals = memo(function StardustSidebarCatego
                     selected && "bg-muted/70 font-semibold text-foreground",
                   )}
                 >
-                  <span>{cat.label}</span>
-                  {selected ? <CheckIcon className="size-3.5 text-primary" /> : null}
+                  <span className="inline-flex min-w-0 items-center gap-2 truncate">
+                    <StardustSemanticIcon
+                      name={spec.name}
+                      color={spec.color}
+                      className="size-3.5"
+                    />
+                    <span className="truncate">{cat.label}</span>
+                  </span>
+                  {selected ? <CheckIcon className="size-3.5 shrink-0 text-primary" /> : null}
                 </button>
               );
             })}

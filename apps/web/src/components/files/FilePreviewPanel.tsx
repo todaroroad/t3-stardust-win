@@ -1,5 +1,13 @@
 import { thrownErrorMessage } from "@t3tools/client-runtime/errors";
-import { DownloadIcon, CopyIcon, CheckIcon, Code2Icon, EyeIcon, Table2Icon } from "lucide-react";
+import {
+  BookOpenIcon,
+  DownloadIcon,
+  CopyIcon,
+  CheckIcon,
+  Code2Icon,
+  EyeIcon,
+  Table2Icon,
+} from "lucide-react";
 import { msg, T, useGT, useMessages, Var } from "gt-react";
 import { m, type MessageResolver } from "~/i18n/messages";
 import { namedClipboardTarget, useCopyToClipboard } from "~/hooks/useCopyToClipboard";
@@ -54,6 +62,7 @@ import {
   Suspense,
   useEffect,
   useEffectEvent,
+  useMemo,
   useRef,
   useState,
   type ComponentProps,
@@ -177,7 +186,39 @@ const MermaidFilePreview = lazy(() =>
 );
 
 const FILE_EXPLORER_STORAGE_KEY = "t3code.fileExplorerOpen";
-const RENDER_MARKDOWN_STORAGE_KEY = "t3code.renderMarkdown";
+const RENDER_MARKDOWN_STORAGE_KEY = "t3m.renderMarkdown";
+
+function countMarkdownWords(text: string | null | undefined): number | null {
+  if (!text) return null;
+  let count = 0;
+  let inLatinWord = false;
+  for (let i = 0; i < text.length; i++) {
+    const code = text.charCodeAt(i);
+    const isCjk =
+      (code >= 0x4e00 && code <= 0x9fff) ||
+      (code >= 0x3400 && code <= 0x4dbf) ||
+      (code >= 0x3040 && code <= 0x30ff) ||
+      (code >= 0xac00 && code <= 0xd7af);
+    if (isCjk) {
+      count += 1;
+      inLatinWord = false;
+    } else if (
+      (code >= 48 && code <= 57) ||
+      (code >= 65 && code <= 90) ||
+      (code >= 97 && code <= 122) ||
+      code === 95 ||
+      code === 45
+    ) {
+      if (!inLatinWord) {
+        count += 1;
+        inLatinWord = true;
+      }
+    } else {
+      inLatinWord = false;
+    }
+  }
+  return count;
+}
 const RENDER_BROWSER_FILE_STORAGE_KEY = "t3code.renderBrowserFile";
 const RENDER_TABLE_STORAGE_KEY = "t3code.renderTable";
 type FilePostRender = <LAnnotation>(
@@ -1356,7 +1397,7 @@ export default function FilePreviewPanel({
   });
   const [renderMarkdownPreferred, setRenderMarkdownPreferred] = useLocalStorage(
     RENDER_MARKDOWN_STORAGE_KEY,
-    false,
+    true,
     Schema.Boolean,
   );
   const [renderBrowserFilePreferred, setRenderBrowserFilePreferred] = useLocalStorage(
@@ -1504,6 +1545,10 @@ export default function FilePreviewPanel({
       : tableDelimiter
         ? setRenderTablePreferred
         : setRenderBrowserFilePreferred;
+  const markdownWordCount = useMemo(
+    () => (isMarkdown && file.data ? countMarkdownWords(file.data.contents) : null),
+    [isMarkdown, file.data],
+  );
   const canOpenInBrowser =
     canOperatePreview &&
     previewPath !== null &&
@@ -1645,7 +1690,50 @@ export default function FilePreviewPanel({
               fileManagerAction={fileManagerAction}
             />
           ) : null}
-          {canToggleRendered && renderedMode ? (
+          {canToggleRendered && renderedMode === "markdown" ? (
+            <div
+              role="group"
+              aria-label="Markdown 视图模式"
+              className="mx-1 inline-flex h-6 shrink-0 items-center rounded-md border border-border/70 bg-muted/55 p-0.5 text-[11px]"
+            >
+              <button
+                type="button"
+                aria-pressed={rendered}
+                onClick={() => {
+                  setRenderedPreferred(true);
+                  if (relativePath !== null) {
+                    setHandledReveal({ path: relativePath, requestId: revealRequestId });
+                  }
+                }}
+                className={cn(
+                  "inline-flex h-5 cursor-pointer items-center gap-1 rounded px-2 font-medium transition-colors duration-120",
+                  rendered
+                    ? "bg-background text-foreground shadow-2xs"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                <BookOpenIcon className="size-3" />
+                <span>阅读</span>
+              </button>
+              <button
+                type="button"
+                aria-pressed={!rendered}
+                onClick={() => {
+                  setRenderedPreferred(false);
+                  setHandledReveal(null);
+                }}
+                className={cn(
+                  "inline-flex h-5 cursor-pointer items-center gap-1 rounded px-2 font-medium transition-colors duration-120",
+                  !rendered
+                    ? "bg-background text-foreground shadow-2xs"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                <Code2Icon className="size-3" />
+                <span>源码</span>
+              </button>
+            </div>
+          ) : canToggleRendered && renderedMode ? (
             <FileSurfaceAction
               label={renderedToggleLabel(renderedMode, rendered, m)}
               pressed={rendered}
@@ -1925,6 +2013,32 @@ export default function FilePreviewPanel({
                 />
               </DiffWorkerPoolProvider>
             )
+          ) : null}
+          {canToggleRendered && isMarkdown && file.data !== null ? (
+            <div className="flex h-7 shrink-0 items-center justify-between border-t border-border/60 bg-background/95 px-3 text-[11px] text-muted-foreground select-none">
+              <button
+                type="button"
+                title={rendered ? "切换到源码视图" : "切换到阅读视图"}
+                onClick={() => {
+                  const next = !rendered;
+                  setRenderedPreferred(next);
+                  setHandledReveal(
+                    next && relativePath !== null
+                      ? { path: relativePath, requestId: revealRequestId }
+                      : null,
+                  );
+                }}
+                className="inline-flex cursor-pointer items-center gap-1.5 rounded px-1.5 py-0.5 font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              >
+                <Code2Icon className={cn("size-3.5", !rendered && "text-primary")} />
+                <span>{rendered ? "阅读视图 · 切源码" : "源码视图 · 切阅读"}</span>
+              </button>
+              {markdownWordCount !== null ? (
+                <span className="tabular-nums">
+                  {file.data.truncated ? `前 1MB · ${markdownWordCount.toLocaleString()} 词` : `${markdownWordCount.toLocaleString()} 词`}
+                </span>
+              ) : null}
+            </div>
           ) : null}
         </div>
         {showExplorer ? (

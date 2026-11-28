@@ -33,6 +33,7 @@ import {
   ThreadDetailsUsage,
   type ThreadDetailsUsageInput,
 } from "./ThreadDetailsUsage";
+import { StardustThreadArtifactsSection } from "./StardustThreadArtifactsSection";
 import { ThreadDetailsItemsMenuItems } from "./ThreadDetailsItemsMenu";
 import { resolveThreadDetailsVisibility, THREAD_DETAILS_ITEMS } from "./threadDetailsItems";
 import { useClientSettings } from "../../hooks/useSettings";
@@ -331,6 +332,17 @@ export function ThreadDetailsPanel(props: ThreadDetailsPanelProps) {
 
               {visible.context && props.usage.contextWindow ? (
                 <ThreadDetailsContext usage={props.usage.contextWindow} />
+              ) : null}
+
+              {density !== "essential" ? (
+                <StardustThreadArtifactsSection
+                  environmentId={props.environmentId}
+                  threadId={props.threadId}
+                  projectId={props.projectId}
+                  gitCwd={props.gitCwd}
+                  isServerThread={props.isServerThread}
+                  isDraft={Boolean(props.draftId)}
+                />
               ) : null}
 
               {/* Shown only when no section above has content, so an emptied card can be refilled. */}

@@ -1,5 +1,5 @@
 import type { EnvironmentThreadShell, ThreadStructure } from "@t3tools/client-runtime/state/shell";
-import type { OrchestrationV2RunStatus, OrchestrationV2TurnItem } from "@t3tools/contracts";
+import type { OrchestrationV2RunStatus } from "@t3tools/contracts";
 import {
   CheckCircle2Icon,
   ChevronRightIcon,
@@ -46,7 +46,7 @@ function shortPathLabel(raw: string): string {
   return `${parts.at(-2)}/${parts.at(-1)}`;
 }
 
-function summarizeTurnItem(item: OrchestrationV2TurnItem): CapsuleActionEntry | null {
+function summarizeTurnItem(item: ThreadStructure["turnItems"][number]): CapsuleActionEntry | null {
   const done = item.completedAt != null;
   switch (item.type) {
     case "file_search": {
@@ -319,7 +319,7 @@ export const StardustLiveExecutionCapsule = memo(function StardustLiveExecutionC
     <div
       ref={containerRef}
       data-t3m-execution-capsule="true"
-      className="pointer-events-auto relative z-20 mb-2 select-none"
+      className="pointer-events-auto relative z-20 mx-auto mb-2 w-full select-none sm:w-2/3"
     >
       {open ? (
         <div
@@ -448,7 +448,6 @@ export const StardustLiveExecutionCapsule = memo(function StardustLiveExecutionC
         </div>
       ) : null}
 
-      {/* Normal-flow minimized bar inside data-chat-composer-overlay: ResizeObserver reserves exact height so chat text is NEVER occluded */}
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}

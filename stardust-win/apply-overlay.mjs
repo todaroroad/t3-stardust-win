@@ -946,12 +946,17 @@ export const WsSubscribeServerConfigRpc =`,
 }
 
 // ---------------------------------------------------------------------------
-// 6. ChatView Enhancements (`StardustSessionStatsBar` + `StardustLiveExecutionCapsule`)
+// 6. ChatView Enhancements (`StardustSessionStatsBar` + `StardustLiveExecutionCapsule`) + Artifacts Section
 // ---------------------------------------------------------------------------
+copyAsset("stardustSemanticIcons.ts", "apps/web/src/lib/stardustSemanticIcons.ts");
 copyAsset("StardustSessionStatsBar.tsx", "apps/web/src/components/chat/StardustSessionStatsBar.tsx");
 copyAsset(
   "StardustLiveExecutionCapsule.tsx",
   "apps/web/src/components/chat/StardustLiveExecutionCapsule.tsx",
+);
+copyAsset(
+  "StardustThreadArtifactsSection.tsx",
+  "apps/web/src/components/chat/StardustThreadArtifactsSection.tsx",
 );
 
 {
@@ -1363,6 +1368,532 @@ copyAsset(
   assertIncludes(src, "onThreadContextMenu={handleThreadContextMenu}", rel);
   assertIncludes(src, "StardustAllProjectsTopWorkbench", rel);
   assertIncludes(src, 'data-project-scope-popup="true"', rel);
+
+  // 7b-2. Upgrade Sidebar.tsx with one-click semantic icon beautification & CommandPalette-aligned project modal
+  if (!src.includes("beautifyAllProjectIcons")) {
+    src = src.replace(
+      "  PlusIcon,\n  SettingsIcon,\n} from \"lucide-react\";",
+      "  PlusIcon,\n  SettingsIcon,\n  SparklesIcon,\n} from \"lucide-react\";",
+    );
+    src = src.replace(
+      'import { useProjectPin } from "../hooks/useProjectGroupUpdate";',
+      'import { useProjectGroupUpdate, useProjectPin } from "../hooks/useProjectGroupUpdate";\nimport { resolveSemanticFolderIcon } from "../lib/stardustSemanticIcons";',
+    );
+    src = src.replace(
+      "  const {\n    canPinProjectGroup: canPinProject,\n    setProjectGroupPinned,\n    toggleProjectGroupPin,\n  } = useProjectPin();",
+      `  const {
+    canPinProjectGroup: canPinProject,
+    setProjectGroupPinned,
+    toggleProjectGroupPin,
+  } = useProjectPin();
+  const { updateProjectGroup } = useProjectGroupUpdate();
+  const [isBeautifyingProjectIcons, setIsBeautifyingProjectIcons] = useState(false);
+  const beautifyAllProjectIcons = useStableCallback(async () => {
+    if (isBeautifyingProjectIcons) return;
+    setIsBeautifyingProjectIcons(true);
+    try {
+      const operableGroups = projectGroups.filter(
+        (group) =>
+          !group.archived &&
+          canPinProject(group) &&
+          group.memberProjects.every((member) => !member.faviconPath),
+      );
+      let updatedCount = 0;
+      for (const group of operableGroups) {
+        if (group.projectIcon?.kind === "emoji") continue;
+        const spec = resolveSemanticFolderIcon(group.displayName);
+        if (
+          group.projectIcon?.kind === "lucide" &&
+          group.projectIcon.name === spec.name &&
+          group.projectIcon.color === spec.color
+        ) {
+          continue;
+        }
+        const res = await updateProjectGroup(
+          group.memberProjects,
+          { projectIcon: { kind: "lucide", name: spec.name, color: spec.color } },
+          "美化项目图标失败",
+        );
+        if (res._tag === "Success") updatedCount += 1;
+      }
+      toastManager.add(
+        stackedThreadToast({
+          type: "success",
+          title:
+            updatedCount > 0
+              ? \`已按目录语义美化 \${updatedCount} 个项目图标\`
+              : "所有项目图标已是最佳语义状态",
+        }),
+      );
+    } finally {
+      setIsBeautifyingProjectIcons(false);
+    }
+  });`,
+    );
+    src = src.replace(
+      'className="w-[min(18rem,var(--available-width))] overflow-hidden"',
+      'className="w-full max-w-xl overflow-hidden"',
+    );
+    src = src.replace(
+      "                    <ComboboxSearchInput\n                      aria-label={gt(\"Search projects\")}",
+      '                    <div className="flex shrink-0 items-center gap-2 border-b border-foreground/[0.07] pr-3 [&>label]:flex-1 [&>label]:pt-2.5 [&>label]:pb-2 [&>label>div]:border-b-0 [&>label>div]:pb-0">\n                      <ComboboxSearchInput\n                        aria-label={gt("Search projects")}',
+    );
+    src = src.replace(
+      "                    <ComboboxEmpty>\n                      <T>No matching projects.</T>\n                    </ComboboxEmpty>\n                    <ComboboxList aria-multiselectable>",
+      `                      <button
+                        type="button"
+                        tabIndex={-1}
+                        disabled={isBeautifyingProjectIcons}
+                        title="根据文件夹名称自动匹配语义矢量图标并保存"
+                        onMouseDown={(event) => event.preventDefault()}
+                        onPointerDown={(event) => event.stopPropagation()}
+                        onClick={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          void beautifyAllProjectIcons();
+                        }}
+                        className="inline-flex h-7 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-foreground/[0.09] bg-foreground/[0.04] px-2.5 text-xs font-medium text-muted-foreground transition-colors duration-150 hover:bg-foreground/[0.09] hover:text-foreground active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50"
+                      >
+                        <SparklesIcon className="size-3.5 text-amber-400" />
+                        <span>{isBeautifyingProjectIcons ? "美化中…" : "一键美化"}</span>
+                      </button>
+                    </div>
+                    <ComboboxEmpty>
+                      <T>No matching projects.</T>
+                    </ComboboxEmpty>
+                    <ComboboxList scrollAreaClassName="min-h-0 flex-1" aria-multiselectable>`,
+    );
+    src = src.replace(
+      "                      }}\n                    </ComboboxList>\n                  </ComboboxPopup>",
+      `                      }}
+                    </ComboboxList>
+                    <div
+                      data-slot="command-footer"
+                      className="relative flex shrink-0 items-center justify-between gap-2 rounded-b-[calc(var(--radius-2xl)-1px)] border-t border-foreground/[0.07] bg-foreground/[0.025] px-4 py-2.5 font-sans text-xs font-medium text-muted-foreground"
+                    >
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                        <span className="inline-flex items-center gap-1">
+                          <kbd
+                            data-slot="kbd"
+                            className="pointer-events-none inline-flex h-5 min-w-5 items-center justify-center rounded bg-foreground/[0.08] px-1 font-sans text-xs font-medium text-foreground"
+                          >
+                            ↑
+                          </kbd>
+                          <kbd
+                            data-slot="kbd"
+                            className="pointer-events-none inline-flex h-5 min-w-5 items-center justify-center rounded bg-foreground/[0.08] px-1 font-sans text-xs font-medium text-foreground"
+                          >
+                            ↓
+                          </kbd>
+                          <span>移动</span>
+                        </span>
+                        <span className="inline-flex items-center gap-1.5">
+                          <kbd
+                            data-slot="kbd"
+                            className="pointer-events-none inline-flex h-5 min-w-5 items-center justify-center rounded bg-foreground/[0.08] px-1.5 font-sans text-xs font-medium text-foreground"
+                          >
+                            Enter
+                          </kbd>
+                          <span>选择</span>
+                        </span>
+                        <span className="inline-flex items-center gap-1.5">
+                          <kbd
+                            data-slot="kbd"
+                            className="pointer-events-none inline-flex h-5 min-w-5 items-center justify-center rounded bg-foreground/[0.08] px-1.5 font-sans text-xs font-medium text-foreground"
+                          >
+                            Shift+Enter
+                          </kbd>
+                          <span>多选</span>
+                        </span>
+                        <span className="inline-flex items-center gap-1.5">
+                          <kbd
+                            data-slot="kbd"
+                            className="pointer-events-none inline-flex h-5 min-w-5 items-center justify-center rounded bg-foreground/[0.08] px-1.5 font-sans text-xs font-medium text-foreground"
+                          >
+                            Esc
+                          </kbd>
+                          <span>关闭</span>
+                        </span>
+                      </div>
+                    </div>
+                  </ComboboxPopup>`,
+    );
+    writeText(rel, src);
+  }
+  assertIncludes(src, "beautifyAllProjectIcons", rel);
+  assertIncludes(src, 'className="w-full max-w-xl overflow-hidden"', rel);
+  assertIncludes(src, 'data-slot="command-footer"', rel);
+}
+
+// 7c. apps/web/src/components/ProjectFavicon.tsx -> Automatic semantic vector icons for unconfigured & CJK-monogram folders
+{
+  const rel = "apps/web/src/components/ProjectFavicon.tsx";
+  let src = readText(rel);
+  if (!src.includes("StardustSemanticIcon")) {
+    src = src.replace(
+      'import { ProjectMonogram } from "./ProjectMonogram";',
+      'import { ProjectMonogram } from "./ProjectMonogram";\nimport {\n  resolveSemanticFolderIcon,\n  StardustSemanticIcon,\n} from "../lib/stardustSemanticIcons";',
+    );
+    src = src.replace(
+      `  if (project.projectIcon?.kind === "monogram") {
+    return (
+      <ProjectMonogram
+        text={project.projectIcon.text}
+        color={project.projectIcon.color}
+        className={input.className}
+      />
+    );
+  }`,
+      `  if (project.projectIcon?.kind === "monogram") {
+    const trimmedMono = project.projectIcon.text.trim();
+    if (/^[A-Za-z0-9]{1,2}$/.test(trimmedMono) || !project.title.trim()) {
+      return (
+        <ProjectMonogram
+          text={project.projectIcon.text}
+          color={project.projectIcon.color}
+          className={input.className}
+        />
+      );
+    }
+    const spec = resolveSemanticFolderIcon(project.title);
+    return <StardustSemanticIcon name={spec.name} color={spec.color} className={input.className} />;
+  }`,
+    );
+    src = src.replace(
+      `  if (projectName && projectName.trim().length > 0) {
+    const identity = deriveProjectIdentity(projectName);
+    return (
+      <ProjectMonogram text={identity.monogram} color={identity.color} className={className} />
+    );
+  }`,
+      `  if (projectName && projectName.trim().length > 0) {
+    void deriveProjectIdentity;
+    const spec = resolveSemanticFolderIcon(projectName);
+    return <StardustSemanticIcon name={spec.name} color={spec.color} className={className} />;
+  }`,
+    );
+    writeText(rel, src);
+  }
+  assertIncludes(src, "StardustSemanticIcon", rel);
+  assertIncludes(src, "trimmedMono", rel);
+}
+
+// 7d. apps/web/src/components/chat/ThreadDetailsCard.tsx & ThreadDetailsPanel.tsx -> Inline scrollable Artifacts section
+{
+  const cardRel = "apps/web/src/components/chat/ThreadDetailsCard.tsx";
+  let cardSrc = readText(cardRel);
+  if (!cardSrc.includes("[data-thread-artifacts-list]")) {
+    assertIncludes(cardSrc, "[data-thread-details-repository-overflow]", cardRel);
+    cardSrc = cardSrc.replace(
+      "[data-thread-details-repository-overflow]",
+      "[data-thread-details-repository-overflow], [data-thread-artifacts-list]",
+    );
+    writeText(cardRel, cardSrc);
+  }
+  assertIncludes(cardSrc, "[data-thread-artifacts-list]", cardRel);
+
+  const panelRel = "apps/web/src/components/chat/ThreadDetailsPanel.tsx";
+  let panelSrc = readText(panelRel);
+  if (!panelSrc.includes("StardustThreadArtifactsSection")) {
+    assertIncludes(panelSrc, 'from "./ThreadDetailsUsage";', panelRel);
+    panelSrc = panelSrc.replace(
+      'from "./ThreadDetailsUsage";',
+      'from "./ThreadDetailsUsage";\nimport { StardustThreadArtifactsSection } from "./StardustThreadArtifactsSection";',
+    );
+    const contextAnchor =
+      "              {visible.context && props.usage.contextWindow ? (\n                <ThreadDetailsContext usage={props.usage.contextWindow} />\n              ) : null}";
+    assertIncludes(panelSrc, contextAnchor, panelRel);
+    panelSrc = panelSrc.replace(
+      contextAnchor,
+      `${contextAnchor}\n\n              {density !== "essential" ? (
+                <StardustThreadArtifactsSection
+                  environmentId={props.environmentId}
+                  threadId={props.threadId}
+                  projectId={props.projectId}
+                  gitCwd={props.gitCwd}
+                  isServerThread={props.isServerThread}
+                  isDraft={Boolean(props.draftId)}
+                />
+              ) : null}`,
+    );
+    writeText(panelRel, panelSrc);
+  }
+  assertIncludes(panelSrc, "StardustThreadArtifactsSection", panelRel);
+}
+
+// 7e. apps/web/src/components/ui/combobox.tsx -> CommandPalette-matched backdrop & 200ms modal transition for project scope popup
+{
+  const rel = "apps/web/src/components/ui/combobox.tsx";
+  let src = readText(rel);
+  if (!src.includes("DIALOG_BACKDROP_CLASS")) {
+    src = src.replace(
+      'import { cn } from "~/lib/utils";',
+      'import { cn } from "~/lib/utils";\nimport { DIALOG_BACKDROP_CLASS, DIALOG_POPUP_CLASS } from "~/components/ui/dialog-styles";',
+    );
+    assertIncludes(
+      src,
+      "  const { chipsRef, multiple } = React.use(ComboboxContext);\n  const anchor = anchorProp ?? (multiple ? chipsRef : undefined);",
+      rel,
+    );
+    src = src.replace(
+      "  const { chipsRef, multiple } = React.use(ComboboxContext);\n  const anchor = anchorProp ?? (multiple ? chipsRef : undefined);",
+      `  const { chipsRef, multiple } = React.use(ComboboxContext);
+  const anchor = anchorProp ?? (multiple ? chipsRef : undefined);
+  const isCenteredModal =
+    (props as Record<string, unknown>)["data-project-scope-popup"] === "true";
+
+  if (isCenteredModal) {
+    return (
+      <ComboboxPrimitive.Portal>
+        <ComboboxPrimitive.Backdrop
+          className={cn(DIALOG_BACKDROP_CLASS, "z-[139] data-ending-style:pointer-events-none")}
+          data-slot="combobox-backdrop"
+        />
+        <ComboboxPrimitive.Positioner
+          align={align}
+          alignOffset={alignOffset}
+          anchor={anchor}
+          collisionAvoidance={collisionAvoidance}
+          className="pointer-events-none fixed! inset-0! z-[140] flex! h-dvh! w-screen! transform-none! flex-col items-center px-4 pt-[max(1rem,4vh,calc(var(--workspace-topbar-height,48px)+0.5rem))] pb-[4vh] select-none [-webkit-app-region:no-drag] sm:pt-[max(10vh,calc(var(--workspace-topbar-height,48px)+0.5rem))] sm:pb-[10vh]"
+          data-slot="combobox-positioner"
+          side={side}
+          sideOffset={sideOffset}
+        >
+          <ComboboxPrimitive.Popup
+            className={cn(
+              DIALOG_POPUP_CLASS,
+              "pointer-events-auto max-h-105 w-full max-w-xl overflow-hidden text-foreground data-ending-style:pointer-events-none",
+              className,
+            )}
+            data-slot="combobox-popup"
+            {...props}
+          >
+            {children}
+          </ComboboxPrimitive.Popup>
+        </ComboboxPrimitive.Positioner>
+      </ComboboxPrimitive.Portal>
+    );
+  }`,
+    );
+    writeText(rel, src);
+  }
+  assertIncludes(src, "DIALOG_BACKDROP_CLASS", rel);
+  assertIncludes(src, "isCenteredModal", rel);
+}
+
+// 7f. apps/web/src/components/files/FilePreviewPanel.tsx & AttachmentFilePreview.tsx -> Default Markdown Reading View + [阅读 | 源码] switch & word count
+{
+  const rel = "apps/web/src/components/files/FilePreviewPanel.tsx";
+  let src = readText(rel);
+  if (!src.includes("countMarkdownWords")) {
+    src = src.replace(
+      'import { DownloadIcon, CopyIcon, CheckIcon, Code2Icon, EyeIcon, Table2Icon } from "lucide-react";',
+      'import {\n  BookOpenIcon,\n  DownloadIcon,\n  CopyIcon,\n  CheckIcon,\n  Code2Icon,\n  EyeIcon,\n  Table2Icon,\n} from "lucide-react";',
+    );
+    src = src.replace(
+      "  useEffect,\n  useEffectEvent,\n  useRef,",
+      "  useEffect,\n  useEffectEvent,\n  useMemo,\n  useRef,",
+    );
+    src = src.replace(
+      'const RENDER_MARKDOWN_STORAGE_KEY = "t3code.renderMarkdown";',
+      `const RENDER_MARKDOWN_STORAGE_KEY = "t3m.renderMarkdown";
+
+function countMarkdownWords(text: string | null | undefined): number | null {
+  if (!text) return null;
+  let count = 0;
+  let inLatinWord = false;
+  for (let i = 0; i < text.length; i++) {
+    const code = text.charCodeAt(i);
+    const isCjk =
+      (code >= 0x4e00 && code <= 0x9fff) ||
+      (code >= 0x3400 && code <= 0x4dbf) ||
+      (code >= 0x3040 && code <= 0x30ff) ||
+      (code >= 0xac00 && code <= 0xd7af);
+    if (isCjk) {
+      count += 1;
+      inLatinWord = false;
+    } else if (
+      (code >= 48 && code <= 57) ||
+      (code >= 65 && code <= 90) ||
+      (code >= 97 && code <= 122) ||
+      code === 95 ||
+      code === 45
+    ) {
+      if (!inLatinWord) {
+        count += 1;
+        inLatinWord = true;
+      }
+    } else {
+      inLatinWord = false;
+    }
+  }
+  return count;
+}`,
+    );
+    src = src.replace(
+      `  const [renderMarkdownPreferred, setRenderMarkdownPreferred] = useLocalStorage(
+    RENDER_MARKDOWN_STORAGE_KEY,
+    false,
+    Schema.Boolean,
+  );`,
+      `  const [renderMarkdownPreferred, setRenderMarkdownPreferred] = useLocalStorage(
+    RENDER_MARKDOWN_STORAGE_KEY,
+    true,
+    Schema.Boolean,
+  );`,
+    );
+    src = src.replace(
+      "  const setRenderedPreferred = isMermaid\n    ? setRenderMermaidPreferred\n    : isMarkdown\n      ? setRenderMarkdownPreferred\n      : tableDelimiter\n        ? setRenderTablePreferred\n        : setRenderBrowserFilePreferred;",
+      `  const setRenderedPreferred = isMermaid
+    ? setRenderMermaidPreferred
+    : isMarkdown
+      ? setRenderMarkdownPreferred
+      : tableDelimiter
+        ? setRenderTablePreferred
+        : setRenderBrowserFilePreferred;
+  const markdownWordCount = useMemo(
+    () => (isMarkdown && file.data ? countMarkdownWords(file.data.contents) : null),
+    [isMarkdown, file.data],
+  );`,
+    );
+    src = src.replace(
+      "          {canToggleRendered && renderedMode ? (\n            <FileSurfaceAction",
+      `          {canToggleRendered && renderedMode === "markdown" ? (
+            <div
+              role="group"
+              aria-label="Markdown 视图模式"
+              className="mx-1 inline-flex h-6 shrink-0 items-center rounded-md border border-border/70 bg-muted/55 p-0.5 text-[11px]"
+            >
+              <button
+                type="button"
+                aria-pressed={rendered}
+                onClick={() => {
+                  setRenderedPreferred(true);
+                  if (relativePath !== null) {
+                    setHandledReveal({ path: relativePath, requestId: revealRequestId });
+                  }
+                }}
+                className={cn(
+                  "inline-flex h-5 cursor-pointer items-center gap-1 rounded px-2 font-medium transition-colors duration-120",
+                  rendered
+                    ? "bg-background text-foreground shadow-2xs"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                <BookOpenIcon className="size-3" />
+                <span>阅读</span>
+              </button>
+              <button
+                type="button"
+                aria-pressed={!rendered}
+                onClick={() => {
+                  setRenderedPreferred(false);
+                  setHandledReveal(null);
+                }}
+                className={cn(
+                  "inline-flex h-5 cursor-pointer items-center gap-1 rounded px-2 font-medium transition-colors duration-120",
+                  !rendered
+                    ? "bg-background text-foreground shadow-2xs"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                <Code2Icon className="size-3" />
+                <span>源码</span>
+              </button>
+            </div>
+          ) : canToggleRendered && renderedMode ? (
+            <FileSurfaceAction`,
+    );
+    src = src.replace(
+      "              </DiffWorkerPoolProvider>\n            )\n          ) : null}\n        </div>\n        {showExplorer ? (",
+      `              </DiffWorkerPoolProvider>
+            )
+          ) : null}
+          {canToggleRendered && isMarkdown && file.data !== null ? (
+            <div className="flex h-7 shrink-0 items-center justify-between border-t border-border/60 bg-background/95 px-3 text-[11px] text-muted-foreground select-none">
+              <button
+                type="button"
+                title={rendered ? "切换到源码视图" : "切换到阅读视图"}
+                onClick={() => {
+                  const next = !rendered;
+                  setRenderedPreferred(next);
+                  setHandledReveal(
+                    next && relativePath !== null
+                      ? { path: relativePath, requestId: revealRequestId }
+                      : null,
+                  );
+                }}
+                className="inline-flex cursor-pointer items-center gap-1.5 rounded px-1.5 py-0.5 font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              >
+                <Code2Icon className={cn("size-3.5", !rendered && "text-primary")} />
+                <span>{rendered ? "阅读视图 · 切源码" : "源码视图 · 切阅读"}</span>
+              </button>
+              {markdownWordCount !== null ? (
+                <span className="tabular-nums">
+                  {file.data.truncated ? \`前 1MB · \${markdownWordCount.toLocaleString()} 词\` : \`\${markdownWordCount.toLocaleString()} 词\`}
+                </span>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+        {showExplorer ? (`,
+    );
+    writeText(rel, src);
+  }
+  assertIncludes(src, '"t3m.renderMarkdown"', rel);
+  assertIncludes(src, "countMarkdownWords", rel);
+  assertIncludes(src, "阅读视图 · 切源码", rel);
+
+  const attRel = "apps/web/src/components/files/AttachmentFilePreview.tsx";
+  let attSrc = readText(attRel);
+  if (!attSrc.includes('aria-label="Markdown 视图模式"')) {
+    attSrc = attSrc.replace(
+      "import {\n  ChevronRightIcon,",
+      "import {\n  BookOpenIcon,\n  ChevronRightIcon,",
+    );
+    attSrc = attSrc.replace(
+      "        {renderedMode ? (\n          <FileSurfaceAction",
+      `        {renderedMode === "markdown" ? (
+          <div
+            role="group"
+            aria-label="Markdown 视图模式"
+            className="mx-1 inline-flex h-6 shrink-0 items-center rounded-md border border-border/70 bg-muted/55 p-0.5 text-[11px]"
+          >
+            <button
+              type="button"
+              aria-pressed={rendered}
+              onClick={() => setRendered(true)}
+              className={cn(
+                "inline-flex h-5 cursor-pointer items-center gap-1 rounded px-2 font-medium transition-colors duration-120",
+                rendered
+                  ? "bg-background text-foreground shadow-2xs"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              <BookOpenIcon className="size-3" />
+              <span>阅读</span>
+            </button>
+            <button
+              type="button"
+              aria-pressed={!rendered}
+              onClick={() => setRendered(false)}
+              className={cn(
+                "inline-flex h-5 cursor-pointer items-center gap-1 rounded px-2 font-medium transition-colors duration-120",
+                !rendered
+                  ? "bg-background text-foreground shadow-2xs"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              <Code2Icon className="size-3" />
+              <span>源码</span>
+            </button>
+          </div>
+        ) : renderedMode ? (
+          <FileSurfaceAction`,
+    );
+    writeText(attRel, attSrc);
+  }
+  assertIncludes(attSrc, 'aria-label="Markdown 视图模式"', attRel);
 }
 
 // ---------------------------------------------------------------------------

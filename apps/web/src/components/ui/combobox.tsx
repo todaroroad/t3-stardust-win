@@ -3,6 +3,7 @@ import { ChevronsUpDownIcon, SearchIcon, XIcon } from "lucide-react";
 import * as React from "react";
 
 import { cn } from "~/lib/utils";
+import { DIALOG_BACKDROP_CLASS, DIALOG_POPUP_CLASS } from "~/components/ui/dialog-styles";
 import { Input } from "~/components/ui/input";
 import { ScrollArea } from "~/components/ui/scroll-area";
 
@@ -152,6 +153,41 @@ function ComboboxPopup({
 }) {
   const { chipsRef, multiple } = React.use(ComboboxContext);
   const anchor = anchorProp ?? (multiple ? chipsRef : undefined);
+  const isCenteredModal =
+    (props as Record<string, unknown>)["data-project-scope-popup"] === "true";
+
+  if (isCenteredModal) {
+    return (
+      <ComboboxPrimitive.Portal>
+        <ComboboxPrimitive.Backdrop
+          className={cn(DIALOG_BACKDROP_CLASS, "z-[139] data-ending-style:pointer-events-none")}
+          data-slot="combobox-backdrop"
+        />
+        <ComboboxPrimitive.Positioner
+          align={align}
+          alignOffset={alignOffset}
+          anchor={anchor}
+          collisionAvoidance={collisionAvoidance}
+          className="pointer-events-none fixed! inset-0! z-[140] flex! h-dvh! w-screen! transform-none! flex-col items-center px-4 pt-[max(1rem,4vh,calc(var(--workspace-topbar-height,48px)+0.5rem))] pb-[4vh] select-none [-webkit-app-region:no-drag] sm:pt-[max(10vh,calc(var(--workspace-topbar-height,48px)+0.5rem))] sm:pb-[10vh]"
+          data-slot="combobox-positioner"
+          side={side}
+          sideOffset={sideOffset}
+        >
+          <ComboboxPrimitive.Popup
+            className={cn(
+              DIALOG_POPUP_CLASS,
+              "pointer-events-auto max-h-105 w-full max-w-xl overflow-hidden text-foreground data-ending-style:pointer-events-none",
+              className,
+            )}
+            data-slot="combobox-popup"
+            {...props}
+          >
+            {children}
+          </ComboboxPrimitive.Popup>
+        </ComboboxPrimitive.Positioner>
+      </ComboboxPrimitive.Portal>
+    );
+  }
 
   return (
     <ComboboxPrimitive.Portal>

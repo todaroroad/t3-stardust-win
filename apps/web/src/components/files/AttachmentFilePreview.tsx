@@ -12,6 +12,7 @@ import {
   FILE_TEXT_PREVIEW_MAX_BYTES,
 } from "@t3tools/shared/filePreview";
 import {
+  BookOpenIcon,
   ChevronRightIcon,
   DownloadIcon,
   Trash2Icon,
@@ -429,7 +430,42 @@ export function AttachmentFilePreview(props: {
             </span>
           ) : null}
         </div>
-        {renderedMode ? (
+        {renderedMode === "markdown" ? (
+          <div
+            role="group"
+            aria-label="Markdown 视图模式"
+            className="mx-1 inline-flex h-6 shrink-0 items-center rounded-md border border-border/70 bg-muted/55 p-0.5 text-[11px]"
+          >
+            <button
+              type="button"
+              aria-pressed={rendered}
+              onClick={() => setRendered(true)}
+              className={cn(
+                "inline-flex h-5 cursor-pointer items-center gap-1 rounded px-2 font-medium transition-colors duration-120",
+                rendered
+                  ? "bg-background text-foreground shadow-2xs"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              <BookOpenIcon className="size-3" />
+              <span>阅读</span>
+            </button>
+            <button
+              type="button"
+              aria-pressed={!rendered}
+              onClick={() => setRendered(false)}
+              className={cn(
+                "inline-flex h-5 cursor-pointer items-center gap-1 rounded px-2 font-medium transition-colors duration-120",
+                !rendered
+                  ? "bg-background text-foreground shadow-2xs"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              <Code2Icon className="size-3" />
+              <span>源码</span>
+            </button>
+          </div>
+        ) : renderedMode ? (
           <FileSurfaceAction
             label={renderedToggleLabel(renderedMode, rendered, messages)}
             pressed={rendered}

@@ -11,6 +11,10 @@ import { projectFaviconUrlAtom, refreshProjectFaviconUrl } from "../state/assets
 import { deriveProjectIdentity } from "../projectIdentity";
 import { projectIconColorClassName } from "../projectIconColors";
 import { ProjectMonogram } from "./ProjectMonogram";
+import {
+  resolveSemanticFolderIcon,
+  StardustSemanticIcon,
+} from "../lib/stardustSemanticIcons";
 import { cn } from "~/lib/utils";
 
 // All lucide icons load as one chunk, only once a project uses a lucide override.
@@ -39,13 +43,18 @@ export function ProjectFavicon(input: {
 }) {
   const { project } = input;
   if (project.projectIcon?.kind === "monogram") {
-    return (
-      <ProjectMonogram
-        text={project.projectIcon.text}
-        color={project.projectIcon.color}
-        className={input.className}
-      />
-    );
+    const trimmedMono = project.projectIcon.text.trim();
+    if (/^[A-Za-z0-9]{1,2}$/.test(trimmedMono) || !project.title.trim()) {
+      return (
+        <ProjectMonogram
+          text={project.projectIcon.text}
+          color={project.projectIcon.color}
+          className={input.className}
+        />
+      );
+    }
+    const spec = resolveSemanticFolderIcon(project.title);
+    return <StardustSemanticIcon name={spec.name} color={spec.color} className={input.className} />;
   }
   if (project.projectIcon?.kind === "emoji") {
     return (
@@ -128,10 +137,9 @@ function ProjectFaviconFallback({
   readonly projectName?: string | undefined;
 }) {
   if (projectName && projectName.trim().length > 0) {
-    const identity = deriveProjectIdentity(projectName);
-    return (
-      <ProjectMonogram text={identity.monogram} color={identity.color} className={className} />
-    );
+    void deriveProjectIdentity;
+    const spec = resolveSemanticFolderIcon(projectName);
+    return <StardustSemanticIcon name={spec.name} color={spec.color} className={className} />;
   }
 
   if (emoji) {

@@ -2,7 +2,7 @@ import type { ThreadStructure } from "@t3tools/client-runtime/state/shell";
 import { orchestrationV2RunWorkStartedAt, type OrchestrationV2RunStatus } from "@t3tools/contracts";
 import * as DateTime from "effect/DateTime";
 import { useLocale } from "gt-react";
-import { memo, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { memo, useEffect, useState } from "react";
 
 import { Popover, PopoverPopup, PopoverTitle, PopoverTrigger } from "../ui/popover";
 
@@ -48,6 +48,7 @@ function computeTurnModelDuration(
   toolMs = Math.min(durationMs, toolMs);
   return { durationMs, toolMs, modelMs: Math.max(0, durationMs - toolMs) };
 }
+
 const RESPONSE_ITEMS = new Set(["assistant_message", "reasoning", "proposed_plan", ...TOOL_ITEMS]);
 const TERMINAL_STATUSES = new Set<OrchestrationV2RunStatus>([
   "completed",
@@ -211,17 +212,6 @@ function formatStatDuration(ms: number, isZh: boolean, compact = false) {
   return isZh ? `${hours}时${remMins}分` : `${hours}h ${remMins}m`;
 }
 
-function positionStatsDockPill(pill: HTMLElement | null, btn: HTMLElement | null) {
-  if (!pill) return;
-  if (!btn) {
-    pill.style.opacity = "0";
-    return;
-  }
-  pill.style.opacity = "1";
-  pill.style.width = `${btn.offsetWidth}px`;
-  pill.style.transform = `translateX(${btn.offsetLeft}px)`;
-}
-
 export const StardustSessionStatsBar = memo(function StardustSessionStatsBar({
   projection,
   disconnected,
@@ -231,9 +221,7 @@ export const StardustSessionStatsBar = memo(function StardustSessionStatsBar({
 }) {
   const locale = useLocale();
   const isZh = locale.startsWith("zh");
-  const [open, setOpen] = useState<"session" | "tokens" | null>(null);
-  const clusterRef = useRef<HTMLDivElement>(null);
-  const dockPillRef = useRef<HTMLDivElement>(null);
+  const [open, setOpen] = useState(false);
 
   const stats = projection ? selectSessionStats(projection) : null;
   const current = stats?.current ?? null;
@@ -247,18 +235,6 @@ export const StardustSessionStatsBar = memo(function StardustSessionStatsBar({
     const id = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(id);
   }, [isTicking]);
-
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- syncs hover/open pill geometry
-  useLayoutEffect(() => {
-    if (!open) {
-      positionStatsDockPill(dockPillRef.current, null);
-      return;
-    }
-    const target = clusterRef.current?.querySelector<HTMLElement>(
-      `[data-t3m-stats-trig="${open}"]`,
-    );
-    positionStatsDockPill(dockPillRef.current, target ?? null);
-  }, [open]);
 
   if (!stats || (stats.runCount === 0 && !stats.usageReported)) return null;
 
@@ -306,7 +282,7 @@ export const StardustSessionStatsBar = memo(function StardustSessionStatsBar({
     }
   };
 
-  const leftSummary =
+  const sessionSummary =
     current === null
       ? [`${roundsText} ${stepsText(stats.steps)}`, rateText].filter(Boolean).join(" · ")
       : [
@@ -316,77 +292,76 @@ export const StardustSessionStatsBar = memo(function StardustSessionStatsBar({
           formatStatDuration(now - current.startMs, isZh, true),
         ].join(" · ");
 
-  const rightSummary = [
-    stats.inputTokens === null && stats.outputTokens === null
-      ? notReported
-      : isZh
-        ? `${formatTokenCount(total)} 令牌`
-        : `${formatTokenCount(total)} tok`,
-    cacheCompact,
-  ]
-    .filter(Boolean)
-    .join(" · ");
+  const tokenSummary = stats.usageReported
+    ? [
+        stats.inputTokens === null && stats.outputTokens === null
+          ? null
+          : isZh
+            ? `${formatTokenCount(total)} 令牌`
+            : `${formatTokenCount(total)} tok`,
+        cacheCompact,
+      ]
+        .filter(Boolean)
+        .join(" · ")
+    : current !== null
+      ? isZh
+        ? "本轮结束后统计"
+        : "Reported after turn"
+      : "";
+
+  const unifiedSummary = [sessionSummary, tokenSummary].filter(Boolean).join(" · ");
 
   return (
     <div
       data-t3m-stats-bar
       className="pointer-events-auto flex items-center justify-center pt-1.5 select-none"
     >
-      <div
-        ref={clusterRef}
-        onMouseLeave={() => {
-          if (!open) positionStatsDockPill(dockPillRef.current, null);
-        }}
-        className="relative inline-flex max-w-full items-center gap-0.5 rounded-full border border-border/55 bg-background/75 p-0.5 text-[11.5px] leading-none text-muted-foreground shadow-xs backdrop-blur-md"
-      >
-        <div
-          ref={dockPillRef}
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-y-0.5 left-0 rounded-full bg-muted/85 opacity-0 transition-[transform,width,opacity] duration-180 ease-out"
-        />
-
-        <Popover
-          open={open === "session"}
-          onOpenChange={(next) => setOpen(next ? "session" : null)}
-        >
-          <PopoverTrigger
-            openOnHover
-            delay={120}
-            render={
-              <button
-                type="button"
-                data-t3m-stats-trig="session"
-                onMouseEnter={(e) => positionStatsDockPill(dockPillRef.current, e.currentTarget)}
-                className="relative z-10 inline-flex h-6 cursor-pointer items-center gap-1.5 rounded-full px-2.5 font-medium whitespace-nowrap text-muted-foreground transition-colors hover:text-foreground data-[popup-open]:text-foreground"
-              />
-            }
-          >
-            <span
-              aria-hidden="true"
-              className={
-                current !== null
-                  ? "size-1.5 shrink-0 animate-pulse rounded-full bg-sky-400 shadow-[0_0_6px_rgba(56,189,248,0.85)]"
-                  : "size-1.5 shrink-0 rounded-full bg-emerald-500 shadow-[0_0_5px_rgba(16,185,129,0.75)]"
-              }
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger
+          render={
+            <button
+              type="button"
+              data-t3m-stats-trig="unified"
+              className="inline-flex h-6.5 max-w-full cursor-pointer items-center gap-2 rounded-full border border-border/55 bg-background/78 px-3 text-[11.5px] leading-none font-medium whitespace-nowrap text-muted-foreground shadow-xs backdrop-blur-md transition-[color,background-color,border-color,transform] duration-150 hover:border-border hover:bg-muted/55 hover:text-foreground active:scale-[0.985] data-[popup-open]:border-border data-[popup-open]:bg-muted/70 data-[popup-open]:text-foreground"
             />
-            <span className="truncate tabular-nums">{leftSummary}</span>
-          </PopoverTrigger>
-          <PopoverPopup side="top" align="center" sideOffset={10} className="w-76 rounded-2xl p-3.5">
-            <div className="space-y-2.5 text-xs">
+          }
+        >
+          <span
+            aria-hidden="true"
+            className={
+              current !== null
+                ? "size-1.5 shrink-0 animate-pulse rounded-full bg-sky-400 shadow-[0_0_6px_rgba(56,189,248,0.85)]"
+                : "size-1.5 shrink-0 rounded-full bg-emerald-500 shadow-[0_0_5px_rgba(16,185,129,0.75)]"
+            }
+          />
+          <span className="truncate tabular-nums">{unifiedSummary}</span>
+        </PopoverTrigger>
+
+        <PopoverPopup side="top" align="center" sideOffset={10} className="w-82 rounded-2xl p-4">
+          <div className="space-y-3.5 text-xs">
+            {/* Section 1: Session Overview */}
+            <div className="space-y-2.5">
               <div className="flex items-center justify-between gap-2">
                 <PopoverTitle className="text-[13px] font-semibold text-foreground">
                   {isZh ? "会话概览" : "Session overview"}
                 </PopoverTitle>
-                <span className="inline-flex h-5 items-center rounded-full bg-emerald-500/15 px-2 text-[11px] font-semibold text-emerald-400">
-                  {isZh ? "精简 3 层" : "3-layer summary"}
+                <span className="inline-flex h-5 items-center rounded-full bg-emerald-500/15 px-2 text-[11px] font-semibold text-emerald-400 tabular-nums">
+                  {busyMs > 0
+                    ? isZh
+                      ? `总耗时 ${formatStatDuration(busyMs, true)}`
+                      : `Total ${formatStatDuration(busyMs, false)}`
+                    : isZh
+                      ? `${stats.runCount} 次运行`
+                      : `${stats.runCount} runs`}
                 </span>
               </div>
-              <div className="grid grid-cols-2 gap-3 border-b border-border/60 pb-2.5">
+
+              <div className="grid grid-cols-2 gap-3">
                 <div>
                   <div className="text-[11px] text-muted-foreground">
                     {isZh ? "轮次与步骤" : "Rounds & steps"}
                   </div>
-                  <div className="mt-0.5 text-lg font-bold text-foreground tabular-nums">
+                  <div className="mt-0.5 text-base font-bold text-foreground tabular-nums">
                     {stats.turns}{" "}
                     <small className="text-[11px] font-medium text-muted-foreground">
                       {isZh ? `轮 · ${stats.steps} 步` : `rounds · ${stats.steps} steps`}
@@ -395,9 +370,9 @@ export const StardustSessionStatsBar = memo(function StardustSessionStatsBar({
                 </div>
                 <div>
                   <div className="text-[11px] text-muted-foreground">
-                    {isZh ? "平均速率" : "Avg speed"}
+                    {isZh ? "平均输出速率" : "Avg speed"}
                   </div>
-                  <div className="mt-0.5 text-lg font-bold text-foreground tabular-nums">
+                  <div className="mt-0.5 text-base font-bold text-foreground tabular-nums">
                     {rateNumber === null ? (
                       <small className="text-xs font-medium text-muted-foreground">
                         {notRecorded}
@@ -406,112 +381,101 @@ export const StardustSessionStatsBar = memo(function StardustSessionStatsBar({
                       <>
                         {rateNumber}{" "}
                         <small className="text-[11px] font-medium text-muted-foreground">
-                          {isZh ? "/秒" : "tok/s"}
+                          {isZh ? "令牌/秒" : "tok/s"}
                         </small>
                       </>
                     )}
                   </div>
                 </div>
               </div>
-              <div className="flex items-center justify-between gap-2 text-[11.5px] text-muted-foreground tabular-nums">
-                {modelPct !== null && toolPct !== null ? (
-                  <>
-                    <span>{isZh ? `模型思考 ${modelPct}%` : `Model ${modelPct}%`}</span>
-                    <span>{isZh ? `工具执行 ${toolPct}%` : `Tools ${toolPct}%`}</span>
-                  </>
-                ) : (
-                  <span>
-                    {isZh ? `累计工具调用 ${stats.steps} 次` : `${stats.steps} tool calls`}
-                  </span>
-                )}
-              </div>
-            </div>
-          </PopoverPopup>
-        </Popover>
 
-        {stats.usageReported ? (
-          <>
-            <span aria-hidden="true" className="mx-0.5 h-3 w-px shrink-0 bg-border/70" />
-            <Popover
-              open={open === "tokens"}
-              onOpenChange={(next) => setOpen(next ? "tokens" : null)}
-            >
-              <PopoverTrigger
-                openOnHover
-                delay={120}
-                render={
-                  <button
-                    type="button"
-                    data-t3m-stats-trig="tokens"
-                    onMouseEnter={(e) =>
-                      positionStatsDockPill(dockPillRef.current, e.currentTarget)
-                    }
-                    className="relative z-10 inline-flex h-6 cursor-pointer items-center gap-1 rounded-full px-2.5 font-medium whitespace-nowrap text-muted-foreground transition-colors hover:text-foreground data-[popup-open]:text-foreground"
-                  />
-                }
-              >
-                <span className="truncate tabular-nums">{rightSummary}</span>
-              </PopoverTrigger>
-              <PopoverPopup
-                side="top"
-                align="center"
-                sideOffset={10}
-                className="w-76 rounded-2xl p-3.5"
-              >
-                <div className="space-y-2.5 text-xs">
-                  <div className="flex items-center justify-between gap-2">
-                    <PopoverTitle className="text-[13px] font-semibold text-foreground">
-                      {isZh ? "令牌与缓存" : "Tokens & cache"}
-                    </PopoverTitle>
-                    {cacheHitPercent !== null ? (
-                      <span className="inline-flex h-5 items-center rounded-full bg-blue-500/15 px-2 text-[11px] font-semibold text-blue-400 tabular-nums">
-                        {isZh ? `命中 ${cacheHitPercent}%` : `Hit ${cacheHitPercent}%`}
-                      </span>
-                    ) : null}
+              {modelPct !== null && toolPct !== null ? (
+                <div className="space-y-1">
+                  <div className="flex h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                    <div
+                      className="bg-sky-400 transition-all duration-200"
+                      style={{ width: `${modelPct}%` }}
+                    />
+                    <div
+                      className="bg-emerald-400 transition-all duration-200"
+                      style={{ width: `${toolPct}%` }}
+                    />
                   </div>
-                  <div className="grid grid-cols-2 gap-3 border-b border-border/60 pb-2.5">
-                    <div>
-                      <div className="text-[11px] text-muted-foreground">
-                        {isZh ? "总计" : "Total"}
-                      </div>
-                      <div className="mt-0.5 text-lg font-bold text-foreground tabular-nums">
-                        {totalText}
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-[11px] text-muted-foreground">
-                        {isZh ? "缓存读取" : "Cache read"}
-                      </div>
-                      <div className="mt-0.5 text-lg font-bold text-foreground tabular-nums">
-                        {cachedReadText}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between gap-2 text-[11.5px] text-muted-foreground tabular-nums">
+                  <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground tabular-nums">
                     <span>
-                      {isZh ? "输入 " : "In "}
-                      {stats.inputTokens === null ? notReported : formatTokenCount(stats.inputTokens)}
+                      {isZh
+                        ? `模型思考 ${modelPct}% (${formatStatDuration(stats.modelMs, true)})`
+                        : `Model ${modelPct}% (${formatStatDuration(stats.modelMs, false)})`}
                     </span>
                     <span>
-                      {isZh ? "输出 " : "Out "}
-                      {stats.outputTokens === null
-                        ? notReported
-                        : formatTokenCount(stats.outputTokens)}
+                      {isZh
+                        ? `工具执行 ${toolPct}% (${formatStatDuration(stats.toolMs, true)})`
+                        : `Tools ${toolPct}% (${formatStatDuration(stats.toolMs, false)})`}
                     </span>
                   </div>
                 </div>
-              </PopoverPopup>
-            </Popover>
-          </>
-        ) : current !== null ? (
-          <>
-            <span aria-hidden="true" className="mx-0.5 h-3 w-px shrink-0 bg-border/70" />
-            <span className="px-2 text-[11px] text-muted-foreground/80">
-              {isZh ? "本轮结束后统计" : "Reported after turn"}
-            </span>
-          </>
-        ) : null}
-      </div>
+              ) : (
+                <div className="text-[11px] text-muted-foreground tabular-nums">
+                  {isZh ? `累计工具调用 ${stats.steps} 次` : `${stats.steps} tool calls`}
+                </div>
+              )}
+            </div>
+
+            {/* Divider */}
+            <div className="border-t border-border/60" />
+
+            {/* Section 2: Tokens & Cache */}
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-[13px] font-semibold text-foreground">
+                  {isZh ? "令牌与缓存" : "Tokens & cache"}
+                </div>
+                {cacheHitPercent !== null ? (
+                  <span className="inline-flex h-5 items-center rounded-full bg-sky-500/15 px-2 text-[11px] font-semibold text-sky-400 tabular-nums">
+                    {isZh ? `缓存命中 ${cacheHitPercent}%` : `Cache hit ${cacheHitPercent}%`}
+                  </span>
+                ) : null}
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <div className="text-[11px] text-muted-foreground">
+                    {isZh ? "总计消耗" : "Total tokens"}
+                  </div>
+                  <div className="mt-0.5 text-base font-bold text-foreground tabular-nums">
+                    {totalText}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[11px] text-muted-foreground">
+                    {isZh ? "缓存读取" : "Cache read"}
+                  </div>
+                  <div className="mt-0.5 text-base font-bold text-foreground tabular-nums">
+                    {cachedReadText}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between gap-2 rounded-lg bg-muted/40 px-2.5 py-1.5 text-[11px] text-muted-foreground tabular-nums">
+                <span>
+                  {isZh ? "总输入：" : "Input: "}
+                  <strong className="font-semibold text-foreground">
+                    {stats.inputTokens === null ? notReported : formatTokenCount(stats.inputTokens)}
+                  </strong>
+                </span>
+                <span>
+                  {isZh ? "总输出：" : "Output: "}
+                  <strong className="font-semibold text-foreground">
+                    {stats.outputTokens === null
+                      ? notReported
+                      : formatTokenCount(stats.outputTokens)}
+                  </strong>
+                </span>
+              </div>
+            </div>
+          </div>
+        </PopoverPopup>
+      </Popover>
     </div>
   );
 });

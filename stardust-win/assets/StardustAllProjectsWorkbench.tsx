@@ -28,6 +28,10 @@ import {
 } from "react";
 
 import { cn } from "~/lib/utils";
+import {
+  resolveSemanticCategoryIcon,
+  StardustSemanticIcon,
+} from "~/lib/stardustSemanticIcons";
 import { serverEnvironment } from "~/state/server";
 import { useUiStateStore } from "~/uiStateStore";
 import { resolveThreadLastVisitedAt, resolveWorkingStartedAt } from "../Sidebar.logic";
@@ -125,13 +129,6 @@ function formatElapsedMinutes(startedAt: string | null | undefined, now: number)
   if (mins < 60) return `已运行 ${mins} 分`;
   const hrs = Math.floor(mins / 60);
   return `已运行 ${hrs} 时 ${mins % 60} 分`;
-}
-
-function pickCategoryGlyph(label: string): string {
-  const trimmed = label.trim();
-  if (!trimmed) return "类";
-  const ch = [...trimmed][0] ?? "类";
-  return /^[a-z]$/i.test(ch) ? ch.toUpperCase() : ch;
 }
 
 function eventContextMenuSource(event: ReactMouseEvent): ContextMenuSource {
@@ -965,6 +962,7 @@ export const StardustAllProjectsCategories = memo(function StardustAllProjectsCa
             (t) => scopedThreadKey(scopeThreadRef(t.environmentId, t.id)) === routeRowThreadKey,
           );
         const isCollapsed = collapsedSet.has(sec.id);
+        const catIcon = resolveSemanticCategoryIcon(sec.label, sec.id);
         return (
           <li key={`cat-sec:${sec.id}`} className="list-none">
             <button
@@ -983,8 +981,12 @@ export const StardustAllProjectsCategories = memo(function StardustAllProjectsCa
                   isCollapsed && "-rotate-90",
                 )}
               />
-              <span className="inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-sidebar-foreground/10 text-[11px] font-semibold text-sidebar-foreground/90">
-                {pickCategoryGlyph(sec.label)}
+              <span className="inline-flex size-5 shrink-0 items-center justify-center rounded-md bg-sidebar-foreground/[0.08]">
+                <StardustSemanticIcon
+                  name={catIcon.name}
+                  color={catIcon.color}
+                  className="size-3.5"
+                />
               </span>
               <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{sec.label}</span>
               {isCollapsed && sec.hasRunning ? (
@@ -1015,18 +1017,27 @@ export const StardustAllProjectsCategories = memo(function StardustAllProjectsCa
       {emptyCategories.length > 0 ? (
         <li className="list-none pt-1 pb-2 select-none">
           <div className="flex flex-col gap-0.5">
-            {emptyCategories.map((cat) => (
-              <button
-                key={`cat-empty:${cat.id}`}
-                type="button"
-                onClick={() => setCategorySettingsDialogOpen(true)}
-                title="暂无匹配会话 · 点击管理分类关键词"
-                className="flex h-7 w-full cursor-pointer items-center gap-2.5 rounded-md px-2.5 text-left text-[12.5px] text-sidebar-muted-foreground/80 transition-colors hover:bg-sidebar-row-hover hover:text-sidebar-foreground"
-              >
-                <span className="size-2 shrink-0 rounded-full bg-sidebar-muted-foreground/45" />
-                <span className="min-w-0 truncate">{cat.label}</span>
-              </button>
-            ))}
+            {emptyCategories.map((cat) => {
+              const catIcon = resolveSemanticCategoryIcon(cat.label, cat.id);
+              return (
+                <button
+                  key={`cat-empty:${cat.id}`}
+                  type="button"
+                  onClick={() => setCategorySettingsDialogOpen(true)}
+                  title="暂无匹配会话 · 点击管理分类关键词"
+                  className="flex h-7 w-full cursor-pointer items-center gap-2 rounded-md px-2 text-left text-[12.5px] text-sidebar-muted-foreground/80 transition-colors hover:bg-sidebar-row-hover hover:text-sidebar-foreground"
+                >
+                  <span className="inline-flex size-4.5 shrink-0 items-center justify-center rounded bg-sidebar-foreground/[0.06] opacity-75">
+                    <StardustSemanticIcon
+                      name={catIcon.name}
+                      color={catIcon.color}
+                      className="size-3"
+                    />
+                  </span>
+                  <span className="min-w-0 truncate">{cat.label}</span>
+                </button>
+              );
+            })}
           </div>
         </li>
       ) : null}

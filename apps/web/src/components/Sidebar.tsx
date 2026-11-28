@@ -86,6 +86,7 @@ import {
   FolderPlusIcon,
   PlusIcon,
   SettingsIcon,
+  SparklesIcon,
 } from "lucide-react";
 import {
   useEffect,
@@ -143,7 +144,8 @@ import {
 } from "../hooks/useThreadActions";
 import { useHandleNewThread } from "../hooks/useHandleNewThread";
 import { useOrderWhileOpen } from "../hooks/useOrderWhileOpen";
-import { useProjectPin } from "../hooks/useProjectGroupUpdate";
+import { useProjectGroupUpdate, useProjectPin } from "../hooks/useProjectGroupUpdate";
+import { resolveSemanticFolderIcon } from "../lib/stardustSemanticIcons";
 import { useSidebarProjectGroups } from "../hooks/useSidebarProjectGroups";
 import { isCommandPaletteOpen, openCommandPalette } from "../commandPaletteBus";
 import { registerSettleAndAdvance } from "../settleAndAdvance";
@@ -1284,6 +1286,49 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     setProjectGroupPinned,
     toggleProjectGroupPin,
   } = useProjectPin();
+  const { updateProjectGroup } = useProjectGroupUpdate();
+  const [isBeautifyingProjectIcons, setIsBeautifyingProjectIcons] = useState(false);
+  const beautifyAllProjectIcons = useStableCallback(async () => {
+    if (isBeautifyingProjectIcons) return;
+    setIsBeautifyingProjectIcons(true);
+    try {
+      const operableGroups = projectGroups.filter(
+        (group) =>
+          !group.archived &&
+          canPinProject(group) &&
+          group.memberProjects.every((member) => !member.faviconPath),
+      );
+      let updatedCount = 0;
+      for (const group of operableGroups) {
+        if (group.projectIcon?.kind === "emoji") continue;
+        const spec = resolveSemanticFolderIcon(group.displayName);
+        if (
+          group.projectIcon?.kind === "lucide" &&
+          group.projectIcon.name === spec.name &&
+          group.projectIcon.color === spec.color
+        ) {
+          continue;
+        }
+        const res = await updateProjectGroup(
+          group.memberProjects,
+          { projectIcon: { kind: "lucide", name: spec.name, color: spec.color } },
+          "美化项目图标失败",
+        );
+        if (res._tag === "Success") updatedCount += 1;
+      }
+      toastManager.add(
+        stackedThreadToast({
+          type: "success",
+          title:
+            updatedCount > 0
+              ? `已按目录语义美化 ${updatedCount} 个项目图标`
+              : "所有项目图标已是最佳语义状态",
+        }),
+      );
+    } finally {
+      setIsBeautifyingProjectIcons(false);
+    }
+  });
   const handleProjectSettings = useStableCallback(
     (
       event: ReactMouseEvent<HTMLElement> | ReactKeyboardEvent<HTMLInputElement>,
@@ -3220,12 +3265,13 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                     data-project-scope-popup="true"
                     align="start"
                     collisionAvoidance={{ side: "flip", align: "shift" }}
-                    className="w-[min(18rem,var(--available-width))] overflow-hidden"
+                    className="w-full max-w-xl overflow-hidden"
                     finalFocus={(closeType) => closeType === "keyboard"}
                     render={<TooltipScrollDismissArea holdPositionOnExit />}
                   >
-                    <ComboboxSearchInput
-                      aria-label={gt("Search projects")}
+                    <div className="flex shrink-0 items-center gap-2 border-b border-foreground/[0.07] pr-3 [&>label]:flex-1 [&>label]:pt-2.5 [&>label]:pb-2 [&>label>div]:border-b-0 [&>label>div]:pb-0">
+                      <ComboboxSearchInput
+                        aria-label={gt("Search projects")}
                       placeholder={gt("Search projects...")}
                       value={projectScopeMenuState.query}
                       onKeyDown={(event) => {
@@ -3271,10 +3317,28 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                         })
                       }
                     />
+                      <button
+                        type="button"
+                        tabIndex={-1}
+                        disabled={isBeautifyingProjectIcons}
+                        title="根据文件夹名称自动匹配语义矢量图标并保存"
+                        onMouseDown={(event) => event.preventDefault()}
+                        onPointerDown={(event) => event.stopPropagation()}
+                        onClick={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          void beautifyAllProjectIcons();
+                        }}
+                        className="inline-flex h-7 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-foreground/[0.09] bg-foreground/[0.04] px-2.5 text-xs font-medium text-muted-foreground transition-colors duration-150 hover:bg-foreground/[0.09] hover:text-foreground active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50"
+                      >
+                        <SparklesIcon className="size-3.5 text-amber-400" />
+                        <span>{isBeautifyingProjectIcons ? "美化中…" : "一键美化"}</span>
+                      </button>
+                    </div>
                     <ComboboxEmpty>
                       <T>No matching projects.</T>
                     </ComboboxEmpty>
-                    <ComboboxList aria-multiselectable>
+                    <ComboboxList scrollAreaClassName="min-h-0 flex-1" aria-multiselectable>
                       {(item: (typeof projectScopeItems)[number]) => {
                         if (item.value === ADD_PROJECT_SCOPE_ITEM_VALUE) {
                           return (
@@ -3358,6 +3422,55 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                         );
                       }}
                     </ComboboxList>
+                    <div
+                      data-slot="command-footer"
+                      className="relative flex shrink-0 items-center justify-between gap-2 rounded-b-[calc(var(--radius-2xl)-1px)] border-t border-foreground/[0.07] bg-foreground/[0.025] px-4 py-2.5 font-sans text-xs font-medium text-muted-foreground"
+                    >
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                        <span className="inline-flex items-center gap-1">
+                          <kbd
+                            data-slot="kbd"
+                            className="pointer-events-none inline-flex h-5 min-w-5 items-center justify-center rounded bg-foreground/[0.08] px-1 font-sans text-xs font-medium text-foreground"
+                          >
+                            ↑
+                          </kbd>
+                          <kbd
+                            data-slot="kbd"
+                            className="pointer-events-none inline-flex h-5 min-w-5 items-center justify-center rounded bg-foreground/[0.08] px-1 font-sans text-xs font-medium text-foreground"
+                          >
+                            ↓
+                          </kbd>
+                          <span>移动</span>
+                        </span>
+                        <span className="inline-flex items-center gap-1.5">
+                          <kbd
+                            data-slot="kbd"
+                            className="pointer-events-none inline-flex h-5 min-w-5 items-center justify-center rounded bg-foreground/[0.08] px-1.5 font-sans text-xs font-medium text-foreground"
+                          >
+                            Enter
+                          </kbd>
+                          <span>选择</span>
+                        </span>
+                        <span className="inline-flex items-center gap-1.5">
+                          <kbd
+                            data-slot="kbd"
+                            className="pointer-events-none inline-flex h-5 min-w-5 items-center justify-center rounded bg-foreground/[0.08] px-1.5 font-sans text-xs font-medium text-foreground"
+                          >
+                            Shift+Enter
+                          </kbd>
+                          <span>多选</span>
+                        </span>
+                        <span className="inline-flex items-center gap-1.5">
+                          <kbd
+                            data-slot="kbd"
+                            className="pointer-events-none inline-flex h-5 min-w-5 items-center justify-center rounded bg-foreground/[0.08] px-1.5 font-sans text-xs font-medium text-foreground"
+                          >
+                            Esc
+                          </kbd>
+                          <span>关闭</span>
+                        </span>
+                      </div>
+                    </div>
                   </ComboboxPopup>
                 </Combobox>
               }
