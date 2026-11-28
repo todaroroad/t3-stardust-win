@@ -1,13 +1,53 @@
 import type { ThreadStructure } from "@t3tools/client-runtime/state/shell";
 import { orchestrationV2RunWorkStartedAt, type OrchestrationV2RunStatus } from "@t3tools/contracts";
-import { TURN_TOOL_ITEM_TYPES, computeTurnModelDuration } from "@t3tools/shared/usageMerge";
 import * as DateTime from "effect/DateTime";
 import { useLocale } from "gt-react";
 import { memo, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { Popover, PopoverPopup, PopoverTitle, PopoverTrigger } from "../ui/popover";
 
-const TOOL_ITEMS = TURN_TOOL_ITEM_TYPES;
+const TOOL_ITEMS = new Set<string>([
+  "command_execution",
+  "file_change",
+  "file_search",
+  "web_search",
+  "subagent",
+  "dynamic_tool",
+  "mcp_tool_call",
+]);
+
+function computeTurnModelDuration(
+  turnStartMs: number,
+  turnEndMs: number,
+  intervals: ReadonlyArray<readonly [number, number]>,
+) {
+  const durationMs = Math.max(0, turnEndMs - turnStartMs);
+  if (durationMs === 0 || intervals.length === 0) {
+    return { durationMs, toolMs: 0, modelMs: durationMs };
+  }
+  const clamped = intervals
+    .map(([s, e]) => [Math.max(turnStartMs, s), Math.min(turnEndMs, e)] as const)
+    .filter(([s, e]) => e > s)
+    .toSorted((a, b) => a[0] - b[0]);
+  let toolMs = 0;
+  let curStart = -1;
+  let curEnd = -1;
+  for (const [s, e] of clamped) {
+    if (curStart < 0) {
+      curStart = s;
+      curEnd = e;
+    } else if (s <= curEnd) {
+      curEnd = Math.max(curEnd, e);
+    } else {
+      toolMs += curEnd - curStart;
+      curStart = s;
+      curEnd = e;
+    }
+  }
+  if (curStart >= 0) toolMs += curEnd - curStart;
+  toolMs = Math.min(durationMs, toolMs);
+  return { durationMs, toolMs, modelMs: Math.max(0, durationMs - toolMs) };
+}
 const RESPONSE_ITEMS = new Set(["assistant_message", "reasoning", "proposed_plan", ...TOOL_ITEMS]);
 const TERMINAL_STATUSES = new Set<OrchestrationV2RunStatus>([
   "completed",
